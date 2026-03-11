@@ -1,23 +1,54 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;; **********************************************************************
-;;;
 ;;; This file contains an interface to internet domain sockets.
 ;;;
-;;; Written by William Lott.
-;;;
+
+(in-package :cl-user)
+
+(defpackage :hemlock.wire
+  (:use :common-lisp)
+  (:nicknames :wire)
+  (:export
+   #:remote-object-p #:remote-object #:remote-object-local-p
+   #:remote-object-eq #:remote-object-value
+   #:make-remote-object #:forget-remote-translation
+   #:make-wire #:wire-p #:wire-fd #:wire-listen
+   #:wire-get-byte #:wire-get-number #:wire-get-string #:wire-get-object
+   #:wire-force-output
+   #:wire-output-byte #:wire-output-number #:wire-output-string
+   #:wire-output-object #:wire-output-funcall
+   #:wire-read-frame
+   #:wire-send-handshake #:wire-receive-handshake
+   #:wire-error #:wire-eof #:wire-io-error #:*current-wire*
+   #:wire-get-bignum #:wire-output-bignum
+   #:+protocol-version+ #:+wire-magic+
+   #:remote #:remote-value #:remote-value-bind
+   #:create-request-server #:destroy-request-server
+   #:device #:stream-device #:make-stream-device
+   #:device-wire #:device-append-to-input-buffer
+   #:device-read #:device-listen #:device-write #:device-close
+   #:device-serve-requests
+   #:dispatch-events #:dispatch-events-no-hang))
 
 (in-package :hemlock.wire)
 
-;;; Stuff that needs to be ported:
+;;; See doc/wire-protocol.md for the full protocol specification.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant +buffer-size+ 2048)
+  ;; I/O buffer sizes. 64KB is large enough for any realistic funcall payload.
+  (defconstant +buffer-size+ 65536)
   (defconstant +initial-cache-size+ 16)
+
+  ;; Protocol version for the version handshake sent at connection open.
+  (defconstant +protocol-version+ 1)
+  (defconstant +wire-magic+
+    (logior (ash (char-code #\H) 24)
+            (ash (char-code #\E) 16)
+            (ash (char-code #\M)  8)
+                 (char-code #\L))
+    "Magic bytes sent as the first 4 bytes of every new connection: ASCII 'HEML'.")
+
+  ;; Funcall opcodes: 0-5 encode arg count inline, 6 uses an explicit count byte.
   (defconstant +funcall0-op+ 0)
   (defconstant +funcall1-op+ 1)
   (defconstant +funcall2-op+ 2)
@@ -25,6 +56,7 @@
   (defconstant +funcall4-op+ 4)
   (defconstant +funcall5-op+ 5)
   (defconstant +funcall-op+ 6)
+  ;; Value opcodes.
   (defconstant +number-op+ 7)
   (defconstant +string-op+ 8)
   (defconstant +symbol-op+ 9)
@@ -53,6 +85,8 @@
 (defstruct device
   (wire nil))
 
+(defgeneric device-listen (device))
+
 (defstruct (stream-device
              (:include device)
              (:conc-name device-)
@@ -63,8 +97,37 @@
   (print-unreadable-object (object stream)
     (format stream "~A" (device-stream object))))
 
+;;; Vector device: used as a staging buffer when encoding framed messages.
+;;; wire-output-funcall writes the funcall body here, measures the length,
+;;; then writes [4-byte-length][body] to the real wire in one shot.
+;;;
+(defstruct (vector-device
+             (:include device)
+             (:constructor make-vector-device ()))
+  (bytes (make-array 256 :element-type '(unsigned-byte 8)
+                     :adjustable t :fill-pointer 0)))
+
+(defmethod device-listen ((device vector-device))
+  (plusp (fill-pointer (vector-device-bytes device))))
+
+(defmethod device-write
+    ((device vector-device) buffer &optional (end (length buffer)))
+  "Append BUFFER bytes to the vector device's accumulator."
+  (let* ((bytes (vector-device-bytes device))
+         (old-len (fill-pointer bytes))
+         (new-len (+ old-len end)))
+    (when (< (array-total-size bytes) new-len)
+      (adjust-array bytes (* 2 new-len)))
+    (setf (fill-pointer bytes) new-len)
+    (replace bytes buffer :start1 old-len :end2 end)))
+
+(defun make-staging-wire ()
+  "Create a wire backed by an in-memory vector, used for framing."
+  (let ((device (make-vector-device)))
+    (make-wire device)))
+
 (defstruct (wire
-            (:constructor %make-wire (device))
+            (:constructor alloc-wire (device))
             (:print-function
              (lambda (wire stream depth)
                (declare (ignore depth))
@@ -86,12 +149,12 @@
   (encoding :utf-8))
 
 (defun make-wire (device)
-  (let ((wire (%make-wire device)))
+  (let ((wire (alloc-wire device)))
     (setf (device-wire device) wire)
     wire))
 
 (defstruct (remote-object
-            (:constructor %make-remote-object (host pid id))
+            (:constructor alloc-remote-object (host pid id))
             (:print-function
              (lambda (obj stream depth)
                (declare (ignore depth))
@@ -206,7 +269,7 @@
       (setf (gethash local *object-to-id*) id)
       (setf (gethash id *id-to-object*) local)
       (incf *next-id*))
-    (%make-remote-object *this-host* *this-pid* id)))
+    (alloc-remote-object *this-host* *this-pid* id)))
 
 ;;; FORGET-REMOTE-TRANSLATION -- public
 ;;;
@@ -231,15 +294,9 @@ object. Passing that remote object to remote-object-value will new return NIL."
 ;;;
 ;;;   If nothing is in the current input buffer, select on the file descriptor.
 
-(defgeneric device-listen (device))
-
 (defun wire-listen (wire)
   "Return T iff anything is in the input buffer or available on the socket."
   (or (< (wire-ibuf-offset wire) (wire-ibuf-end wire))
-      #+(or)
-      (progn
-        (dispatch-events-no-hang)
-        (< (wire-ibuf-offset wire) (wire-ibuf-end wire)))
       (device-listen (wire-device wire))))
 
 (defmethod device-listen ((device stream-device))
@@ -333,12 +390,12 @@ signed (defaults to T)."
   "Reads an arbitrary integer sent by WIRE-OUTPUT-BIGNUM from the wire and
    return it."
   (let ((count-and-sign (wire-get-number wire)))
-    (do ((count (abs count-and-sign) (1- count))
-         (result 0 (+ (ash result 32) (wire-get-number wire nil))))
-        ((not (plusp count))
-         (if (minusp count-and-sign)
-             (- result)
-             result)))))
+    (loop with result = 0
+          repeat (abs count-and-sign)
+          do (setf result (+ (ash result 32) (wire-get-number wire nil)))
+          finally (return (if (minusp count-and-sign)
+                              (- result)
+                              result)))))
 
 ;;; WIRE-GET-STRING -- public
 ;;;
@@ -375,7 +432,7 @@ signed (defaults to T)."
                (incf offset avail)
                (decf nbytes avail)
                (incf (wire-ibuf-offset wire) avail)))))
-    (babel:octets-to-string bytes :encoding (wire-encoding wire))))
+    (sb-ext:octets-to-string bytes :external-format (wire-encoding wire))))
 
 ;;; WIRE-GET-OBJECT -- public
 ;;;
@@ -417,21 +474,21 @@ signed (defaults to T)."
            (let ((host (wire-get-number wire nil))
                  (pid (wire-get-number wire))
                  (id (wire-get-number wire)))
-             (%make-remote-object host pid id)))
+             (alloc-remote-object host pid id)))
           ((eql identifier +save-op+)
            (let ((index (wire-get-number wire))
                  (cache (wire-object-cache wire)))
              (declare (integer index))
              (declare (simple-vector cache))
              (when (>= index (length cache))
-               (do ((newsize (* (length cache) 2)
-                             (* newsize 2)))
-                   ((< index newsize)
-                    (let ((newcache (make-array newsize)))
-                      (declare (simple-vector newcache))
-                      (replace newcache cache)
-                      (setf cache newcache)
-                      (setf (wire-object-cache wire) cache)))))
+               (loop for newsize = (* (length cache) 2) then (* newsize 2)
+                     when (< index newsize)
+                       do (let ((newcache (make-array newsize)))
+                            (declare (simple-vector newcache))
+                            (replace newcache cache)
+                            (setf cache newcache)
+                            (setf (wire-object-cache wire) cache))
+                          (return)))
              (setf (svref cache index)
                    (wire-get-object wire))))
           ((eql identifier +funcall0-op+)
@@ -480,6 +537,50 @@ signed (defaults to T)."
              (apply function args))))))
 
 
+;;; WIRE-READ-FRAME -- public
+;;;
+;;; Read one complete framed message and dispatch it (via wire-get-object).
+;;; Every top-level message is prefixed with a 4-byte big-endian length;
+;;; see doc/wire-protocol.md. The length is read and currently used only
+;;; as a framing guard — wire-get-object reads the body from the same ibuf.
+
+(defun wire-read-frame (wire)
+  "Read and dispatch one framed message from WIRE.
+   Reads the 4-byte length prefix then calls wire-get-object on the body."
+  (let ((length (wire-get-number wire nil)))
+    (declare (ignore length)) ; currently unused; future: pre-read validation
+    (wire-get-object wire)))
+
+
+;;; WIRE-SEND-HANDSHAKE -- public
+;;;
+;;; Send the 8-byte version handshake: 4-byte magic + 4-byte version.
+;;; See doc/wire-protocol.md, Connection Lifecycle.
+
+(defun wire-send-handshake (wire)
+  "Send the 8-byte version handshake: 4-byte magic + 4-byte version (big-endian)."
+  (wire-output-number wire +wire-magic+)
+  (wire-output-number wire +protocol-version+)
+  (wire-force-output wire))
+
+;;; WIRE-RECEIVE-HANDSHAKE -- public
+;;;
+;;; Read and validate the 8-byte handshake from WIRE.
+;;; Signals wire-error on magic or version mismatch.
+
+(defun wire-receive-handshake (wire)
+  "Read and validate the 8-byte handshake from WIRE. Signals wire-error on mismatch."
+  (let ((magic   (wire-get-number wire nil))
+        (version (wire-get-number wire nil)))
+    (unless (= magic +wire-magic+)
+      (error "Bad magic in handshake on ~A: got #x~X, expected #x~X"
+             wire magic +wire-magic+))
+    (unless (= version +protocol-version+)
+      (error "Wire version mismatch on ~A: got ~D, expected ~D"
+             wire version +protocol-version+))
+    t))
+
+
 ;;; Wire output routines.
 
 ;;; WIRE-FORCE-OUTPUT -- internal
@@ -537,16 +638,17 @@ harmfull will happen if called when the output buffer is empty."
 ;;;
 (defun wire-output-bignum (wire number)
   "Outputs an arbitrary integer, but less effeciently than WIRE-OUTPUT-NUMBER."
-  (do ((digits 0 (1+ digits))
-       (remaining (abs number) (ash remaining -32))
-       (words nil (cons (ldb (byte 32 0) remaining) words)))
-      ((zerop remaining)
-       (wire-output-number wire
-                           (if (minusp number)
-                               (- digits)
-                               digits))
-       (dolist (word words)
-         (wire-output-number wire word)))))
+  (loop with words = nil
+        for digits from 0
+        for remaining = (abs number) then (ash remaining -32)
+        while (not (zerop remaining))
+        do (setf words (cons (ldb (byte 32 0) remaining) words))
+        finally (wire-output-number wire
+                                    (if (minusp number)
+                                        (- digits)
+                                        digits))
+                (dolist (word words)
+                  (wire-output-number wire word))))
 
 ;;; WIRE-OUTPUT-STRING -- public
 ;;;
@@ -557,7 +659,7 @@ harmfull will happen if called when the output buffer is empty."
   "Output the given string. First output the length using WIRE-OUTPUT-NUMBER,
 then output the bytes."
   (declare (simple-string string))
-  (let* ((bytes (babel:string-to-octets string :encoding (wire-encoding wire)))
+  (let* ((bytes (sb-ext:string-to-octets string :external-format (wire-encoding wire)))
          (nbytes (length bytes)))
     (wire-output-number wire nbytes)
     (let* ((obuf (wire-obuf wire))
@@ -578,22 +680,37 @@ then output the bytes."
 
 ;;; WIRE-OUTPUT-FUNCALL -- public
 ;;;
-;;;   Send the funcall down the wire. Arguments are evaluated locally in the
-;;; lexical environment of the WIRE-OUTPUT-FUNCALL.
+;;; Send the funcall down the wire as a framed message. Each message is
+;;; prefixed with a 4-byte big-endian length (see doc/wire-protocol.md).
+;;;
+;;; We encode the funcall body into a staging wire (vector-device) first so
+;;; we know the length before writing to the real wire. This is necessary
+;;; because large string arguments can flush the output buffer mid-write,
+;;; making a "reserve header, fill in later" approach incorrect.
 
 (defmacro wire-output-funcall (wire-form function &rest args)
-  "Send the function and args down the wire as a funcall."
+  "Encode the funcall into a staging buffer, then write [length][body] to wire."
   (let ((num-args (length args))
-        (wire (gensym)))
-    `(let ((,wire ,wire-form))
+        (wire (gensym))
+        (staging (gensym))
+        (bytes (gensym))
+        (nbytes (gensym)))
+    `(let* ((,wire ,wire-form)
+            (,staging (make-staging-wire)))
        ,@(if (> num-args 5)
-            `((wire-output-byte ,wire +funcall-op+)
-              (wire-output-byte ,wire ,num-args))
-            `((wire-output-byte ,wire ,(+ +funcall0-op+ num-args))))
-       (wire-output-object ,wire ,function)
+            `((wire-output-byte ,staging +funcall-op+)
+              (wire-output-byte ,staging ,num-args))
+            `((wire-output-byte ,staging ,(+ +funcall0-op+ num-args))))
+       (wire-output-object ,staging ,function)
        ,@(mapcar #'(lambda (arg)
-                     `(wire-output-object ,wire ,arg))
+                     `(wire-output-object ,staging ,arg))
                  args)
+       ;; Flush the staging wire to its vector, then write framed to real wire.
+       (wire-force-output ,staging)
+       (let* ((,bytes (vector-device-bytes (wire-device ,staging)))
+              (,nbytes (fill-pointer ,bytes)))
+         (wire-output-number ,wire ,nbytes)
+         (device-write (wire-device ,wire) ,bytes ,nbytes))
        (values))))
 
 ;;; WIRE-OUTPUT-OBJECT -- public

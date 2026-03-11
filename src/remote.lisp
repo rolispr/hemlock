@@ -1,15 +1,7 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;; **********************************************************************
-;;;
 ;;; This file implements a simple remote procedure call mechanism on top
 ;;; of wire.lisp.
-;;;
-;;; Written by William Lott.
 ;;;
 
 (in-package :hemlock.wire)
@@ -114,14 +106,10 @@ to aborting due to a throw)."
                               ,(fourth vars) (remote-wait-value4 ,remote)
                               ,(fifth vars) (remote-wait-value5 ,remote)))
                     (t
-                     (do ((remaining-vars vars (cdr remaining-vars))
-                          (form (list 'setf)
-                                (nconc form
-                                       (list (car remaining-vars)
-                                             `(pop values)))))
-                         ((null remaining-vars)
-                          `(let ((values (remote-wait-value1 ,remote)))
-                             ,form)))))
+                     (let ((form (loop for v in vars
+                                       nconc (list v `(pop values)))))
+                       `(let ((values (remote-wait-value1 ,remote)))
+                          (setf ,@form)))))
                  ,@body))
            (maybe-nuke-remote-wait ,remote)))))))
 
@@ -157,7 +145,7 @@ to aborting due to a throw)."
            (unwind-protect
                (progn
                  (multiple-value-setq ,vars
-                   (wire-get-object *current-wire*))
+                   (wire-read-frame *current-wire*))
                  (setf worked t))
              (if worked
                (remote *current-wire*
@@ -204,7 +192,7 @@ to aborting due to a throw)."
            (funcall fun wire remote)
            (wire-force-output wire)
            (loop
-              (wire-get-object wire)
+              (wire-read-frame wire)
               (when (remote-wait-finished remote)
                 (return))))
       (maybe-nuke-remote-wait remote))
@@ -243,7 +231,7 @@ to aborting due to a throw)."
     (unwind-protect
         (progn
           (setf values
-                (multiple-value-list (wire-get-object *current-wire*)))
+                (multiple-value-list (wire-read-frame *current-wire*)))
           (setf worked t))
       (if worked
         (remote *current-wire*
@@ -275,7 +263,7 @@ to aborting due to a throw)."
      (unless (or force (wire-listen wire))
        (return))
      (setf force nil)
-     (wire-get-object wire))
+     (wire-read-frame wire))
   (values))
 
 (defun device-serve-requests (device &optional force)
