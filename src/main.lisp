@@ -1,18 +1,11 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;; Hemlock initialization code and random debugging stuff.
 ;;;
-;;; Written by Bill Chiles and Rob MacLachlan
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock)
 
 #||
 GB
@@ -77,19 +70,19 @@ GB
 ;;; table.lisp which defines MAKE-STRING-TABLE.
 ;;;
 ;;; vars.lisp
-(defvar *global-variable-names* (make-string-table)
+(defvar hemlock.command::*global-variable-names* (make-string-table)
   "A String Table of global variable names, the values are the symbol names.")
 ;;;
 ;;; buffer.lisp
-(defvar *mode-names* (make-string-table) "A String Table of Mode names.")
-(defvar *buffer-names* (make-string-table)
+(defvar hemlock.command::*mode-names* (make-string-table) "A String Table of Mode names.")
+(defvar hemlock.command::*buffer-names* (make-string-table)
   "A String Table of Buffer names and their corresponding objects.")
 ;;;
 ;;; interp.lisp
-(defvar *command-names* (make-string-table) "String table of command names.")
+(defvar hemlock.command::*command-names* (make-string-table) "String table of command names.")
 ;;;
 ;;; syntax.lisp
-(defvar *character-attribute-names* (make-string-table)
+(defvar hemlock.command::*character-attribute-names* (make-string-table)
  "String Table of character attribute names and their corresponding keywords.")
 
 

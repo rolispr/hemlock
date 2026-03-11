@@ -20,7 +20,7 @@
 ;;; TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 ;;; SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-(in-package :hi)
+(in-package :hemlock)
 
 
 ;;;; LINEDIT-DEVICE: a minimal backend implemented as a subclass of TTY-DEVICE

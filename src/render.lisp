@@ -5,7 +5,7 @@
 ;;; Extracted and adapted from cl-tuition (MIT, Anthony Green 2025).
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock.tty)
 
 
 ;;;; Color constants — 16-color ANSI SGR codes

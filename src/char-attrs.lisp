@@ -1,15 +1,12 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;; Implementation specific character-hacking macros and constants.
 ;;;
-(in-package :hemlock-internals)
+(in-package :hemlock.text)
+
+;;; Shadow of cl:char-code-limit — Hemlock uses 256-entry tables.
+(defconstant char-code-limit 256)
 
 ;;; This file contains various constants and macros which are implementation or
 ;;; ASCII dependant.  It contains some versions of CHAR-CODE which do not check

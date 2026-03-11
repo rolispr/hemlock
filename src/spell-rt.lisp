@@ -1,14 +1,5 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
-;;;
-;;;    Written by Bill Chiles
-;;;
 ;;; This file contains system dependent primitives for the spelling checking/
 ;;; correcting code in Spell-Correct.Lisp, Spell-Augment.Lisp, and
 ;;; Spell-Build.Lisp.

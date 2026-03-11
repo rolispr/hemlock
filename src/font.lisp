@@ -1,20 +1,10 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
-;;;
-;;; Written by Rob MacLachlan
-;;; Modified by Bill Chiles toward Hemlock running under X.
-;;;
 ;;;    This file contains various functions that make up the user interface to
 ;;; fonts.
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock.command)
 
 ;;; Default-font used to be in the above list, but when I cleaned up the way
 ;;; Hemlock compiles, a name conflict occurred because "Default Font" is a

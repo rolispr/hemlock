@@ -1,18 +1,11 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;; Hemlock File manipulation functions.
-;;; Written by Skef Wholey, Horribly Hacked by Rob MacLachlan.
 ;;; Unhacked by Gilbert Baumann.
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock.command)
 
 
 ;;;; Utility functions.

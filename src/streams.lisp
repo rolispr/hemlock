@@ -1,21 +1,14 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;;    This file contains definitions of various types of streams used
 ;;; in Hemlock.  They are implementation dependant, but should be
 ;;; portable to all implementations based on Spice Lisp with little
 ;;; difficulty.
 ;;;
-;;; Written by Skef Wholey and Rob MacLachlan.
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock.command)
 
 ;;; Note: although this stream is intended for output only it also supports
 ;;; input to help if the debugger is called.

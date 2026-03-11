@@ -1,10 +1,5 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;; **********************************************************************
 ;;;
 ;;; This file implements typescript streams.
 ;;;
@@ -12,7 +7,6 @@
 ;;; function calls to interact with a Hemlock typescript buffer. That
 ;;; is: the code in this file is executed on the slave side.
 ;;;
-;;; Written by William Lott.
 ;;;
 
 (in-package :hemlock)

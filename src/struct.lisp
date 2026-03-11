@@ -1,13 +1,5 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-(in-package :hemlock-internals)
-
-;;;
-;;; **********************************************************************
 ;;;
 ;;; Structures and assorted macros for Hemlock.
 ;;;
@@ -703,27 +695,6 @@
               (if buffer (buffer-name buffer))))))
 
 
-;;;; Some defsetfs:
-
-(define-setf-expander value (var)
-  "Set the value of a Hemlock variable, calling any hooks."
-  (let ((svar (gensym)))
-    (values
-     ()
-     ()
-     (list svar)
-     `(%set-value ',var ,svar)
-     `(value ,var))))
-
-(defsetf variable-value (name &optional (kind :current) where) (new-value)
-  "Set the value of a Hemlock variable, calling any hooks."
-  `(%set-variable-value ,name ,kind ,where ,new-value))
-
-(defsetf variable-hooks (name &optional (kind :current) where) (new-value)
-  "Set the list of hook functions for a Hemlock variable."
-  `(%set-variable-hooks ,name ,kind ,where ,new-value))
-
-(defsetf variable-documentation (name &optional (kind :current) where) (new-value)
-  "Set a Hemlock variable's documentation."
-  `(%set-variable-documentation ,name ,kind ,where ,new-value))
+;;;; Some defsetfs moved to vars.lisp and macros.lisp
+;;;; (struct.lisp is in hemlock.text; the setf-expanded functions live in hemlock.command)
 

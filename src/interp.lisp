@@ -1,14 +1,5 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
-;;;
-;;; Written by Rob MacLachlan and Blaine Burks.
-;;;
 ;;; This file contains the routines which define hemlock commands and
 ;;; the command interpreter.
 ;;;

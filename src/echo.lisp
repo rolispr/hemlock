@@ -1,17 +1,9 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;; Hemlock Echo Area stuff.
-;;; Written by Skef Wholey and Rob MacLachlan.
-;;; Modified by Bill Chiles.
 ;;;
-(in-package :hemlock-internals)
+(in-package :hemlock.command)
 
 (defmode "Echo Area" :major-p t)
 (defvar *echo-area-buffer* (make-buffer "Echo Area" :modes '("Echo Area"))

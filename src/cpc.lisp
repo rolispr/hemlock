@@ -1,12 +1,11 @@
+;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;; cpc.lisp -- ILISP style Compound Prefix Completion
 ;;
-;; Author: Luke Gorrie  <luke@synap.se>
 ;;         Edi Weitz  <edi@agharta.de>
 ;;         Matthias Koeppe  <mkoeppe@mail.math.uni-magdeburg.de> 
 ;;         Tobias C. Rittweiler <tcr@freebits.de>
 ;;         and others
 ;;
-;; License: Public Domain
 ;;
 
 (in-package :hemlock)

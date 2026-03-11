@@ -1,16 +1,9 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;; This file contains code for sending requests to eval servers and the
 ;;; commands based on that code.
 ;;;
-;;; Written by William Lott and Rob MacLachlan.
 ;;;
 
 (in-package :hemlock)

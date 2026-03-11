@@ -1,21 +1,14 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;; Hemlock Text-Manipulation functions.
-;;; Written by Skef Wholey.
 ;;;
 ;;; The code in this file implements the functions in the "Representation
 ;;; of Text," "Buffers," and "Predicates" chapters of the Hemlock design
 ;;; document.
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock.text)
 
 
 ;;;; Representation of Text:

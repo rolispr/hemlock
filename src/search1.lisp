@@ -1,17 +1,11 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;; Searching and replacing functions for Hemlock.
 ;;; Originally written by Skef Wholey, Rewritten by Rob MacLachlan.
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock.text)
 
 
 ;;; The search pattern structure is used only by simple searches, more

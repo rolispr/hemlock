@@ -1,20 +1,13 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;;    This file contains implementation independent code which implements
 ;;; the Hemlock window primitives and most of the code which defines
 ;;; other aspects of the interface to redisplay.
 ;;;
-;;; Written by Bill Chiles and Rob MacLachlan.
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock.command)
 
 (declaim (special *echo-area-buffer* ; defined in echo.lisp --amb
                   *things-to-do-once*)) ; defined in display.lisp --amb

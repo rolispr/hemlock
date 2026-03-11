@@ -1,6 +1,6 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 
-(in-package :hi)
+(in-package :hemlock)
 
 ;;; Terminal hunks.
 ;;;

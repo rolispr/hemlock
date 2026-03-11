@@ -1,10 +1,9 @@
+;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;; fuzzy.lisp --- fuzzy symbol completion
 ;;
-;; Authors: Brian Downing <bdowning@lavos.net>
 ;;          Tobias C. Rittweiler <tcr@freebits.de>
 ;;          and others
 ;;
-;; License: Public Domain
 ;;
 
 (in-package :hemlock)

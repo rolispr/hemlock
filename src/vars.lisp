@@ -1,18 +1,9 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
-;;;
-;;; Written by Rob MacLachlan
-;;;
 ;;; The file contains the routines which define Hemlock variables.
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock.command)
 
 (defstruct (binding
             (:type vector)
@@ -157,6 +148,30 @@
 (defun %set-variable-documentation (name kind where new-value)
   (setf (variable-object-documentation (get-variable-object name kind where))
         new-value))
+
+;;;; Setf expanders (moved here from struct.lisp which is in hemlock.text)
+
+(define-setf-expander value (var)
+  "Set the value of a Hemlock variable, calling any hooks."
+  (let ((svar (gensym)))
+    (values
+     ()
+     ()
+     (list svar)
+     `(%set-value ',var ,svar)
+     `(value ,var))))
+
+(defsetf variable-value (name &optional (kind :current) where) (new-value)
+  "Set the value of a Hemlock variable, calling any hooks."
+  `(%set-variable-value ,name ,kind ,where ,new-value))
+
+(defsetf variable-hooks (name &optional (kind :current) where) (new-value)
+  "Set the list of hook functions for a Hemlock variable."
+  `(%set-variable-hooks ,name ,kind ,where ,new-value))
+
+(defsetf variable-documentation (name &optional (kind :current) where) (new-value)
+  "Set a Hemlock variable's documentation."
+  `(%set-variable-documentation ,name ,kind ,where ,new-value))
 
 ;;; VARIABLE-NAME  --  Public
 ;;;

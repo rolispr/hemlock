@@ -1,18 +1,9 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
-;;;
-;;;    Written by Bill Chiles.
-;;;
 ;;; Device independent screen management functions.
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock.command)
 
 
 ;;;; Screen management initialization.

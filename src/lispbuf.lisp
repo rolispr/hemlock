@@ -1,13 +1,5 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-(in-package :hemlock)
-
-;;;
-;;; **********************************************************************
 ;;;
 ;;; Stuff to do a little lisp hacking in the editor's Lisp environment.
 ;;;

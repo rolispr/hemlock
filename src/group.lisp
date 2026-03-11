@@ -1,14 +1,7 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;; File group stuff for Hemlock.
-;;; Written by Skef Wholey and Rob MacLachlan.
 ;;;
 ;;;    The "Compile Group" and "List Compile Group" commands in lispeval
 ;;;    also know about groups.

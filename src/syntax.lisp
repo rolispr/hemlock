@@ -1,18 +1,11 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;; Hemlock syntax table routines.
 ;;;
-;;; Written by Rob MacLachlan.
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock.command)
 
 
 ;;;; Character attribute caching.

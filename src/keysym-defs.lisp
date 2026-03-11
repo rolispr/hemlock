@@ -1,17 +1,9 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;; This file defines all the definitions of keysyms (see key-event.lisp).
 ;;; These keysyms match those for X11.
 ;;;
-;;; Written by Bill Chiles
-;;; Modified by Blaine Burks.
 ;;;
 
 (in-package :hemlock-internals)

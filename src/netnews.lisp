@@ -1,14 +1,5 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
-;;;
-;;; Written by Blaine Burks
-;;;
 ;;; This file implements the reading of bulletin boards from within Hemlock
 ;;; via a known NNTP server.  Something should probably be done so that
 ;;; when the server is down Hemlock doesn't hang as I suspect it will.
@@ -526,7 +517,8 @@
       (write-line group-name s)
       (format s "~14D~%" new-value))))
 
-(defconstant nntp-eof "."
+(defconstant nntp-eof ".
+"
   "NNTP marks the end of a textual response with this.  NNTP also recognizes
    this as the end of a post.")
 

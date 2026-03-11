@@ -1,16 +1,9 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;; This file implements key-events for representing editor input.  It also
 ;;; provides a couple routines to interface this to X11.
 ;;;
-;;; Written by Blaine Burks and Bill Chiles.
 ;;;
 
 ;;; The following are the implementation dependent parts of this code (what
@@ -27,7 +20,7 @@
 ;;; keys to the keysyms defined with DEFINE-KEYSYM.
 ;;;
 
-(in-package :hemlock-ext)
+(in-package :hemlock.text)
 
 
 ;;;; Keysym <==> Name translation.
@@ -212,6 +205,10 @@
 
 
 ;;;; Stuff for parsing #k syntax.
+
+;;; Helper used by the #k reader.
+(defun skip-whitespace (stream)
+  (peek-char t stream))
 
 (defstruct (key-event (:print-function %print-key-event)
                       (:constructor %make-key-event (keysym bits)))

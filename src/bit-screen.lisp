@@ -1,16 +1,10 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;; **********************************************************************
 ;;;
 ;;; Screen allocation functions.
 ;;;
 ;;; This is the screen management and event handlers for Hemlock under X.
 ;;;
-;;; Written by Bill Chiles, Rob MacLachlan, and Blaine Burks.
 ;;;
 
 (in-package :hemlock.x11)

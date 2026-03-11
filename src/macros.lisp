@@ -1,19 +1,12 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;; This file contains most of the junk that needs to be in the compiler
 ;;; to compile Hemlock commands.
 ;;;
-;;; Written by Rob MacLachlin and Bill Chiles.
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock.command)
 
 (declaim (special *editor-input*)) ; defined in input --amb
 

@@ -1,14 +1,5 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
-;;;
-;;;    Written by Bill Chiles
-;;;
 ;;; This file contains stuff that operates on units of texts, such as
 ;;;    paragraphs, sentences, lines, and words.
 ;;;

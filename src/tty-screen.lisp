@@ -1,20 +1,13 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
 ;;;
-;;;
-;;; **********************************************************************
-;;;
-;;; Written by Bill Chiles, except for the code that implements random typeout,
 ;;; which was done by Blaine Burks and Bill Chiles.  The code for splitting
 ;;; windows was rewritten by Blaine Burks to allow more than a 50/50 split.
 ;;;
 ;;; Terminal device screen management functions.
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock.tty)
 
 
 

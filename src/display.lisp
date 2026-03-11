@@ -1,18 +1,9 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
-;;;
-;;; Written by Bill Chiles.
-;;;
 ;;; This is the device independent redisplay entry points for Hemlock.
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock.command)
 
 (declaim (special *in-the-editor*)) ; defined in main.lisp --amb
 

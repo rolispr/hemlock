@@ -1,15 +1,7 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
 ;;;
 ;;; More Hemlock Text-Manipulation functions.
-;;; Written by Skef Wholey and Rob MacLachlan.
-;;; Modified by Bill Chiles.
 ;;;
 ;;; The code in this file implements the delete and copy functions in the
 ;;; "Doing Stuff and Going Places" chapter of the Hemlock Design document.

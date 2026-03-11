@@ -58,7 +58,7 @@
 ;; and not just by 20 characters as the [documented] behaviour of
 ;; XEmacs. This also is the observed behavior.
 
-(in-package :hemlock-internals)
+(in-package :hemlock.command)
 
 ;; Unfortunately we need numeric buffer positions. (Hmm, maybe after
 ;; all RMS has a point?) Anyhow to graft this onto hemlock we define

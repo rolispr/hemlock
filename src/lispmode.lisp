@@ -1,17 +1,8 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-(in-package :hemlock)
-
-;;;
-;;; **********************************************************************
 ;;;
 ;;; Hemlock LISP Mode commands
 ;;;
-;;; Written by Ivan Vazquez and Bill Maddox.
 ;;;
 
 

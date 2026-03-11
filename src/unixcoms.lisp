@@ -1,18 +1,9 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
-;;;
-;;;
 ;;; This file contains Commands useful when running on a Unix box.  Hopefully
 ;;; there are no CMU Unix dependencies though there are probably CMU Common
 ;;; Lisp dependencies, such as RUN-PROGRAM.
 ;;;
-;;; Written by Christopher Hoover.
 
 (in-package :hemlock)
 

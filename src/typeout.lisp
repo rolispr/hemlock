@@ -1,6 +1,6 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 
-(in-package :hemlock-internals)
+(in-package :hemlock.command)
 
 (defun make-unique-buffer (base-name &rest keys)
   (loop

@@ -1,17 +1,8 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
-;;;
-;;;    Written by Bill Chiles
-;;;
 ;;; Terminal Capability
 
-(in-package :hemlock-internals)
+(in-package :hemlock.tty)
 
 ;;; This stuff used to parse a Termcap file.  Now it's just a
 ;;; compatibility layer over the Terminfo code.  At some point this

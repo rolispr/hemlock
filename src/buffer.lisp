@@ -1,18 +1,9 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
-;;;
-;;;    Written by Rob MacLachlan
-;;;
 ;;; This file contains functions for changing modes and buffers.
 ;;;
 
-(in-package :hemlock-internals)
+(in-package :hemlock.command)
 
 (declaim (special *current-buffer* ; because it is defined too late --amb
                   *global-variable-names* ; defined in main.lisp --amb

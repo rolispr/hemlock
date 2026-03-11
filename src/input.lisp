@@ -1,13 +1,5 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-(in-package :hemlock-internals)
-
-;;;
-;;; **********************************************************************
 ;;;
 ;;; This file contains the code that handles input to Hemlock.
 ;;;
@@ -45,7 +37,7 @@
    (tail :accessor editor-input-tail :initarg :tail)))
 
 (defmethod initialize-instance :after ((instance editor-input) &key)
-  (let ((e (hi::make-input-event)))
+  (let ((e (make-input-event)))
     (setf (editor-input-head instance) e)
     (setf (editor-input-tail instance) e)))
 
