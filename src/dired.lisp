@@ -109,9 +109,9 @@
    user will be asked whether it should be overwritten or not."
   (cond
    ((not directoryp)
-    (let* ((ses-name1 (iolib.pathnames:file-path-namestring spec1))
-           (exists1p (iolib.os:file-kind spec1))
-           (ses-name2 (iolib.pathnames:file-path-namestring spec2))
+    (let* ((ses-name1 (if (stringp spec1) spec1 (namestring spec1)))
+           (exists1p (probe-file spec1))
+           (ses-name2 (if (stringp spec2) spec2 (namestring spec2)))
            (pname1 (pathname ses-name1))
            (pname2 (pathname ses-name2))
            (dirp1 (directoryp pname1))
@@ -155,7 +155,7 @@
        (funcall *error-function*
                 "Spec1 is just a pattern when supplying directory -- ~S."
                 spec1))
-     (let* ((pname2 (pathname (iolib.pathnames:file-path-namestring spec2)))
+     (let* ((pname2 (pathname (if (stringp spec2) spec2 (namestring spec2))))
             (dirp2 (directoryp pname2))
             (wildp1 (wildcardp spec1))
             (wildp2 (wildcardp (file-namestring pname2))))
@@ -310,9 +310,9 @@
    specify the trailing slash."
   (cond
    ((not directoryp)
-    (let* ((ses-name1 (iolib.pathnames:file-path-namestring spec1))
-           (exists1p (iolib.os:file-kind ses-name1))
-           (ses-name2 (iolib.pathnames:file-path-namestring spec2))
+    (let* ((ses-name1 (if (stringp spec1) spec1 (namestring spec1)))
+           (exists1p (probe-file ses-name1))
+           (ses-name2 (if (stringp spec2) spec2 (namestring spec2)))
            (pname1 (pathname ses-name1))
            (pname2 (pathname ses-name2))
            (dirp2 (directoryp pname2))
@@ -340,7 +340,7 @@
                 "Spec1 is just a pattern when supplying directory -- ~S."
                 spec1))
 
-     (let* ((pname2 (pathname (iolib.pathnames:file-path-namestring spec2)))
+     (let* ((pname2 (pathname (if (stringp spec2) spec2 (namestring spec2))))
             (dirp2 (directoryp pname2))
             (wildp1 (wildcardp spec1))
             (wildp2 (wildcardp (file-namestring pname2))))
@@ -449,7 +449,7 @@
    subdirectory structure.  An empty directory may be specified without
    recursive being non-nil.  When specifying a directory, the trailing slash
    must be included."
-  (let* ((ses-name (iolib.pathnames:file-path-namestring spec))
+  (let* ((ses-name (if (stringp spec) spec (namestring spec)))
          (pname (pathname ses-name))
          (wildp (wildcardp (file-namestring pname)))
          (dirp (directoryp pname)))
@@ -564,8 +564,8 @@
 
 (defun make-directory (name)
   "Creates directory name.  If name exists, then an error is signaled."
-  (let ((ses-name (iolib.pathnames:file-path-namestring name)))
-    (when (iolib.os:file-kind ses-name)
+  (let ((ses-name (if (stringp name) name (namestring name))))
+    (when (probe-file ses-name)
       (funcall *error-function* "Name already exists -- ~S" ses-name))
     (enter-directory ses-name))
   t)
@@ -600,8 +600,8 @@
     mtime))
 #-(or cmu scl)
 (defun get-write-date (ses-name)
-  (isys:stat-mtime
-   (or (isys:stat ses-name)
+  (sb-posix:stat-mtime
+   (or (sb-posix:stat ses-name)
        (funcall *error-function* "Couldn't stat file ~S" ses-name))))
 
 
@@ -619,14 +619,14 @@
                ses-name1 ses-name2 (unix:get-unix-error-msg err)))))
 #-(or cmu scl)
 (defun sub-rename-file (ses-name1 ses-name2)
-  (isys:rename ses-name1 ses-name2))
+  (sb-posix:rename ses-name1 ses-name2))
 
 #+(or cmu scl)
 (defun directory-existsp (ses-name)
   (eq (unix:unix-file-kind ses-name) :directory))
 #-(or cmu scl)
 (defun directory-existsp (ses-name)
-  (iolib.os:directory-exists-p ses-name))
+  (uiop:directory-exists-p ses-name))
 
 #+(or cmu scl)
 (defun enter-directory (ses-name)
@@ -649,7 +649,7 @@
                       length-1)
                    (subseq ses-name 0 (1- (length ses-name)))
                    ses-name)))
-    (isys:mkdir name #o755)))
+    (sb-posix:mkdir name #o755)))
 
 #+(or cmu scl)
 (defun delete-directory (ses-name)
@@ -664,7 +664,7 @@
 #-(or cmu scl)
 (defun delete-directory (ses-name)
   (declare (simple-string ses-name))
-  (isys:rmdir (subseq ses-name 0 (1- (length ses-name)))))
+  (sb-posix:rmdir (subseq ses-name 0 (1- (length ses-name)))))
 
 
 

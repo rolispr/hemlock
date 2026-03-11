@@ -203,8 +203,8 @@
               :accessor connection-directory)))
 
 (defmethod class-for
-    ((backend (eql :iolib)) (type (eql 'process-connection-mixin)))
-  'process-connection/iolib)
+    ((backend (eql :sb-sys)) (type (eql 'process-connection-mixin)))
+  'process-connection/sb-sys)
 
 (defmethod class-for
     ((backend (eql :qt)) (type (eql 'process-connection-mixin)))
@@ -240,8 +240,8 @@
             (connection-port instance))))
 
 (defmethod class-for
-    ((backend (eql :iolib)) (type (eql 'tcp-connection-mixin)))
-  'tcp-connection/iolib)
+    ((backend (eql :sb-sys)) (type (eql 'tcp-connection-mixin)))
+  'tcp-connection/sb-sys)
 
 (defmethod class-for
     ((backend (eql :qt)) (type (eql 'tcp-connection-mixin)))
@@ -301,21 +301,17 @@
     (dolist (char '(#\p #\q) (error "no pty found"))
       (dotimes (digit 16)
         (handler-case
-            (isys:open (format nil "/dev/pty~C~X" char digit)
-                                      isys:o-rdwr)
-          ((or isys:enoent
-               isys:enxio
-               isys:eio)
+            (sb-posix:open (format nil "/dev/pty~C~X" char digit)
+                                      sb-posix:o-rdwr)
+          (sb-posix:syscall-error
            ())
           (:no-error (master-fd)
             (let ((slave-name (format nil "/dev/tty~C~X" char digit)))
               (handler-case
-                  (isys:open slave-name isys:o-rdwr)
-                ((or isys:enoent
-                     isys:enxio
-                     isys:eio)
+                  (sb-posix:open slave-name sb-posix:o-rdwr)
+                (sb-posix:syscall-error
                  ()
-                 (isys:close master-fd))
+                 (sb-posix:close master-fd))
                 (:no-error (slave-fd)
                   (return-from t
                     (values master-fd
@@ -355,7 +351,7 @@
   (multiple-value-bind (master slave slave-name)
       (find-a-pty)
     (let ((pc (make-process-connection command :slave-pty-name slave-name)))
-      (isys:close slave)
+      (sb-posix:close slave)
       (make-pipelike-connection master
                                 master
                                 :name (or name (princ-to-string command))
@@ -385,16 +381,16 @@
   (delete-connection (connection-process-connection connection)))
 
 (defmethod class-for
-    ((backend (eql :iolib)) (type (eql 'process-with-pty-connection-mixin)))
-  'process-with-pty-connection/iolib)
+    ((backend (eql :sb-sys)) (type (eql 'process-with-pty-connection-mixin)))
+  'process-with-pty-connection/sb-sys)
 
 (defmethod class-for
     ((backend (eql :qt)) (type (eql 'process-with-pty-connection-mixin)))
   'process-with-pty-connection/qt)
 
 (defmethod class-for
-    ((backend (eql :iolib)) (type (eql 'pipelike-connection-mixin)))
-  'pipelike-connection/iolib)
+    ((backend (eql :sb-sys)) (type (eql 'pipelike-connection-mixin)))
+  'pipelike-connection/sb-sys)
 
 (defmethod class-for
     ((backend (eql :qt)) (type (eql 'pipelike-connection-mixin)))
@@ -513,8 +509,8 @@
          args))
 
 (defmethod class-for
-    ((backend (eql :iolib)) (type (eql 'tcp-listener-mixin)))
-  'tcp-listener/iolib)
+    ((backend (eql :sb-sys)) (type (eql 'tcp-listener-mixin)))
+  'tcp-listener/sb-sys)
 
 (defmethod class-for
     ((backend (eql :qt)) (type (eql 'tcp-listener-mixin)))

@@ -20,12 +20,82 @@
 
 ;;;; Terminal screen initialization
 
+;;; Forward declarations for functions defined in tty-input.lisp (loaded after
+;;; tty-screen.lisp).  Without these, the lambda in init-tty-screen-manager
+;;; generates undefined-function compile-time warnings.
+(declaim (ftype (function (t) t) translate-tty-event tty-key-event))
+;;; Forward declarations for scroll commands in command.lisp (user-1 module).
+(declaim (ftype (function (t &optional t) t)
+                scroll-window-up-command scroll-window-down-command))
+
 (declaim (special *parse-starting-mark*))
 
 (defvar *do-not-finalize*)
 (defvar *tty-connection*)
+(defvar *tty-device* nil)
+
+(defun handle-sigwinch (signal code scp)
+  (declare (ignore signal code scp))
+  ;; Capture the new terminal size right here in the handler so that
+  ;; maybe-resize-tty-device sees a consistent snapshot.  Use ioctl rather
+  ;; than get-terminal-attributes to avoid forking stty from a signal handler.
+  (handler-case
+      (cffi:with-foreign-object (ws '(:struct winsize))
+        (ioctl-syscall 0 tiocgwinsz :pointer ws)
+        (cffi:with-foreign-slots ((row col)
+                                  ws (:struct winsize))
+          (when (and (> row 0) (> col 0))
+            (setf *pending-resize-lines* row
+                  *pending-resize-cols*  col))))
+    (error ()))
+  (setf *pending-resize* t)
+  (setf *screen-image-trashed* t))
+
+;;; SIGTSTP (C-z) handler: restore the terminal, stop the process.
+;;; When the shell resumes us (SIGCONT), re-initialize terminal state
+;;; and force a full redisplay.
+(defun handle-sigtstp (signal code scp)
+  (declare (ignore signal code scp))
+  (when *tty-device*
+    (device-exit *tty-device*))
+  ;; Restore the default SIGTSTP handler so the kill actually stops us.
+  (sb-sys:enable-interrupt sb-unix:sigtstp :default)
+  (sb-posix:kill 0 sb-unix:sigtstp)
+  ;; We resume here after SIGCONT.
+  (when *tty-device*
+    (device-init *tty-device*)
+    (setf *screen-image-trashed* t))
+  ;; Re-arm our handler for the next C-z.
+  (sb-sys:enable-interrupt sb-unix:sigtstp #'handle-sigtstp))
+
+;;; ESC DISAMBIGUATION
+;;;
+;;; When the user presses the Escape key, the terminal sends a single ESC byte.
+;;; When they press Alt+key, the terminal sends ESC followed immediately by the
+;;; key byte(s).  Wait up to 40 ms for more bytes before passing to tty-key-event.
+;;;
+(defun esc-disambiguate (fd data)
+  "If DATA is a lone ESC, wait up to 40ms for continuation bytes on FD.
+This distinguishes a bare Escape keypress from an Alt+key escape sequence."
+  (when (and (= (length data) 1)
+             (char= (char data 0) #\Escape))
+    (when (sb-sys:wait-until-fd-usable fd :input 0.04 nil)
+      (let ((buf (make-array 256 :element-type '(unsigned-byte 8))))
+        (multiple-value-bind (n err)
+            (sb-unix:unix-read fd (sb-sys:vector-sap buf) 256)
+          (declare (ignore err))
+          (when (and n (> n 0))
+            (let ((extra (make-string n)))
+              (dotimes (i n)
+                (setf (char extra i) (code-char (aref buf i))))
+              (setf data (concatenate 'simple-string data extra))))))))
+  data)
 
 (defun init-tty-screen-manager (device)
+  (setf *tty-device* device)
+  (setf *pending-resize* nil)
+  (sb-sys:enable-interrupt sb-unix:sigwinch #'handle-sigwinch)
+  (sb-sys:enable-interrupt sb-unix:sigtstp #'handle-sigtstp)
   (setf *line-wrap-char* #\!)
   (setf *window-list* ())
   (setf *tty-connection*
@@ -39,7 +109,7 @@
            :buffer nil
            :filter (lambda (connection bytes)
                      (tty-key-event
-                      (hi::default-filter connection bytes))
+                      (esc-disambiguate fd (hi::default-filter connection bytes)))
                      nil))))
   (let* ((width (tty-device-columns device))
          (height (tty-device-lines device))

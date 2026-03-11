@@ -14,11 +14,135 @@
 
 (pushnew :tty hi::*available-backends*)
 
+(defvar *pending-resize* nil
+  "Set to T by the SIGWINCH handler; cleared by maybe-resize-tty-device.")
+
+(defvar *pending-resize-lines* nil
+  "Number of terminal rows captured in the SIGWINCH handler, or NIL.")
+
+(defvar *pending-resize-cols* nil
+  "Number of terminal columns captured in the SIGWINCH handler, or NIL.")
+
 
 ;;;; Get terminal attributes:
 
 (defvar *terminal-baud-rate* nil)
 (declaim (type (or (unsigned-byte 24) null) *terminal-baud-rate*))
+
+;;;;
+;;;; CFFI definitions replacing osicat-posix
+;;;;
+
+;;; struct winsize
+(cffi:defcstruct (winsize :size 8)
+  (row    :uint16 :offset 0)
+  (col    :uint16 :offset 2)
+  (xpixel :uint16 :offset 4)
+  (ypixel :uint16 :offset 6))
+
+(defconstant tiocgwinsz
+  #+darwin 1074295912
+  #+linux  #x00005413)
+
+(cffi:defcfun ("ioctl" ioctl-syscall) :int
+  (fd :int) (request :unsigned-long) &rest)
+
+;;; struct termios
+(cffi:defcstruct (termios :size 72)
+  (iflag :uint32 :offset  0)
+  (oflag :uint32 :offset  8)
+  (cflag :uint32 :offset 16)
+  (lflag :uint32 :offset 24)
+  (cc    :uint8  :count 20 :offset 32))
+
+;;; tcsetattr action codes
+(defconstant tcsanow   0)
+(defconstant tcsadrain 1)
+(defconstant tcsaflush 2)
+
+;;; _POSIX_VDISABLE
+(defconstant posix-vdisable 255)
+
+;;; c_cc indices
+#+darwin
+(progn
+  (defconstant cflag-veof    0)
+  (defconstant cflag-veol    1)
+  (defconstant cflag-veol2   2)
+  (defconstant cflag-verase  3)
+  (defconstant cflag-vwerase 4)
+  (defconstant cflag-vkill   5)
+  (defconstant cflag-vintr   8)
+  (defconstant cflag-vquit   9)
+  (defconstant cflag-vsusp  10)
+  (defconstant cflag-vdsusp 11)
+  (defconstant cflag-vstart 12)
+  (defconstant cflag-vstop  13)
+  (defconstant cflag-vmin   16)
+  (defconstant cflag-vtime  17))
+
+#+linux
+(progn
+  (defconstant cflag-vintr   0)
+  (defconstant cflag-vquit   1)
+  (defconstant cflag-verase  2)
+  (defconstant cflag-vkill   3)
+  (defconstant cflag-veof    4)
+  (defconstant cflag-vtime   5)
+  (defconstant cflag-vmin    6)
+  (defconstant cflag-vstart  8)
+  (defconstant cflag-vstop   9)
+  (defconstant cflag-vsusp  10)
+  (defconstant cflag-veol   11)
+  (defconstant cflag-vmin   16))
+
+;;; c_iflag bits
+#+darwin
+(progn
+  (defconstant tty-ignbrk #x0001)
+  (defconstant tty-brkint #x0002)
+  (defconstant tty-istrip #x0020)
+  (defconstant tty-icrnl  #x0100)
+  (defconstant tty-ixon   #x0200))
+
+#+linux
+(progn
+  (defconstant tty-ignbrk #x0001)
+  (defconstant tty-brkint #x0002)
+  (defconstant tty-istrip #x0020)
+  (defconstant tty-icrnl  #x0100)
+  (defconstant tty-ixon   #x0400))
+
+;;; c_oflag bits
+#+darwin
+(progn
+  (defconstant tty-opost #x00001)
+  (defconstant tty-onlcr #x00002)
+  (defconstant tty-ocrnl #x00010))
+
+#+linux
+(progn
+  (defconstant tty-opost #x00001)
+  (defconstant tty-onlcr #x00004)
+  (defconstant tty-ocrnl #x00008))
+
+;;; c_lflag bits
+#+darwin
+(progn
+  (defconstant tty-icanon #x0100)
+  (defconstant tty-echo   #x0008)
+  (defconstant tty-echonl #x0010))
+
+#+linux
+(progn
+  (defconstant tty-icanon #x0002)
+  (defconstant tty-echo   #x0008)
+  (defconstant tty-echonl #x0040))
+
+;;; syscall wrappers
+(cffi:defcfun ("isatty"    isatty)    :int (fd :int))
+(cffi:defcfun ("tcgetattr" tcgetattr) :int (fd :int) (termios :pointer))
+(cffi:defcfun ("tcsetattr" tcsetattr) :int (fd :int) (action :int) (termios :pointer))
 
 ;;; GET-TERMINAL-ATTRIBUTES  --  Interface
 ;;;
@@ -46,11 +170,10 @@
                                    (logxor baud unix::tty-cbaudex))))))
                    #-(or CMU scl) 4800))
     (setf *terminal-baud-rate* baud-rate)
-    (cffi:with-foreign-object (ws 'osicat-posix::winsize)
-      (osicat-posix:ioctl fd osicat-posix:tiocgwinsz ws)
-      (cffi:with-foreign-slots ((osicat-posix::row osicat-posix::col)
-                                ws osicat-posix::winsize)
-        (values osicat-posix::row osicat-posix::col baud-rate)))))
+    (cffi:with-foreign-object (ws '(:struct winsize))
+      (ioctl-syscall fd tiocgwinsz :pointer ws)
+      (cffi:with-foreign-slots ((row col) ws (:struct winsize))
+        (values row col baud-rate)))))
 
 
 ;;;; Output routines and buffering.
@@ -74,9 +197,11 @@
 ;;;
 (defun write-and-maybe-wait (count)
   (declare (fixnum count))
+  ;; dispatch-events-no-hang is NOT called here (per chunk) — it is called
+  ;; once per redisplay cycle from device-force-output instead, after all
+  ;; chunks are queued.  This avoids firing fd-handlers between chunks.
   (connection-write (subseq *redisplay-output-buffer* 0 count)
-                    *tty-connection*)
-  (dispatch-events-no-hang))
+                    *tty-connection*))
 
 
 ;;; TTY-WRITE-STRING blasts the string into the redisplay output buffer.
@@ -202,7 +327,10 @@
 (defmethod device-force-output ((device tty-device))
   (unless (zerop *redisplay-output-buffer-index*)
     (write-and-maybe-wait *redisplay-output-buffer-index*)
-    (setf *redisplay-output-buffer-index* 0)))
+    (setf *redisplay-output-buffer-index* 0))
+  ;; Flush the async write queue once per redisplay cycle rather than
+  ;; once per chunk, to avoid serving fd-handlers mid-output.
+  (dispatch-events-no-hang))
 
 
 ;;; TTY-FINISH-OUTPUT simply dumps output.
@@ -215,22 +343,68 @@
 
 ;;;; Terminal init and exit methods.
 
+;;;; Terminal feature helpers (cursor shape, mouse, focus, window title)
+
+(defun tty-set-cursor-shape (shape)
+  "Set terminal cursor shape. SHAPE is :block, :underline, or :beam.
+Uses the DECSCUSR escape sequence (xterm and most modern terminals)."
+  (let ((code (ecase shape
+                (:block     1)   ; blinking block
+                (:underline 3)   ; blinking underline
+                (:beam      5)   ; blinking bar / I-beam
+                )))
+    (tty-write-cmd (format nil "~C[~D q" #\Escape code))))
+
+(defun tty-set-window-title (title)
+  "Set the terminal window/tab title via OSC 2."
+  (tty-write-cmd (format nil "~C]2;~A~C\\" #\Escape title #\Escape)))
+
+(defun tty-enable-mouse ()
+  "Enable SGR 1006 mouse button+motion reporting."
+  (tty-write-cmd (format nil "~C[?1002h~C[?1006h" #\Escape #\Escape)))
+
+(defun tty-disable-mouse ()
+  "Disable mouse tracking."
+  (tty-write-cmd (format nil "~C[?1002l~C[?1006l" #\Escape #\Escape)))
+
+(defun tty-enable-focus-events ()
+  "Enable focus-in / focus-out event reporting (ESC[I / ESC[O)."
+  (tty-write-cmd (format nil "~C[?1004h" #\Escape)))
+
+(defun tty-disable-focus-events ()
+  "Disable focus event reporting."
+  (tty-write-cmd (format nil "~C[?1004l" #\Escape)))
+
+
 (defmethod device-init ((device tty-device))
   (setup-input)
   (tty-write-cmd (tty-device-init-string device))
-  (redisplay-all))
+  ;; Enter alternate screen buffer — gives us a clean slate and preserves
+  ;; the user's shell scrollback.
+  (tty-write-cmd (format nil "~C[?1049h" #\Escape))
+  ;; Enable bracketed paste mode.
+  (tty-write-cmd (format nil "~C[?2004h" #\Escape))
+  ;; Enable mouse button+motion tracking (SGR 1006 format).
+  (tty-enable-mouse)
+  ;; Enable focus in/out events.
+  (tty-enable-focus-events)
+  ;; Set block cursor for normal mode.
+  (tty-set-cursor-shape :block)
+  (tty-set-window-title "Hemlock")
+  ;; Flush the terminal init sequences immediately.
+  (device-force-output device)
+  ;; Mark screen as trashed so the command loop does the initial repaint.
+  (setf *screen-image-trashed* t))
 
 (defmethod device-exit ((device tty-device))
-  (cursor-motion device 0 (1- (tty-device-lines device)))
-  ;; Can't call the clear-to-eol method since we don't have a hunk to
-  ;; call it on, and you can't count on the bottom hunk being the echo area.
-  ;;
-  (if (tty-device-clear-to-eol-string device)
-      (tty-write-cmd (tty-device-clear-to-eol-string device))
-      (dotimes (i (tty-device-columns device)
-                  (cursor-motion device 0 (1- (tty-device-lines device))))
-        (tty-write-char #\space)))
-  (tty-write-cmd (tty-device-cm-end-string device))
+  ;; Disable mouse, focus events, bracketed paste.
+  (tty-disable-mouse)
+  (tty-disable-focus-events)
+  (tty-write-cmd (format nil "~C[?2004l" #\Escape))
+  ;; Restore default cursor shape.
+  (tty-write-cmd (format nil "~C[0 q" #\Escape))
+  ;; Exit alternate screen buffer — restores the user's terminal state.
+  (tty-write-cmd (format nil "~C[?1049l" #\Escape))
   (device-force-output device)
   (reset-input))
 
@@ -255,65 +429,59 @@
 (defvar *tty-erase-char* nil)
 
 (defun setup-input ()
-  (let ((fd 1 #+nil *editor-file-descriptor*))
-    (when (plusp (osicat-posix::isatty fd))
-      (cffi:with-foreign-object (tios 'osicat-posix::termios)
-        (osicat-posix::tcgetattr fd tios)
-        (cffi:with-foreign-slots ((osicat-posix::iflag
-                                   osicat-posix::oflag
-                                   osicat-posix::cflag
-                                   osicat-posix::lflag
-                                   osicat-posix::cc)
-                                  tios osicat-posix::termios)
-          (setf *old-c-iflag* osicat-posix::iflag)
-          (setf *old-c-oflag* osicat-posix::oflag)
-          (setf *old-c-cflag* osicat-posix::cflag)
-          (setf *old-c-lflag* osicat-posix::lflag)
+  (let ((fd 1))
+    (when (plusp (isatty fd))
+      (cffi:with-foreign-object (tios '(:struct termios))
+        (tcgetattr fd tios)
+        (cffi:with-foreign-slots ((iflag oflag cflag lflag cc)
+                                  tios (:struct termios))
+          (setf *old-c-iflag* iflag)
+          (setf *old-c-oflag* oflag)
+          (setf *old-c-cflag* cflag)
+          (setf *old-c-lflag* lflag)
           (macrolet ((ccref (slot)
-                       `(cffi:mem-ref osicat-posix::cc :uint8 ,slot)))
+                       `(cffi:mem-ref cc :uint8 ,slot)))
             (setf *old-c-cc*
-                  (vector (ccref osicat-posix::cflag-vsusp)
-                          (ccref osicat-posix::cflag-veof)
-                          (ccref osicat-posix::cflag-verase)
-                          (ccref osicat-posix::cflag-vintr)
-                          (ccref osicat-posix::cflag-vquit)
-                          (ccref osicat-posix::cflag-vstart)
-                          (ccref osicat-posix::cflag-vstop)
-                          (ccref osicat-posix::cflag-vsusp)
-                          (when (boundp 'osicat-posix::cflag-vdsusp)
-                            (ccref osicat-posix::cflag-vdsusp))
-                          (ccref osicat-posix::cflag-vmin)
-                          (ccref osicat-posix::cflag-vtime)))
-            (setf osicat-posix::lflag
-                  (logandc2 osicat-posix::lflag
-                            (logior osicat-posix::tty-echo
-                                    osicat-posix::tty-icanon)))
-            (setf osicat-posix::iflag
-                  (logandc2 (logior osicat-posix::iflag
-                                    osicat-posix::tty-ignbrk)
-                            (logior osicat-posix::tty-icrnl
-                                    osicat-posix::tty-istrip
-                                    osicat-posix::tty-ixon)))
-            (setf osicat-posix::oflag
-                  (logandc2 osicat-posix::oflag
-                            (logior #-bsd osicat-posix::tty-ocrnl
-                                    #+bsd osicat-posix::tty-onlcr)))
-            (setf (ccref osicat-posix::cflag-vsusp) osicat-posix::posix-vdisable)
-            (setf (ccref osicat-posix::cflag-veof) osicat-posix::posix-vdisable)
-            (setf *tty-erase-char* (ccref osicat-posix::cflag-verase))
-            (setf (ccref osicat-posix::cflag-vintr)
-                  (if *editor-windowed-input* osicat-posix::posix-vdisable 28))
-            (setf (ccref osicat-posix::cflag-vquit) osicat-posix::posix-vdisable)
-            (setf (ccref osicat-posix::cflag-vstart) osicat-posix::posix-vdisable)
-            (setf (ccref osicat-posix::cflag-vstop) osicat-posix::posix-vdisable)
-            (setf (ccref osicat-posix::cflag-vsusp) osicat-posix::posix-vdisable)
-            (when (boundp 'osicat-posix::cflag-vdsusp)
-              ;; Default VDSUSP is C-y; it causes SIGTSTP on BSD-heritage
-              ;; systems -- but may be undefined elsewhere.
-              (setf (ccref osicat-posix::cflag-vdsusp) osicat-posix::posix-vdisable))
-            (setf (ccref osicat-posix::cflag-vmin) 1)
-            (setf (ccref osicat-posix::cflag-vtime) 0))
-          (osicat-posix::tcsetattr fd osicat-posix::tcsaflush tios))))))
+                  (vector (ccref cflag-vsusp)
+                          (ccref cflag-veof)
+                          (ccref cflag-verase)
+                          (ccref cflag-vintr)
+                          (ccref cflag-vquit)
+                          (ccref cflag-vstart)
+                          (ccref cflag-vstop)
+                          (ccref cflag-vsusp)
+                          (when (boundp 'cflag-vdsusp)
+                            (ccref cflag-vdsusp))
+                          (ccref cflag-vmin)
+                          (ccref cflag-vtime)))
+            (setf lflag
+                  (logandc2 lflag
+                            (logior tty-echo
+                                    tty-icanon)))
+            (setf iflag
+                  (logandc2 (logior iflag
+                                    tty-ignbrk)
+                            (logior tty-icrnl
+                                    tty-istrip
+                                    tty-ixon)))
+            (setf oflag
+                  (logandc2 oflag
+                            (logior #-bsd tty-ocrnl
+                                    #+bsd tty-onlcr)))
+            (setf (ccref cflag-vsusp) posix-vdisable)
+            (setf (ccref cflag-veof) posix-vdisable)
+            (setf *tty-erase-char* (ccref cflag-verase))
+            (setf (ccref cflag-vintr)
+                  (if *editor-windowed-input* posix-vdisable 28))
+            (setf (ccref cflag-vquit) posix-vdisable)
+            (setf (ccref cflag-vstart) posix-vdisable)
+            (setf (ccref cflag-vstop) posix-vdisable)
+            (setf (ccref cflag-vsusp) posix-vdisable)
+            (when (boundp 'cflag-vdsusp)
+              (setf (ccref cflag-vdsusp) posix-vdisable))
+            (setf (ccref cflag-vmin) 1)
+            (setf (ccref cflag-vtime) 0))
+          (tcsetattr fd tcsaflush tios))))))
 
 ;;; #+nil ;; #-(or hpux irix bsd glibc2)
 ;;;       (alien:with-alien ((sg (alien:struct unix:sgttyb)))
@@ -395,36 +563,32 @@
 ;;;                (unix:get-unix-error-msg err)))))
 
 (defun reset-input ()
-  (let ((fd 1 #+nil *editor-file-descriptor*))
-    (when (plusp (osicat-posix::isatty fd))
-      (cffi:with-foreign-object (tios 'osicat-posix::termios)
-        (osicat-posix::tcgetattr fd tios)
-        (cffi:with-foreign-slots ((osicat-posix::iflag
-                                   osicat-posix::oflag
-                                   osicat-posix::cflag
-                                   osicat-posix::lflag
-                                   osicat-posix::cc)
-                                  tios osicat-posix::termios)
-          (setf osicat-posix::iflag *old-c-iflag*)
-          (setf osicat-posix::oflag *old-c-oflag*)
-          (setf osicat-posix::cflag *old-c-cflag*)
-          (setf osicat-posix::lflag *old-c-lflag*)
+  (let ((fd 1))
+    (when (plusp (isatty fd))
+      (cffi:with-foreign-object (tios '(:struct termios))
+        (tcgetattr fd tios)
+        (cffi:with-foreign-slots ((iflag oflag cflag lflag cc)
+                                  tios (:struct termios))
+          (setf iflag *old-c-iflag*)
+          (setf oflag *old-c-oflag*)
+          (setf cflag *old-c-cflag*)
+          (setf lflag *old-c-lflag*)
           (macrolet ((ccref (slot)
-                       `(cffi:mem-ref osicat-posix::cc :uint8 ,slot)))
+                       `(cffi:mem-ref cc :uint8 ,slot)))
             (assert (= (length *old-c-cc*) 11))
-            (setf (ccref osicat-posix::cflag-vsusp) (elt *old-c-cc* 0)
-                  (ccref osicat-posix::cflag-veof) (elt *old-c-cc* 1)
-                  (ccref osicat-posix::cflag-verase) (elt *old-c-cc* 2)
-                  (ccref osicat-posix::cflag-vintr) (elt *old-c-cc* 3)
-                  (ccref osicat-posix::cflag-vquit) (elt *old-c-cc* 4)
-                  (ccref osicat-posix::cflag-vstart) (elt *old-c-cc* 5)
-                  (ccref osicat-posix::cflag-vstop) (elt *old-c-cc* 6)
-                  (ccref osicat-posix::cflag-vsusp) (elt *old-c-cc* 7))
-            (when (boundp 'osicat-posix::cflag-vdsusp)
-              (setf (ccref osicat-posix::cflag-vdsusp) (elt *old-c-cc* 8)))
-            (setf (ccref osicat-posix::cflag-vmin) (elt *old-c-cc* 9)
-                  (ccref osicat-posix::cflag-vtime) (elt *old-c-cc* 10)))
-          (osicat-posix::tcsetattr fd osicat-posix::tcsaflush tios))))))
+            (setf (ccref cflag-vsusp)  (elt *old-c-cc* 0)
+                  (ccref cflag-veof)   (elt *old-c-cc* 1)
+                  (ccref cflag-verase) (elt *old-c-cc* 2)
+                  (ccref cflag-vintr)  (elt *old-c-cc* 3)
+                  (ccref cflag-vquit)  (elt *old-c-cc* 4)
+                  (ccref cflag-vstart) (elt *old-c-cc* 5)
+                  (ccref cflag-vstop)  (elt *old-c-cc* 6)
+                  (ccref cflag-vsusp)  (elt *old-c-cc* 7))
+            (when (boundp 'cflag-vdsusp)
+              (setf (ccref cflag-vdsusp) (elt *old-c-cc* 8)))
+            (setf (ccref cflag-vmin)  (elt *old-c-cc* 9)
+                  (ccref cflag-vtime) (elt *old-c-cc* 10)))
+          (tcsetattr fd tcsaflush tios))))))
 
 #+(or)
 (defun pause-hemlock ()

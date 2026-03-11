@@ -1,361 +1,301 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
+;;;
+;;; Native backend: sb-sys event loop + sb-bsd-sockets + sb-ext:run-program.
+;;; Replaces iolib entirely.
 
 (in-package :hi)
+
 #+sbcl (declaim (optimize (speed 2)))
 
-(defmethod invoke-with-new-event-loop ((backend (eql :iolib)) fun)
-  ;; the epoll muxer gives me segfaults and memory corruption.
-  ;; Don't know why, but select works, so let's use it:
-  (iolib:with-event-base
-      (*event-base* :mux 'iolib.multiplex:select-multiplexer)
-    (funcall fun)))
+;;;;
+;;;; Event loop — delegates to SBCL's built-in sb-sys fd handler system.
+;;;;
 
-(defmethod make-event-loop ((backend (eql :iolib)))
-  (make-instance 'iolib:event-base
-                 :mux 'iolib.multiplex:select-multiplexer))
+(defmethod invoke-with-new-event-loop ((backend (eql :sb-sys)) fun)
+  (funcall fun))
 
-(defmethod invoke-with-existing-event-loop ((backend (eql :iolib)) loop fun)
-  (let ((*event-base* loop))
-    (funcall fun)))
+(defmethod make-event-loop ((backend (eql :sb-sys)))
+  nil)
 
-(defmethod dispatch-events-with-backend ((backend (eql :iolib)))
-  (handler-case
-      (iolib:event-dispatch *event-base* :one-shot t :min-step 0)
-    ((or isys:etimedout isys:ewouldblock) ())))
+(defmethod invoke-with-existing-event-loop ((backend (eql :sb-sys)) loop fun)
+  (declare (ignore loop))
+  (funcall fun))
 
-(defmethod dispatch-events-no-hang-with-backend ((backend (eql :iolib)))
-  (handler-case
-      (iolib:event-dispatch *event-base*
-                            :one-shot t
-                            :timeout 0
-                            :min-step 0)
-    ((or isys:etimedout isys:ewouldblock) ())))
+(defmethod dispatch-events-with-backend ((backend (eql :sb-sys)))
+  (drain-pending-invocations)
+  (sb-sys:serve-event))
 
-(defmethod invoke-later ((backend (eql :iolib)) fun)
-  (iolib.multiplex:add-timer *event-base* fun 0 :one-shot t))
+(defmethod dispatch-events-no-hang-with-backend ((backend (eql :sb-sys)))
+  (drain-pending-invocations)
+  (sb-sys:serve-event 0))
+
+;;; invoke-later: push onto a list and drain at the next dispatch point.
+(defvar *pending-invocations* nil)
+
+(defmethod invoke-later ((backend (eql :sb-sys)) fun)
+  (push fun *pending-invocations*))
+
+(defun drain-pending-invocations ()
+  (loop while *pending-invocations*
+        do (funcall (pop *pending-invocations*))))
 
 
 ;;;;
-;;;; IOLIB-CONNECTION
+;;;; fd-readable-p — poll(2) with timeout 0
 ;;;;
 
-(defclass iolib-connection (io-connection)
-  ((read-fd :initarg :read-fd
-            :initarg :fd
-            :initform nil
-            :accessor connection-read-fd)
-   (write-fd :initarg :write-fd
-             :initarg :fd
-             :initform nil
-             :accessor connection-write-fd)
-   (write-buffers :initform nil
-                  :accessor connection-write-buffers)))
+;;; struct pollfd layout: fd(int32) events(int16) revents(int16)
+(defconstant +pollin+ 1)
 
-(defmethod initialize-instance :after
-    ((instance iolib-connection) &key)
-  )
+(defun fd-readable-p (fd)
+  "Return true if FD has data available without blocking."
+  (cffi:with-foreign-object (pfd :uint64)
+    (setf (cffi:mem-ref pfd :int32 0) fd
+          (cffi:mem-ref pfd :int16 4) +pollin+
+          (cffi:mem-ref pfd :int16 6) 0)
+    (plusp (cffi:foreign-funcall "poll" :pointer pfd :uint32 1 :int 0 :int))))
 
-(defmethod (setf connection-read-fd)
-    :after
-    ((newval t) (connection iolib-connection))
+
+;;;;
+;;;; SB-SYS-CONNECTION — base class
+;;;;
+
+(defclass sb-sys-connection (io-connection)
+  ((read-fd   :initarg :read-fd  :initarg :fd :initform nil
+              :accessor connection-read-fd)
+   (write-fd  :initarg :write-fd :initarg :fd :initform nil
+              :accessor connection-write-fd)
+   (read-handler  :initform nil :accessor connection-read-handler)
+   (write-handler :initform nil :accessor connection-write-handler)
+   (write-buffers :initform nil :accessor connection-write-buffers)))
+
+(defmethod (setf connection-read-fd) :after
+    ((newval t) (connection sb-sys-connection))
   (when (connection-read-fd connection)
-    (set-iolib-handlers connection)))
+    (install-read-handler connection)))
 
-(defmethod (setf connection-write-fd)
-    :after
-    ((newval t) (connection iolib-connection))
-  (when (connection-write-fd connection)
-    (set-iolib-handlers connection)))
-
-(defun set-iolib-handlers (connection)
-  (let ((fd (connection-read-fd connection)))
-    (iolib:set-io-handler
-     *event-base*
-     fd
-     :read
-     (lambda (.fd event error)
-       (declare (ignore event))
-       (when (or (eq error :error)
-                 (eq (process-incoming-data connection) :eof))
-         (iolib:remove-fd-handlers *event-base* fd :read t))))))
-
-(defmethod %read ((connection iolib-connection))
+(defun install-read-handler (connection)
   (let* ((fd (connection-read-fd connection))
+         (handler
+           (sb-sys:add-fd-handler
+            fd :input
+            (lambda (fd)
+              (declare (ignore fd))
+              (when (eq (process-incoming-data connection) :eof)
+                (let ((h (connection-read-handler connection)))
+                  (when h
+                    (sb-sys:remove-fd-handler h)
+                    (setf (connection-read-handler connection) nil))))))))
+    (setf (connection-read-handler connection) handler)))
+
+(defmethod %read ((connection sb-sys-connection))
+  (let* ((fd     (connection-read-fd connection))
          (buffer (connection-input-buffer connection))
-         (n
-          ;; fixme: with-pointer-to-vector-data isn't portable
-          (cffi-sys:with-pointer-to-vector-data (ptr buffer)
-            (isys:read fd ptr (length buffer)))))
-    (cond
-      ((zerop n)
-       :eof)
-      (t
-       (subseq buffer 0 n)))))
+         (n (cffi:with-pointer-to-vector-data (ptr buffer)
+              (cffi:foreign-funcall "read"
+                                    :int fd :pointer ptr
+                                    :size (length buffer) :long))))
+    (cond ((or (zerop n) (minusp n)) :eof)
+          (t (subseq buffer 0 n)))))
 
-(defmethod delete-connection :before ((connection iolib-connection))
-  (with-slots (read-fd write-fd) connection
+(defmethod delete-connection :before ((connection sb-sys-connection))
+  (with-slots (read-fd write-fd read-handler write-handler) connection
+    (when read-handler
+      (sb-sys:remove-fd-handler read-handler)
+      (setf read-handler nil))
+    (when write-handler
+      (sb-sys:remove-fd-handler write-handler)
+      (setf write-handler nil))
     (when read-fd
-      (isys:close read-fd))
-    (when write-fd
-      (unless (eql write-fd read-fd)
-        (isys:close write-fd)))))
+      (cffi:foreign-funcall "close" :int read-fd :int)
+      (setf read-fd nil))
+    (when (and write-fd (not (eql write-fd read-fd)))
+      (cffi:foreign-funcall "close" :int write-fd :int)
+      (setf write-fd nil))))
 
-(defmethod connection-listen ((connection iolib-connection))
-  (iolib.multiplex:fd-readablep (connection-read-fd connection)))
+(defmethod connection-listen ((connection sb-sys-connection))
+  (fd-readable-p (connection-read-fd connection)))
 
-(defmethod connection-write (data (connection iolib-connection))
-  (let ((bytes (filter-connection-output connection data))
-        (fd (connection-write-fd connection))
-        (need-handler (null (connection-write-buffers connection)))
-        handler)
+(defmethod connection-write (data (connection sb-sys-connection))
+  (let* ((bytes (filter-connection-output connection data))
+         (fd    (connection-write-fd connection))
+         (need-handler (null (connection-write-buffers connection))))
     (check-type bytes (simple-array (unsigned-byte 8) (*)))
     (setf (connection-write-buffers connection)
-          (nconc (connection-write-buffers connection)
-                 (list bytes)))
+          (nconc (connection-write-buffers connection) (list bytes)))
     (when need-handler
-      (setf handler
-            (iolib:set-io-handler
-             *event-base*
-             fd
-             :write
-             (lambda (.fd event error)
-               (declare (ignore event))
-               (when (eq error :error) (error "error with ~A" .fd))
-               ;; fixme: with-pointer-to-vector-data isn't portable
-               (let ((bytes (pop (connection-write-buffers connection))))
-                 (check-type bytes (simple-array (unsigned-byte 8) (*)))
-                 (cffi-sys:with-pointer-to-vector-data (ptr bytes)
-                   (let ((n-bytes-written
-                          (isys:write fd ptr (length bytes))))
-                     (unless (eql n-bytes-written (length bytes))
-                       (push (subseq bytes n-bytes-written)
-                             (connection-write-buffers connection)))))
-                 (setf (iolib.multiplex::fd-handler-one-shot-p handler)
-                       (null (connection-write-buffers connection))))))))))
+      (labels ((write-some ()
+                 (let ((buf (first (connection-write-buffers connection))))
+                   (when buf
+                     (let ((n (cffi:with-pointer-to-vector-data (ptr buf)
+                                (cffi:foreign-funcall "write"
+                                                      :int fd :pointer ptr
+                                                      :size (length buf) :long))))
+                       (cond
+                         ((minusp n)
+                          (error "write error on ~A" connection))
+                         ((< n (length buf))
+                          (setf (first (connection-write-buffers connection))
+                                (subseq buf n)))
+                         (t
+                          (pop (connection-write-buffers connection)))))
+                     (when (null (connection-write-buffers connection))
+                       (let ((h (connection-write-handler connection)))
+                         (when h
+                           (sb-sys:remove-fd-handler h)
+                           (setf (connection-write-handler connection) nil))))))))
+        (setf (connection-write-handler connection)
+              (sb-sys:add-fd-handler fd :output
+                                     (lambda (fd)
+                                       (declare (ignore fd))
+                                       (write-some))))))))
 
 
 ;;;;
-;;;; PROCESS-CONNECTION/IOLIB
+;;;; PROCESS-CONNECTION/SB-SYS — spawned child process via sb-ext:run-program
 ;;;;
 
-(defclass process-connection/iolib
-    (process-connection-mixin iolib-connection)
-  ((pid :initform nil
-        :accessor connection-pid)))
+(defclass process-connection/sb-sys
+    (process-connection-mixin sb-sys-connection)
+  ((process :initform nil :accessor connection-process)))
 
-(defmethod initialize-instance
-    :after
-    ((instance process-connection/iolib) &key)
-  (with-slots (read-fd write-fd pid command slave-pty-name directory) instance
+(defmethod connection-pid ((connection process-connection/sb-sys))
+  (let ((p (connection-process connection)))
+    (when p (sb-ext:process-pid p))))
+
+(defmethod initialize-instance :after
+    ((instance process-connection/sb-sys) &key)
+  (with-slots (read-fd write-fd process command directory) instance
     (connection-note-event instance :initialized)
     (when (stringp command)
       (setf command (cl-ppcre:split " " command)))
     (assert (every #'stringp command))
     (assert command)
-    (setf (values pid read-fd write-fd)
-          (%fork-and-exec (car command) command directory slave-pty-name))
-    (set-iolib-handlers instance)
+    (let* ((prog (car command))
+           (args (cdr command))
+           (proc (sb-ext:run-program prog args
+                                     :input  :stream
+                                     :output :stream
+                                     :wait   nil
+                                     :directory (or directory "/"))))
+      (setf process proc
+            write-fd (sb-sys:fd-stream-fd (sb-ext:process-input proc))
+            read-fd  (sb-sys:fd-stream-fd (sb-ext:process-output proc))))
+    (install-read-handler instance)
     (note-connected instance)))
 
-(defmethod delete-connection :before ((connection process-connection/iolib))
-  (isys:kill (connection-pid connection) 15))
-
-;; ccl gives an exception in foreign code without this:
-#+ccl
-(defun invoke-without-interrupts (fun)
-  (ccl::without-interrupts (funcall fun)))
-
-#-ccl
-(defun invoke-without-interrupts (fun)
-  (funcall fun))
-
-(defmacro maybe-without-interrupts (&body body)
-  `(invoke-without-interrupts (lambda () ,@body)))
-
-(defun %exec
-       (stdin-read stdin-write stdout-read stdout-write file args directory
-                   slave-pty-name)
-  (maybe-without-interrupts
-   (isys:close stdin-write)
-   (isys:close stdout-read)
-   (isys:dup2 stdin-read 0)
-   (isys:dup2 stdout-write 1)
-   (isys:dup2 stdout-write 2)
-   (isys:close stdin-read)
-   (isys:close stdout-write)
-   (when slave-pty-name
-     (isys:setsid)
-     (handler-case
-         (isys:open "/dev/tty" isys:o-rdwr)
-       (isys:enoent ())
-       (isys:enxio ())
-       (:no-error (fd)
-         (isys:ioctl fd osicat-posix:tiocnotty 0)
-         (isys:close fd)))
-     (isys:close 0)
-     (isys:open slave-pty-name isys:o-rdwr)
-     (isys:dup2 0 1)
-     (isys:dup2 0 2)
-     (cffi:with-foreign-object (tios 'osicat-posix::termios)
-       (osicat-posix::tcgetattr 0 tios)
-       (cffi:with-foreign-slots ((osicat-posix::iflag
-                                  osicat-posix::oflag
-                                  osicat-posix::lflag
-                                  osicat-posix::cc)
-                                 tios osicat-posix::termios)
-         (setf osicat-posix::lflag
-               (logandc2 osicat-posix::lflag
-                         (logior osicat-posix::tty-echo
-                                 osicat-posix::tty-echonl)))
-         (setf osicat-posix::iflag
-               (logior (logandc2 osicat-posix::iflag
-                                 osicat-posix::tty-brkint)
-                       osicat-posix::tty-icanon
-                       osicat-posix::tty-icrnl))
-         (setf osicat-posix::oflag
-               (logandc2 osicat-posix::oflag
-                         osicat-posix::tty-onlcr ))
-         (setf (cffi:mem-ref osicat-posix::cc
-                             :uint8
-                             osicat-posix::cflag-verase)
-               #o177)
-         (osicat-posix::tcsetattr 0 osicat-posix::tcsaflush tios))))
-   (when directory
-     (isys:chdir directory))
-   (let ((n (length args)))
-     (cffi:with-foreign-object (argv :pointer (1+ n))
-       (loop for i from 0
-             for arg in args
-             do (setf (cffi:mem-aref argv :pointer i)
-                      (cffi:foreign-string-alloc arg)))
-       (setf (cffi:mem-aref argv :pointer n) (cffi:null-pointer))
-       (isys:execvp file argv)))
-   (isys::exit 1)))
-
-(defun %fork-and-exec (file args &optional directory slave-pty-name)
-  (multiple-value-bind (stdin-read stdin-write)
-      (isys:pipe)
-    (multiple-value-bind (stdout-read stdout-write)
-        (isys:pipe)
-      (let ((pid (isys:fork)))
-        (case pid
-          (0 (%exec stdin-read
-                    stdin-write
-                    stdout-read
-                    stdout-write
-                    file
-                    args
-                    directory
-                    slave-pty-name))
-          (t
-           (isys:close stdin-read)
-           (isys:close stdout-write)
-           (values pid stdout-read stdin-write)))))))
+(defmethod delete-connection :before ((connection process-connection/sb-sys))
+  (let ((p (connection-process connection)))
+    (when p
+      (sb-ext:process-kill p 15)
+      (setf (connection-process connection) nil))))
 
 
 ;;;;
-;;;; TCP-CONNECTION/IOLIB
+;;;; TCP-CONNECTION/SB-SYS — TCP client socket via sb-bsd-sockets
 ;;;;
 
-(defclass tcp-connection/iolib (tcp-connection-mixin iolib-connection)
+(defclass tcp-connection/sb-sys (tcp-connection-mixin sb-sys-connection)
   ((socket :accessor connection-socket)))
 
-(defmethod initialize-instance :after ((instance tcp-connection/iolib) &key)
+(defmethod initialize-instance :after ((instance tcp-connection/sb-sys) &key)
   (with-slots (read-fd write-fd socket host port) instance
     (connection-note-event instance :initialized)
     (unless (or read-fd write-fd)
-      (setf socket
-            (iolib.sockets:make-socket :address-family :ipv4
-                                       :connect :active
-                                       :type :stream
-                                       :remote-host host
-                                       :remote-port port))
-      (setf read-fd (iolib.sockets:socket-os-fd socket))
-      (setf write-fd (iolib.sockets:socket-os-fd socket)))
-    (set-iolib-handlers instance)
+      (let* ((sock (make-instance 'sb-bsd-sockets:inet-socket
+                                  :type :stream :protocol :tcp))
+             (addr (sb-bsd-sockets:make-inet-address host)))
+        (sb-bsd-sockets:socket-connect sock addr port)
+        (let ((fd (sb-bsd-sockets:socket-file-descriptor sock)))
+          (setf socket  sock
+                read-fd  fd
+                write-fd fd))))
+    (install-read-handler instance)
     (note-connected instance)))
 
-;;;
-;;; PIPELIKE-CONNECTION/IOLIB
-;;;
-
-(defclass pipelike-connection/iolib
-    (pipelike-connection-mixin iolib-connection)
-  ())
-
-(defmethod initialize-instance
-    :after
-    ((instance pipelike-connection/iolib) &key)
-  (connection-note-event instance :initialized)
-  (set-iolib-handlers instance))
-
-
-;;;
-;;; PROCESS-WITH-PTY-CONNECTION/IOLIB
-;;;
-
-(defclass process-with-pty-connection/iolib
-    (process-with-pty-connection-mixin pipelike-connection/iolib)
-  ())
-
 
 ;;;;
-;;;; LISTENING-CONNECTION/IOLIB
+;;;; PIPELIKE-CONNECTION/SB-SYS
 ;;;;
 
-(defclass listening-connection/iolib (listening-connection)
-  ((socket :accessor connection-socket)
-   (fd :initform nil
-       :accessor connection-fd)))
+(defclass pipelike-connection/sb-sys
+    (pipelike-connection-mixin sb-sys-connection)
+  ())
 
 (defmethod initialize-instance :after
-    ((instance listening-connection/iolib) &key)
+    ((instance pipelike-connection/sb-sys) &key)
+  (connection-note-event instance :initialized)
+  (install-read-handler instance))
+
+
+;;;;
+;;;; PROCESS-WITH-PTY-CONNECTION/SB-SYS
+;;;;
+
+(defclass process-with-pty-connection/sb-sys
+    (process-with-pty-connection-mixin pipelike-connection/sb-sys)
+  ())
+
+
+;;;;
+;;;; LISTENING-CONNECTION/SB-SYS — TCP server socket
+;;;;
+
+(defclass listening-connection/sb-sys (listening-connection)
+  ((socket  :accessor connection-socket)
+   (fd      :initform nil :accessor connection-fd)
+   (handler :initform nil :accessor connection-accept-handler)))
+
+(defmethod initialize-instance :after
+    ((instance listening-connection/sb-sys) &key)
   (with-slots (fd socket host port) instance
     (unless fd
       (connection-note-event instance :initialized)
       (let ((addr (if host
-                      (iolib.sockets:ensure-hostname host)
-                      iolib.sockets:+ipv4-unspecified+)))
-        (setf socket
-              (flet ((doit (port)
-                       (iolib.sockets:make-socket :address-family :ipv4
-                                                  :connect :passive
-                                                  :type :stream
-                                                  :local-host addr
-                                                  :local-port port)))
+                      (sb-bsd-sockets:make-inet-address host)
+                      (sb-bsd-sockets:make-inet-address "0.0.0.0"))))
+        (flet ((try-bind (p)
+                 (let ((sock (make-instance 'sb-bsd-sockets:inet-socket
+                                            :type :stream :protocol :tcp)))
+                   (setf (sb-bsd-sockets:sockopt-reuse-address sock) t)
+                   (sb-bsd-sockets:socket-bind sock addr p)
+                   (sb-bsd-sockets:socket-listen sock 5)
+                   sock)))
+          (setf socket
                 (if port
-                    (doit port)
+                    (try-bind port)
                     (loop for p from 1024 below 65536
                           do (handler-case
-                                 (doit p)
-                               (:no-error (socket)
+                                 (try-bind p)
+                               (:no-error (sock)
                                  (setf port p)
-                                 (return socket))
-                               (error (c) (warn "~A" c))))))))
-      (setf fd (iolib.sockets:socket-os-fd socket)))
-    (set-iolib-server-handlers instance)))
+                                 (return sock))
+                               (error ()))))))
+        (setf fd (sb-bsd-sockets:socket-file-descriptor socket)))))
+  (install-accept-handler instance))
 
-(defun set-iolib-server-handlers (instance)
-  (iolib:set-io-handler
-   *event-base*
-   (connection-fd instance)
-   :read
-   (lambda (.fd event error)
-     (declare (ignore event))
-     (when (eq error :error) (error "error with ~A" .fd))
-     (process-incoming-connection instance))))
+(defun install-accept-handler (instance)
+  (setf (connection-accept-handler instance)
+        (sb-sys:add-fd-handler
+         (connection-fd instance) :input
+         (lambda (fd)
+           (declare (ignore fd))
+           (process-incoming-connection instance)))))
 
-(defmethod delete-connection :before ((connection listening-connection/iolib))
-  (close (connection-socket connection)))
+(defmethod delete-connection :before ((connection listening-connection/sb-sys))
+  (let ((h (connection-accept-handler connection)))
+    (when h
+      (sb-sys:remove-fd-handler h)
+      (setf (connection-accept-handler connection) nil)))
+  (sb-bsd-sockets:socket-close (connection-socket connection)))
 
-(defmethod (setf connection-fd)
-    :after
-    ((newval t) (connection listening-connection/iolib))
-  (set-iolib-server-handlers connection))
+(defmethod (setf connection-fd) :after
+    ((newval t) (connection listening-connection/sb-sys))
+  (install-accept-handler connection))
 
 (defun %tcp-connection-from-fd (name fd host port initargs)
   (apply #'make-instance
-         'tcp-connection/iolib
+         'tcp-connection/sb-sys
          :name name
          :fd fd
          :host host
@@ -364,31 +304,25 @@
 
 
 ;;;;
-;;;; TCP-LISTENER/IOLIB
+;;;; TCP-LISTENER/SB-SYS
 ;;;;
 
-(defclass tcp-listener/iolib (tcp-listener-mixin listening-connection/iolib)
+(defclass tcp-listener/sb-sys (tcp-listener-mixin listening-connection/sb-sys)
   ())
 
-(defmethod initialize-instance :after ((instance tcp-listener/iolib) &key)
-  ;; ...
+(defmethod initialize-instance :after ((instance tcp-listener/sb-sys) &key)
   )
 
-(defmethod convert-pending-connection ((connection tcp-listener/iolib))
-  (iolib.sockets::with-sockaddr-storage-and-socklen (ss size)
-    (let* ((socket (connection-socket connection))
-           (fd (iolib.sockets::%accept (iolib.streams:fd-of socket) ss size)))
-      (multiple-value-bind (host port)
-          (iolib.sockets::sockaddr-storage->sockaddr ss)
+(defmethod convert-pending-connection ((connection tcp-listener/sb-sys))
+  (multiple-value-bind (client-sock client-addr)
+      (sb-bsd-sockets:socket-accept (connection-socket connection))
+    (declare (ignore client-addr))
+    (multiple-value-bind (host port)
+        (sb-bsd-sockets:socket-peername client-sock)
+      (let ((fd (sb-bsd-sockets:socket-file-descriptor client-sock)))
         (%tcp-connection-from-fd
          (format nil "Accepted for: ~A" (connection-name connection))
          fd
-         host
+         (format nil "~{~A~^.~}" (coerce host 'list))
          port
          (connection-initargs connection))))))
-
-#+(or)
-(trace connection-write
-       %read
-       isys:read
-       isys:write)

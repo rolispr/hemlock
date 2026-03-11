@@ -386,7 +386,7 @@ GB
 (defun hemlock (&optional x
                 &key (load-user-init t)
                      backend-type
-                     (display (isys:getenv "DISPLAY")))
+                     (display (sb-posix:getenv "DISPLAY")))
   "Invokes the editor, Hemlock.  If X is supplied and is a symbol, the
    definition of X is put into a buffer, and that buffer is selected.  If X is
    a pathname, the file specified by X is visited in a new buffer.  If X is not
@@ -434,7 +434,7 @@ GB
 ;;;
 (defun call-with-editor
     (fun
-     &key (load-user-init t) backend-type (display (isys:getenv "DISPLAY")))
+     &key (load-user-init t) backend-type (display (sb-posix:getenv "DISPLAY")))
   (when *in-the-editor*
     (error "already in the editor"))
   (when (and backend-type (not (validate-backend-type backend-type)))
@@ -446,7 +446,7 @@ GB
     (setf *connection-backend*
           (ecase backend-type
             (:qt :qt)
-            ((:tty :clx :mini) :iolib)))
+            ((:tty :clx :mini) :sb-sys)))
     (with-existing-event-loop
         (or *main-event-base*
             (setf *main-event-base*

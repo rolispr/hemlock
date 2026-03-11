@@ -789,10 +789,6 @@
 
 (defun install-special-variables-for-background-threads ()
   (install-thread-variable-default
-   'prepl:*entering-prepl-debugger-hook*
-   (lambda ()
-     'hi::call-with-typeout-for-thread-debugger))
-  (install-thread-variable-default
    'hi::*connection-backend*
    (constantly hi::*connection-backend*))
   (install-thread-variable-default
@@ -816,13 +812,12 @@
   (let ((hi::*connection-backend*
          (ecase backend-type
            (:qt :qt)
-           ((:tty :clx :mini) :iolib)))
+           ((:tty :clx :mini) :sb-sys)))
         (seperator (position #\: editor :test #'char=)))
     (unless seperator
       (error "Editor name ~S invalid. ~
               Must be of the form \"MachineName:PortNumber\"."
              editor))
-    (prepl:install-global-prepl-debugger-hook)
     (install-special-variables-for-background-threads)
     (let ((machine (subseq editor 0 seperator))
           (port (parse-integer editor :start (1+ seperator)))
@@ -848,7 +843,7 @@
                    (write-line "Waiting for typestream buffer..."
                                *original-terminal-io*)
                    (force-output *original-terminal-io*))
-          (prepl:repl))))))
+          (loop (dispatch-events)))))))
 
 (defun simple-backtrace (&optional (stream *standard-output*))
   (let ((i 0))
@@ -860,8 +855,7 @@
        (incf i)))))
 
 (defun start-slave (&rest args)
-  (let ((prepl:*entering-prepl-debugger-hook* nil)
-        (*original-terminal-io* *terminal-io*))
+  (let ((*original-terminal-io* *terminal-io*))
     (block nil
       (handler-bind
           ((serious-condition
@@ -1132,11 +1126,11 @@
 #-scl
 (defun invoke-with-temporary-file-name (fun)
   (multiple-value-bind (fd pathname)
-                       (isys:mkstemp "/tmp/hemlock")
-    (isys:close fd)
+                       (sb-posix:mkstemp "/tmp/hemlockXXXXXX")
+    (sb-posix:close fd)
     (funcall fun pathname)
-    (when (iolib.os::get-file-kind pathname nil)
-      (isys:unlink pathname))))
+    (when (probe-file pathname)
+      (sb-posix:unlink pathname))))
 
 (defun server-compile-text (note package text defined-from
                             terminal-io error-output)

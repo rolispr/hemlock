@@ -18,8 +18,7 @@
 
 (defun call-with-typeout-for-thread-debugger (cont)
   (with-new-event-loop ()
-    (let ((prepl:*entering-prepl-debugger-hook* nil)
-          (hi::*in-hemlock-slave-p* t)
+    (let ((hi::*in-hemlock-slave-p* t)
           (hemlock.wire:*current-wire* :not-yet))
       (hemlock::connect-to-editor-for-background-thread
        (car hemlock::*master-machine-and-port*)

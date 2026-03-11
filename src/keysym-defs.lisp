@@ -125,6 +125,12 @@
 (hemlock-ext:define-keysym 10 "Linefeed" "Action" "Newline")            ;action
 (hemlock-ext:define-keysym 32 "Space" " ")
 
+;;; Mouse / pointer events (0xFF00-0xFF02, not used by X11 keysyms).
+;;;
+(hemlock-ext:define-keysym 65280 "Mouse1")
+(hemlock-ext:define-keysym 65281 "WheelUp")
+(hemlock-ext:define-keysym 65282 "WheelDown")
+
 ;;; Letters.
 ;;;
 (hemlock-ext:define-keysym 97 "a") (hemlock-ext:define-keysym 65 "A")

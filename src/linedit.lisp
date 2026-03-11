@@ -893,30 +893,23 @@ empty string."
 (defun repl ()
   ;; FIXME: should check whether a tty is available, and fall back to
   ;; non-linedit usage otherwise.
-  (let* ((prompt "")
-         (prepl::*read-command*
-          (lambda (stream)
-            (declare (ignore stream))
-            (block t
-              (catch 'linedit-eof
-                (return-from t
-                  (with-input-from-string (s (formedit :prompt prompt))
-                    (prepl::read-command s))))
-              (let ((*event-base* *main-event-base*)) ;...
-                (newline (current-device))
-                (dispatch-events-no-hang))
-              prepl::*eof-command*)))
-         (real-prompt-fun prepl::*prompt*)
-         (prepl::*prompt*
-          (lambda (&rest junk)
-            (declare (ignore stream))
-            (setf prompt
-                  (string-trim (list #\newline)
-                               (with-output-to-string (s)
-                                 (let ((prepl::*prompt* real-prompt-fun))
-                                   (prepl::prompt s)))))
-            "")))
-    (prepl:repl)))
+  (loop
+    (let ((form (block nil
+                  (catch 'linedit-eof
+                    (return (read-interactively nil :eof)))
+                  (let ((*event-base* *main-event-base*))
+                    (newline (current-device))
+                    (dispatch-events-no-hang))
+                  :eof)))
+      (when (eq form :eof) (return))
+      (let ((results (multiple-value-list
+                      (handler-case (eval form)
+                        (error (e)
+                          (format t "~&Error: ~A~%" e)
+                          (values))))))
+        (dolist (r results)
+          (format t "~&~S~%" r))
+        (force-output)))))
 
 (defun advance-history (direction)
   (let* ((editor (current-device))

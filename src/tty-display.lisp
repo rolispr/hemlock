@@ -213,16 +213,17 @@
          (setf (si-line-fonts ,screen-image-line) ,dl-fonts)))))
 
 (defun maybe-resize-tty-device (device)
-  (multiple-value-bind (lines cols)
-      (hi::get-terminal-attributes)
-    (let ((delta (- lines (tty-device-lines device)))
-          #+nil (cols (if hemlock.terminfo:auto-right-margin
-                    (1- cols)
-                    cols)))
-      (unless (and (zerop delta)
-                   #+nil (eql (tty-device-columns device) cols))
+  ;; Only query terminal size when the SIGWINCH handler has signalled a resize.
+  ;; This avoids an ioctl syscall on every redisplay cycle.
+  (when *pending-resize*
+    (setf *pending-resize* nil)
+    (let* ((lines (or *pending-resize-lines*
+                      (nth-value 0 (hi::get-terminal-attributes))))
+           (delta (- lines (tty-device-lines device))))
+      (setf *pending-resize-lines* nil
+            *pending-resize-cols*  nil)
+      (unless (zerop delta)
         (setf (tty-device-lines device) lines)
-        #+nil (setf (tty-device-columns device) cols)
         (enlarge-device device delta)))))
 
 (defmethod device-dumb-redisplay ((device tty-device) window)

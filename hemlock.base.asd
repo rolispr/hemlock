@@ -46,10 +46,9 @@
      :depends-on (#-scl :alexandria
                   :bordeaux-threads
                   :trivial-gray-streams
-                  :prepl
-                  :osicat
-                  :iolib
-                  :iolib/os
+                  :sb-bsd-sockets
+                  :cffi
+                  :babel
                   :cl-ppcre
                   #-scl :command-line-arguments)
     :components
@@ -69,8 +68,8 @@
                (:file "decls" :depends-on ("package")) ; early declarations of functions and stuff
                (:file "struct" :depends-on ("package"))
                #+port-core-struct-ed (:file "struct-ed" :depends-on ("package"))
-               (:file "charmacs" :depends-on ("package"))
-               (:file "key-event" :depends-on ("package" "charmacs"))
+               (:file "char-attrs" :depends-on ("package"))
+               (:file "key-event" :depends-on ("package" "char-attrs"))
                ))
      (:module bitmap-1
               :pathname #.(merge-pathnames
@@ -94,14 +93,14 @@
                (:file "macros")
                (:file "line")
                (:file "ring")
-               (:file "htext1") ; buffer depends on it --amb
+               (:file "text-primitives") ; buffer depends on it --amb
                (:file "buffer")
                (:file "vars")
-               (:file "interp")
+               (:file "key-dispatch")
                (:file "syntax")
-               (:file "htext2")
-               (:file "htext3")
-               (:file "htext4")
+               (:file "text-ops")
+               (:file "text-insert")
+               (:file "text-delete")
                (:file "files")
                (:file "search1")
                (:file "search2")
@@ -113,7 +112,7 @@
                (:file "linimage")
                (:file "cursor")
                (:file "display")
-               (:file "exp-syntax")
+               (:file "syntax-highlight")
                (:file "connections")
                (:file "repl" :depends-on ("macros" "rompsite" "connections"))))
      (:module root-1
@@ -136,7 +135,7 @@
                #+port-root-hacks (:file "hacks")
                (:file "main")
                (:file "echo")
-               (:file "new-undo")))
+               (:file "undo-system")))
      (:module core-3
               :pathname #.(merge-pathnames
                            (make-pathname
@@ -164,20 +163,20 @@
                            *hemlock-base-directory*)
               :depends-on (root-2 core-1 wire)
               :components
-              ((:file "echocoms")
+              ((:file "echo-commands")
 
                (:file "command")
-               (:file "kbdmac")
+               (:file "kbd-macro")
                (:file "undo")
-               (:file "killcoms")
-               (:file "indent" :depends-on ("filecoms"))
-               (:file "searchcoms")
-               (:file "filecoms")
-               (:file "grep" :depends-on ("filecoms"))
-               (:file "apropos" :depends-on ("filecoms"))
+               (:file "kill-commands")
+               (:file "indent" :depends-on ("file-commands"))
+               (:file "search-commands")
+               (:file "file-commands")
+               (:file "grep" :depends-on ("file-commands"))
+               (:file "apropos" :depends-on ("file-commands"))
                (:file "morecoms")
-               (:file "doccoms")
-               (:file "srccom")
+               (:file "help-commands")
+               (:file "source-compare")
                (:file "group")
                (:file "fill")
                (:file "text")
@@ -187,19 +186,19 @@
                (:file "ts-stream")
                (:file "request")
                (:file "eval-server")
-               (:file "lispbuf" :depends-on ("filecoms"))
+               (:file "lisp-commands" :depends-on ("file-commands"))
                (:file "lispeval" :depends-on ("eval-server"))
                (:file "spell-rt")
                (:file "spell-corr" :depends-on ("spell-rt"))
                (:file "spell-aug" :depends-on ("spell-corr"))
-               (:file "spellcoms" :depends-on ("spell-aug" "filecoms"))
+               (:file "spellcoms" :depends-on ("spell-aug" "file-commands"))
                (:file "spell-build" :depends-on ("spell-aug"))
 
                (:file "comments")
                (:file "overwrite")
                #+nil ; port to new event model.
                (:file "abbrev")
-               (:file "icom")
+               (:file "italic-mode")
                (:file "defsyn")
 
                (:file "edit-defs")
@@ -210,14 +209,14 @@
                #+port-user-mh (:file "mh")
                (:file "highlight")
                (:file "dired")
-               (:file "diredcoms" :depends-on ("dired"))
-               (:file "bufed")
+               (:file "dired-commands" :depends-on ("dired"))
+               (:file "buflist")
                (:file "coned")
                (:file "xref")
                #+port-user-lisp-lib (:file "lisp-lib")
                (:file "completion" :depends-on ("lispmode"))
-               (:file "cpc")
-               (:file "fuzzy" :depends-on ("cpc"))
+               (:file "symbol-completion")
+               (:file "fuzzy" :depends-on ("symbol-completion"))
                (:file "shell")
                (:file "debug")
                #+port-user-netnews (:file "netnews")

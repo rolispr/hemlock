@@ -1,7 +1,8 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (require 'sb-posix))
+  (require 'sb-posix)
+  (require :sb-introspect))
 
 (in-package :hemlock.wire)
 

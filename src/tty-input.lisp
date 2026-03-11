@@ -80,6 +80,9 @@
     (reg hemlock.terminfo:key-ppage #k"Pageup")
     (reg hemlock.terminfo:key-npage #k"Pagedown")
     (reg hemlock.terminfo:key-backspace #k"Backspace")
+    ;; Many modern terminals (including macOS Terminal) send DEL (0x7F) for
+    ;; the physical Backspace key rather than BS (0x08).  Register both.
+    (reg (string (code-char 127)) #k"Backspace")
 
     (reg hemlock.terminfo:key-sr #k"Shift-Uparrow")
     (reg hemlock.terminfo:key-sf #k"Shift-Downarrow")
@@ -178,14 +181,188 @@
         (when (= 1 (length string))
           (hemlock-ext:char-key-event (char string 0))))))
 
+;;; Bracketed paste markers (xterm protocol).
+(defvar +paste-begin+ (coerce #(#\Esc #\[ #\2 #\0 #\0 #\~) 'string))
+(defvar +paste-end+   (coerce #(#\Esc #\[ #\2 #\0 #\1 #\~) 'string))
+(defconstant +paste-begin-length+ 6)
+(defconstant +paste-end-length+   6)
+
+;;; Focus event markers (xterm protocol, enabled with ESC[?1004h).
+(defvar +focus-in+  (coerce #(#\Esc #\[ #\I) 'string))
+(defvar +focus-out+ (coerce #(#\Esc #\[ #\O) 'string))
+
+(defvar *tty-focused* t
+  "True when the terminal window has focus (updated by focus in/out events).")
+
+(defvar *last-mouse-x* 0 "Terminal column of the last mouse click (0-based).")
+(defvar *last-mouse-y* 0 "Terminal row of the last mouse click (0-based).")
+
+;;; SGR mouse sequence prefix: ESC[<
+(defconstant +sgr-mouse-prefix-length+ 3)
+
+(defun parse-sgr-mouse (data start length)
+  "Try to parse an SGR mouse sequence starting at START.
+  SGR format: ESC [ < Pb ; Px ; Py M|m
+  Returns NIL if incomplete/invalid, or the index past the sequence."
+  ;; Need at least ESC [ < digit ... M|m
+  (when (< (- length start) 4) (return-from parse-sgr-mouse nil))
+  (let ((i (+ start 3))) ; past ESC [ <
+    (flet ((read-num ()
+             (let ((n 0) (found nil))
+               (loop while (< i length)
+                     for c = (char data i)
+                     while (digit-char-p c)
+                     do (setf n (+ (* n 10) (digit-char-p c))
+                              found t)
+                        (incf i))
+               (when found n))))
+      (let* ((b  (read-num))
+             (_1 (when (and b (< i length) (char= (char data i) #\;)) (incf i)))
+             (px (read-num))
+             (_2 (when (and px (< i length) (char= (char data i) #\;)) (incf i)))
+             (py (read-num))
+             (final (when (and py (< i length)) (char data i))))
+        (declare (ignore _1 _2))
+        (when (and b px py (member final '(#\M #\m)))
+          (incf i)
+          ;; Dispatch mouse event as a Hemlock key event.
+          ;; Column px and row py are 1-based in the SGR protocol.
+          (let ((pressed (char= final #\M))
+                (button  (logand b 3))
+                (scroll  (or (= (logand b 63) 64) (= (logand b 63) 65))))
+            (cond
+              (scroll
+               (let ((sym (if (= (logand b 63) 64) #k"WheelUp" #k"WheelDown")))
+                 (when sym (q-event *real-editor-input* sym))))
+              ((and pressed (zerop button))
+               ;; Left button press — store coords and fire Mouse1.
+               (setf *last-mouse-x* (1- px)
+                     *last-mouse-y* (1- py))
+               (q-event *real-editor-input* #k"Mouse1")))
+            i))))))
+
 (defun tty-key-event (data)
   (loop with start = 0
         with length = (length data)
         while (< start length)
-        do (loop for end from length downto (1+ start)
-                 do (let ((event (translate-tty-event (subseq data start end))))
-                      (when event
-                        (q-event *real-editor-input* event)
-                        (setf start end)
-                        (return))))))
+        do
+          (let ((remaining (- length start)))
+            (cond
+              ;; Bracketed paste: ESC[200~ ... content ... ESC[201~
+              ((and (>= remaining +paste-begin-length+)
+                    (string= data +paste-begin+
+                             :start1 start :end1 (+ start +paste-begin-length+)))
+               (let* ((content-start (+ start +paste-begin-length+))
+                      (end-pos (search +paste-end+ data :start2 content-start)))
+                 (if end-pos
+                     (progn
+                       (loop for i from content-start below end-pos
+                             for event = (hemlock-ext:char-key-event (char data i))
+                             when event do (q-event *real-editor-input* event))
+                       (setf start (+ end-pos +paste-end-length+)))
+                     (incf start +paste-begin-length+))))
+              ;; Focus in: ESC[I
+              ((and (>= remaining 3)
+                    (string= data +focus-in+ :start1 start :end1 (+ start 3)))
+               (setf *tty-focused* t)
+               (incf start 3))
+              ;; Focus out: ESC[O
+              ((and (>= remaining 3)
+                    (string= data +focus-out+ :start1 start :end1 (+ start 3)))
+               (setf *tty-focused* nil)
+               (incf start 3))
+              ;; SGR mouse: ESC[<...
+              ((and (>= remaining 4)
+                    (char= (char data start) #\Escape)
+                    (< (1+ start) length) (char= (char data (1+ start)) #\[)
+                    (< (+ 2 start) length) (char= (char data (+ 2 start)) #\<))
+               (let ((next (parse-sgr-mouse data start length)))
+                 (if next
+                     (setf start next)
+                     ;; Incomplete — fall through to normal longest-match.
+                     (loop for end from length downto (1+ start)
+                           do (let ((event (translate-tty-event (subseq data start end))))
+                                (when event
+                                  (q-event *real-editor-input* event)
+                                  (setf start end)
+                                  (return)))))))
+              (t
+               (loop for end from length downto (1+ start)
+                     do (let ((event (translate-tty-event (subseq data start end))))
+                          (when event
+                            (q-event *real-editor-input* event)
+                            (setf start end)
+                            (return)))))))))
+
+;;; TTY Mouse support commands.
+
+;;; Move point to the absolute terminal (col, row) click position.
+;;; Switches the current window if the click lands in a different window.
+(defun tty-move-point-to-click (abs-col abs-row)
+  (dolist (window *window-list*)
+    (let* ((hunk (window-hunk window)))
+      (when (typep hunk 'tty-hunk)
+        (let* ((text-pos (tty-hunk-text-position hunk))
+               (text-height (tty-hunk-text-height hunk))
+               ;; Absolute screen row of the first text line of this window.
+               (top-row (1+ (- text-pos text-height))))
+          (when (and (>= abs-row top-row)
+                     (< abs-row (+ top-row text-height)))
+            (let ((rel-row (- abs-row top-row)))
+              ;; Find the dis-line for this relative row.
+              (loop for dl on (cdr (window-first-line window))
+                    do
+                (let ((dis (car dl)))
+                  (when (= (dis-line-position dis) rel-row)
+                    (let* ((chars (dis-line-chars dis))
+                           (hemline (dis-line-line dis))
+                           (end (dis-line-end dis))
+                           ;; Walk displayed chars to find charpos at abs-col.
+                           (col 0)
+                           (charpos 0))
+                      (loop for i from 0 below end
+                            do (let ((w (char-display-width (char chars i))))
+                                 (when (> (+ col w) abs-col)
+                                   (return))
+                                 (incf col w)
+                                 (setf charpos (1+ i))))
+                      ;; Switch window if needed.
+                      (unless (eq window (current-window))
+                        (setf (current-window) window))
+                      (move-to-position (current-point) charpos hemline)
+                      (return-from tty-move-point-to-click t))))))))))))
+
+(defcommand "TTY Mouse Click" (p)
+  "Move point to the terminal position of the last mouse click."
+  "Move point to the terminal position of the last mouse click."
+  (declare (ignore p))
+  (tty-move-point-to-click *last-mouse-x* *last-mouse-y*))
+
+(defcommand "TTY Mouse Wheel Up" (p)
+  "Scroll the current window up by mouse wheel lines."
+  "Scroll the current window up by mouse wheel lines."
+  (declare (ignore p))
+  (scroll-window-up-command 3))
+
+(defcommand "TTY Mouse Wheel Down" (p)
+  "Scroll the current window down by mouse wheel lines."
+  "Scroll the current window down by mouse wheel lines."
+  (declare (ignore p))
+  (scroll-window-down-command 3))
+
+(defun register-tty-translation (string keysym &key kludge)
+  (when kludge
+    ;; FIXME: This is pretty terrible, but for some reason my *terminfo* has
+    ;; Esc,O,<foo> for arrow keys, whereas terminal actually sends Esc,[,<foo>
+    ;; -- either I don't understand how terminfo stuff is supposed to work,
+    ;; Apple ships with a broken terminfo db, or something is wrong with
+    ;; the terminfo code. I'm inclined to blame me...
+    (assert (eq #\O (char string 1)))
+    (setf string (format nil "~A[~A" (char string 0) (subseq string 2))))
+  (setf (gethash (string string) *tty-translations*) keysym))
+
+;;; Mouse key bindings — must be after the commands are defined above.
+(bind-key "TTY Mouse Click"      #k"Mouse1")
+(bind-key "TTY Mouse Wheel Up"   #k"WheelUp")
+(bind-key "TTY Mouse Wheel Down" #k"WheelDown")
 

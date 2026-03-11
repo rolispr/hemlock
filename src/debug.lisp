@@ -81,26 +81,21 @@
   (format s "~D: ~A~%" i (slave-stack-frame-label entry)))
 
 (defun debug-using-master (&optional (start 0) (end 10))
-  (if prepl:*debugging-context*
-      (let ((frames
-             (let ((result '()) (i -1))
-               (sb-debug:map-backtrace
-                (lambda (frame)
-                  (incf i)
-                  (when (and (>= i start) (< i end))
-                    (push (cons (with-output-to-string (s)
-                                  (sb-debug::print-frame-call frame s))
-                                (hemlock.wire:make-remote-object frame))
-                          result)))
-                :count end)
-               (nreverse result)))
-            (context nil
-                     #+nil (hemlock.wire:make-remote-object
-                            prepl:*debugging-context*))
-            ;; fixme: show the slave name rather than just the impl type
-            (impl (lisp-implementation-type))
-            (thread (bordeaux-threads:thread-name
-                     (bordeaux-threads:current-thread))))
-        (hemlock::eval-in-master
-         `(make-debug-buffer ',context ',frames ',impl ',thread)))
-      (prepl:debugger nil nil (lambda () (debug-using-master start end)))))
+  (let ((frames
+         (let ((result '()) (i -1))
+           (sb-debug:map-backtrace
+            (lambda (frame)
+              (incf i)
+              (when (and (>= i start) (< i end))
+                (push (cons (with-output-to-string (s)
+                              (sb-debug::print-frame-call frame s))
+                            (hemlock.wire:make-remote-object frame))
+                      result)))
+            :count end)
+           (nreverse result)))
+        (context nil)
+        (impl (lisp-implementation-type))
+        (thread (bordeaux-threads:thread-name
+                 (bordeaux-threads:current-thread))))
+    (hemlock::eval-in-master
+     `(make-debug-buffer ',context ',frames ',impl ',thread))))

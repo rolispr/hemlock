@@ -24,12 +24,9 @@
 (defun default-directory ()
   (let* ((p (hemlock::buffer-default-directory (current-buffer)))
          (p (and p (namestring p))))
-    (if (and p
-             (handler-case
-                 (eq (iolib.os:file-kind p) :directory)
-               (iolib.pathnames:invalid-file-path () nil)))
+    (if (and p (uiop:directory-exists-p p))
         p
-        (isys:getcwd))))
+        (sb-posix:getcwd))))
 #+(or cmu scl)
 (defun default-directory ()
   (let ((p (hemlock::buffer-default-directory (current-buffer))))
@@ -371,19 +368,16 @@
           (namestring
            (merge-pathnames pathname (directory-namestring defaults))))
          (directory
-          (if (eq (iolib.os::get-file-kind namestring t) :directory)
+          (if (uiop:directory-exists-p namestring)
               namestring
-              (iolib.pathnames:file-path-directory namestring :namestring t))))
+              (directory-namestring namestring))))
     (delete-if-not (lambda (candidate)
                      (search namestring candidate))
                    (append
                     (when (probe-file namestring)
                       (list namestring))
-                    (mapcar (lambda (f)
-                              (iolib.pathnames:file-path-namestring
-                               (iolib.pathnames:merge-file-paths
-                                f directory)))
-                            (iolib.os:list-directory directory))))))
+                    (mapcar #'namestring
+                            (uiop:directory-files directory))))))
 
 ;;; Ambiguous-Files  --  Public
 ;;;
