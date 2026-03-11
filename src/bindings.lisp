@@ -438,11 +438,6 @@
 (bind-key "Put Register" #k"control-x x")
 (bind-key "Get Register" #k"control-x g")
 
-(bind-key "Delete Previous Character Expanding Tabs" #k"backspace"
-          :mode "Pascal")
-(bind-key "Scribe Insert Bracket" #k")" :mode "Pascal")
-(bind-key "Scribe Insert Bracket" #k"]" :mode "Pascal")
-(bind-key "Scribe Insert Bracket" #k"}" :mode "Pascal")
 
 
 ;;;; Auto Fill Mode.
@@ -532,17 +527,6 @@
 
 
 
-;;;; Scribe Mode.
-
-(dolist (key (list #k"]" #k")" #k"}" #k"\>"))
-  (bind-key "Scribe Insert Bracket" key :mode "Scribe"))
-
-#+port-user-unixcoms
-(bind-key "Scribe Buffer File" #k"control-x c" :mode "Scribe")
-(bind-key "Select Scribe Warnings" #k"control-meta-C" :mode "Scribe")
-
-(bind-key "Insert Scribe Directive" #k"hyper-i" :mode "Scribe")
-
 
 ;;;; X commands:
 

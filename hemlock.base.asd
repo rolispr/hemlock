@@ -203,9 +203,6 @@
                (:file "abbrev")
                (:file "icom")
                (:file "defsyn")
-               (:file "scribe")
-               (:file "pascal")
-               (:file "dylan" :depends-on ("filecoms"))
 
                (:file "edit-defs")
                (:file "auto-save")
@@ -228,13 +225,4 @@
                #+port-user-netnews (:file "netnews")
                #+port-user-rcs (:file "rcs")
                (:file "dabbrev")
-               (:file "bindings")
-               (:file "slave-list")))
-     (:module misc-1
-              :pathname #.(merge-pathnames
-                           (make-pathname
-                            :directory '(:relative "src"))
-                           *hemlock-base-directory*)
-              :depends-on (core-1)
-              :components
-              ((:file "clbuild")))))
+               (:file "bindings")))))
