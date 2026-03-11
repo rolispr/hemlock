@@ -5,6 +5,8 @@
 ;;;
 
 
+(in-package :hemlock.text)
+
 ;;;; Marks.
 
 (defclass mark ()

@@ -5,6 +5,8 @@
 ;;; functions and macros to manipulate them.
 ;;;
 
+(in-package :hemlock.text)
+
 (setf (documentation 'linep 'function)
   "Returns true if its argument is a Hemlock line object, Nil otherwise.")
 (setf (documentation 'line-previous 'function)

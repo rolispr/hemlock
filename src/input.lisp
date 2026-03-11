@@ -4,6 +4,7 @@
 ;;; This file contains the code that handles input to Hemlock.
 ;;;
 
+(in-package :hemlock.command)
 
 ;;;
 ;;; INPUT-WAITING is exported solely as a hack for the kbdmac definition

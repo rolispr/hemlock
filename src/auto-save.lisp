@@ -282,7 +282,6 @@
 ;;; increment the key count for the buffer.
 ;;;
 (defun auto-save-count-keys ()
-  #.*fast*
   (let ((buffer (current-buffer)))
     (unless (eq buffer *echo-area-buffer*)
       (let ((state (value auto-save-state))

@@ -3,6 +3,7 @@
 ;;; This file contains functions related to building line images.
 ;;;
 
+(in-package :hemlock.command)
 
 ;;;    The code in here is factored out in this way because it is more
 ;;; or less implementation dependant.  The reason this code is
