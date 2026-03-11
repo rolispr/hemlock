@@ -37,21 +37,17 @@
 
 (flet ((required-argument ()
          (error "A required argument was not supplied.")))
-  (defstruct (terminfo
-               (:print-function
-                (lambda (object stream depth)
-                  (declare (ignore depth))
-                  (print-unreadable-object (object stream :type t :identity t)
-                    (format stream "~A" (first (terminfo-names object)))))))
+  (defstruct terminfo
     (names (required-argument) :type list :read-only t)
     (booleans (required-argument) :type (simple-array (member t nil) (*)))
     (numbers (required-argument) :type (simple-array (signed-byte 16) (*)))
     (strings (required-argument) :type (simple-array t (*)))))
 
-#+(or CMU scl)
-(declaim (ext:start-block capability %capability))
+(defmethod print-object ((object terminfo) stream)
+  (print-unreadable-object (object stream :type t :identity t)
+    (format stream "~A" (first (terminfo-names object)))))
 
-(defun %capability (name terminfo)
+(defun capability-lookup (name terminfo)
   (let ((whatsit (gethash name *capabilities*)))
     (when (null whatsit)
       (error "Terminfo capability ~S doesn't exist." name))
@@ -65,10 +61,7 @@
 
 (declaim (inline capability))
 (defun capability (name &optional (terminfo *terminfo*))
-  (%capability name terminfo))
-
-#+(or CMU scl)
-(declaim (ext:end-block))
+  (capability-lookup name terminfo))
 
 (define-compiler-macro capability (&whole form
                                    name &optional (terminfo '*terminfo*))
@@ -83,7 +76,7 @@
            (if (eq (car ,value) ,tmp)
                (cdr ,value)
                (setf (car ,value) ,tmp
-                     (cdr ,value) (%capability ,name ,tmp)))))))
+                     (cdr ,value) (capability-lookup ,name ,tmp)))))))
 
 (defmacro defcap (name type index)
   (let ((thing (ecase type
@@ -611,10 +604,7 @@
            #+darwin (format nil "~X" (char-code (char name 0)))
            #-darwin (string (char name 0))))
     (let ((name (concatenate 'string (stringify-first-char name) "/" name)))
-      (dolist (path (list* #+CMU "home:.terminfo/"
-                           #+Allegro "~/.terminfo/"
-                           #-(or CMU Allegro)
-                           (merge-pathnames ".terminfo/" (user-homedir-pathname))
+      (dolist (path (list* (merge-pathnames ".terminfo/" (user-homedir-pathname))
                            *terminfo-directories*))
         (with-open-file (stream (merge-pathnames name path)
                                 :direction :input
@@ -627,10 +617,10 @@
                            (- n 65536)
                            n)))
                    (read-string (stream)
-                     (do ((c (read-byte stream) (read-byte stream))
-                          (s '()))
-                         ((zerop c) (coerce (nreverse s) 'string))
-                       (push (code-char c) s))))
+                     (loop for c = (read-byte stream)
+                           until (zerop c)
+                           collect (code-char c) into s
+                           finally (return (coerce s 'string)))))
               (let* ((magic (read-short stream))
                      (sznames (read-short stream))
                      (szbooleans (read-short stream))
@@ -680,17 +670,36 @@
   (when (null string) (return-from tparm ""))
   (with-output-to-string (out)
     (with-input-from-string (in string)
-      (do ((stack '()) (flags 0) (width 0) (precision 0) (number 0)
-           (dvars (make-array 26 :element-type '(unsigned-byte 8)
-                              :initial-element 0))
-           (svars (load-time-value
-                   (make-array 26 :element-type '(unsigned-byte 8)
-                               :initial-element 0)))
-           (c (read-char in nil) (read-char in nil)))
-          ((null c))
+      (let ((stack '()) (flags 0) (width 0) (precision 0) (number 0)
+            (dvars (make-array 26 :element-type '(unsigned-byte 8)
+                               :initial-element 0))
+            (svars (load-time-value
+                    (make-array 26 :element-type '(unsigned-byte 8)
+                                :initial-element 0))))
+        (loop for c = (read-char in nil) then (read-char in nil)
+              while c do
         (cond ((char= c #\%)
                (setq c (read-char in) flags 0 width 0 precision 0)
-               (tagbody
+               (flet ((skip-to-marker (stop-chars)
+                        ;; Read from IN discarding characters until %X where X
+                        ;; is in STOP-CHARS at nesting depth 0.  Handles nested
+                        ;; %?...%; by tracking depth.  Returns the marker char.
+                        (let ((depth 0))
+                          (loop
+                            (let ((sc (read-char in nil)))
+                              (when (null sc) (return nil))
+                              (when (char= sc #\%)
+                                (let ((nc (read-char in nil)))
+                                  (when (null nc) (return nil))
+                                  (cond
+                                    ((char= nc #\?) (incf depth))
+                                    ((char= nc #\;)
+                                     (if (zerop depth)
+                                         (when (find #\; stop-chars) (return #\;))
+                                         (decf depth)))
+                                    ((and (zerop depth) (find nc stop-chars))
+                                     (return nc))))))))))
+                 (tagbody
                 state0
                   (case c
                     (#\% (princ c out) (go terminal))
@@ -713,9 +722,11 @@
                     (#\l (push (length (pop stack)) stack) (go terminal))
                     (#\* (push (* (pop stack) (pop stack)) stack)
                          (go terminal))
-                    (#\/ (push (/ (pop stack) (pop stack)) stack)
+                    (#\/ (let ((b (pop stack)) (a (pop stack)))
+                           (push (/ a b) stack))
                          (go terminal))
-                    (#\m (push (mod (pop stack) (pop stack)) stack)
+                    (#\m (let ((b (pop stack)) (a (pop stack)))
+                           (push (mod a b) stack))
                          (go terminal))
                     (#\& (push (logand (pop stack) (pop stack)) stack)
                          (go terminal))
@@ -725,9 +736,11 @@
                          (go terminal))
                     (#\= (push (if (= (pop stack) (pop stack)) 1 0) stack)
                          (go terminal))
-                    (#\> (push (if (> (pop stack) (pop stack)) 1 0) stack)
+                    (#\> (let ((b (pop stack)) (a (pop stack)))
+                           (push (if (> a b) 1 0) stack))
                          (go terminal))
-                    (#\< (push (if (< (pop stack) (pop stack)) 1 0) stack)
+                    (#\< (let ((b (pop stack)) (a (pop stack)))
+                           (push (if (< a b) 1 0) stack))
                          (go terminal))
                     (#\A (push (if (and (pop stack) (pop stack)) 1 0) stack)
                          (go terminal))
@@ -743,6 +756,9 @@
                              (incf (second args))))
                          (go terminal))
                     (#\? (go state14))
+                    (#\t (go state-then))
+                    (#\e (go state-else))
+                    (#\; (go terminal))
                     (otherwise (error "Unknown %-control character: ~C" c)))
                 state1
                   (let ((next (peek-char nil in nil)))
@@ -750,7 +766,8 @@
                       (go state2)))
                   (if (char= c #\+)
                       (push (+ (pop stack) (pop stack)) stack)
-                      (push (- (pop stack) (pop stack)) stack))
+                      (let ((b (pop stack)) (a (pop stack)))
+                        (push (- a b) stack)))
                   (go terminal)
                 state2
                   (case c
@@ -870,27 +887,39 @@
                            (push number stack)
                            (go terminal))))
                   (error "Invalid integer constant")
+                state-then
+                  ;; %t: pop condition; if false skip to %e or %;
+                  (let ((cond-val (pop stack)))
+                    (when (zerop cond-val)
+                      (skip-to-marker '(#\e #\;))))
+                  (go terminal)
+                state-else
+                  ;; %e: condition was true, then-part done; skip to %;
+                  (skip-to-marker '(#\;))
+                  (go terminal)
                 state14
-                  (error "Conditional expression parser not yet written.")
+                  ;; %? conditional begin — noop; condition evaluated by
+                  ;; subsequent iterations until %t is reached.
+                  (go terminal)
 
                 terminal
-                  #| that's all, folks |#))
-              (t (princ c out)))))))
+                  #| that's all, folks |#)))
+              (t (princ c out))))))))
 
 
 ;;; Handle the delay sequence $<...> with terminfo strings.  Padding
 ;;; characters are used if possible, otherwise a list strings and
 ;;; delays in milliseconds is returned.
-(declaim (special hi::*terminal-baud-rate*))
+(defvar *terminal-baud-rate* nil
+  "Terminal baud rate used by TPUTS for padding delays.  Set by the TTY backend.")
 (defun tputs (string &key (terminfo *terminfo*)
-              (baud-rate hi::*terminal-baud-rate*)
+              (baud-rate *terminal-baud-rate*)
               (affcnt 1))
   (when string
     (let ((strings-and-delays ())
           (start 0)
           (length (length string)))
-      (do ()
-          ((>= start length))
+      (loop until (>= start length) do
         (let ((found (search "$<" string :start2 start)))
           (cond ((not found)
                  ;; Done
@@ -908,28 +937,27 @@
                        (multiply 1)
                        (pos (+ found 2)))
                    ;; Find out how long to pad for:
-                   (do ()
-                       ((>= pos length)
-                        ;; Invalid, give up.
-                        (return))
-                     (let* ((c (schar string pos))
-                            (n (digit-char-p c)))
-                       (cond (n
-                              (setf time (+ (* time 10) n))
-                              (incf pos))
-                             ((char= c #\.)
-                              (incf pos)
-                              (when (< pos length)
-                                (let* ((c (schar string pos))
-                                       (n (digit-char-p c)))
-                                  (cond (n
-                                         (setf time (+ (* time 10) n))
-                                         (incf pos))
-                                        (t
-                                         (setf time (* time 10)))))
-                                (return)))
-                             (t
-                              (return)))))
+                   (loop until (>= pos length)
+                         do (let* ((c (schar string pos))
+                                   (n (digit-char-p c)))
+                              (cond (n
+                                     (setf time (+ (* time 10) n))
+                                     (incf pos))
+                                    ((char= c #\.)
+                                     (incf pos)
+                                     (when (< pos length)
+                                       (let* ((c (schar string pos))
+                                              (n (digit-char-p c)))
+                                         (cond (n
+                                                (setf time (+ (* time 10) n))
+                                                (incf pos))
+                                               (t
+                                                (setf time (* time 10)))))
+                                       (return)))
+                                    (t
+                                     (return))))
+                         ;; Invalid, give up.
+                         finally (return))
                    (flet ((option ()
                             (when (< pos length)
                               (let ((c (schar string pos)))
@@ -962,7 +990,8 @@
                                   (cond ((and strings-and-delays
                                               (stringp (first strings-and-delays)))
                                          (setf (first strings-and-delays)
-                                               (concatenate (first strings-and-delays)
+                                               (concatenate 'string
+                                                            (first strings-and-delays)
                                                             pad-string)))
                                         (t
                                          (push pad-string strings-and-delays)))))))))
@@ -972,7 +1001,7 @@
 
 (defun set-terminal (&optional name)
   (setf *terminfo*
-        (let ((name (or name (hemlock-ext:getenv "TERM") "dumb")))
+        (let ((name (or name (uiop:getenv "TERM") "dumb")))
           (or (load-terminfo name)
               (error "Failed to load terminfo data for: ~A" name)))))
 
