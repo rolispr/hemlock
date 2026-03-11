@@ -843,12 +843,11 @@
         (let ((hemlock.wire::*current-wire* :wire-not-yet-known))
           (connect-to-editor machine port slave-buffer background-buffer)
           (dispatch-events-no-hang)
-          (iter:iter
-           (iter:until cl-user::*io*)
-           (dispatch-events)
-           (write-line "Waiting for typestream buffer..."
-                       *original-terminal-io*)
-           (force-output *original-terminal-io*))
+          (loop until cl-user::*io*
+                do (dispatch-events)
+                   (write-line "Waiting for typestream buffer..."
+                               *original-terminal-io*)
+                   (force-output *original-terminal-io*))
           (prepl:repl))))))
 
 (defun simple-backtrace (&optional (stream *standard-output*))

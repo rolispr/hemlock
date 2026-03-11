@@ -45,10 +45,8 @@
 
 (defun rename-buffer-uniquely (buffer new-name)
   (or (maybe-rename-buffer buffer new-name)
-      (iter:iter
-       (iter:for i from 2)
-       (iter:until
-        (maybe-rename-buffer buffer (format nil "~A<~D>" new-name i))))))
+      (loop for i from 2
+            until (maybe-rename-buffer buffer (format nil "~A<~D>" new-name i)))))
 
 ;;;;;;;;;;;;
 

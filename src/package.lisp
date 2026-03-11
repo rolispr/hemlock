@@ -589,8 +589,7 @@
 
 (defpackage :hemlock-internals
   (:use :common-lisp :hemlock-interface
-        #-(or cmu scl) :command-line-arguments
-        :iterate)
+        #-(or cmu scl) :command-line-arguments)
   (:nicknames :hi)
   (:shadow #:char-code-limit #:show-option-help)
   #-scl
@@ -788,7 +787,7 @@
 
 
 (defpackage :hemlock
-  (:use :common-lisp :hemlock-interface :hi :hemlock-ext :iterate)
+  (:use :common-lisp :hemlock-interface :hi :hemlock-ext)
 ;;;  (:import-from :hemlock-ext #:delq #:memq #:assq)
 ;;;  (:import-from :hemlock-internals #:*fast*)
   (:import-from :hemlock-internals #:hemlock)

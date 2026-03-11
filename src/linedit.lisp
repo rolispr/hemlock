@@ -143,34 +143,17 @@
                    (+ (mark-charpos mark)
                       (let ((line (line-previous (mark-line mark))))
                         (if line
-                            (iter
-                              (while line)
-                              (summing (1+ (line-length line)))
-                              (setf line (line-previous line)))
+                            (let ((sum 0))
+                              (loop while line
+                                    do (incf sum (1+ (line-length line)))
+                                       (setf line (line-previous line)))
+                              sum)
                             0))))
           :fonts (compute-linedit-font-marks buffer (editor-prompt device)))))))
 
   ;; tell the redisplay algorithm that we did our job, otherwise it
   ;; retries forever:
   (mark-window-display-as-done window))
-
-(iter::defclause-driver (for var in-buffer-lines buffer)
-  "Lines of a buffer"
-  (iter::top-level-check)
-  (let* ((step ''line-next)
-         (on-var
-          (iter::make-var-and-default-binding 'line :type '(or line null)))
-         (setqs (iter::do-dsetq var on-var))
-         (test `(if (null ,on-var) (go ,iter::*loop-end*))))
-    (setq iter::*loop-end-used?* t)
-    (iter::return-driver-code
-     :initial `((setq ,on-var (mark-line
-                               (region-start
-                                (buffer-region ,buffer)))))
-     :next (list test
-                 setqs
-                 (iter::generate-function-step-code on-var step))
-     :variable var)))
 
 ;; the prompt used to be 7 in bold, but all those
 ;; black-on-white-by-default terminals look really bad when I try bold
@@ -185,19 +168,24 @@
 (defun compute-linedit-font-marks (buffer prompt)
   (let ((offset (length prompt)))
     (list* (list 0 *prompt-color* *prompt-bold*)
-           (iter (for line in-buffer-lines buffer)
-                       (collect (list offset *default-color* nil))
-                       (line-tag line)	;update tag/syntax cache 
-                       (when (line-next line)
-                         (line-tag (line-next line)))
-                       (dolist (mark (reverse
-                                      (sy-font-marks
-                                       (tag-syntax-info
-                                        (line-tag line)))))
-                         (collect (list (+ offset (mark-charpos mark))
-                                        (font-mark-font mark)
-                                        nil)))
-                       (incf offset (1+ (line-length line)))))))
+           (let ((result '()))
+             (let ((line (mark-line (region-start (buffer-region buffer)))))
+               (loop while line
+                     do (push (list offset *default-color* nil) result)
+                        (line-tag line)
+                        (when (line-next line)
+                          (line-tag (line-next line)))
+                        (dolist (mark (reverse
+                                       (sy-font-marks
+                                        (tag-syntax-info
+                                         (line-tag line)))))
+                          (push (list (+ offset (mark-charpos mark))
+                                      (font-mark-font mark)
+                                      nil)
+                                result))
+                        (incf offset (1+ (line-length line)))
+                        (setf line (line-next line))))
+             (nreverse result)))))
 
 (defmethod device-init ((device tty-device))
   (setup-input)
@@ -363,13 +351,9 @@
 ;;;;
 
 (defun make-linedit-buffer (modes)
-  (iter
-    (for i from 1)
-    (let ((buf (make-buffer (format nil "*linedit-~D*" i)
-                            :modes modes)))
-      (when buf
-        (push buf *linedit-buffers*)
-        (return buf)))))
+  (loop for i from 1
+        for buf = (make-buffer (format nil "*linedit-~D*" i) :modes modes)
+        when buf do (push buf *linedit-buffers*) and return buf))
 
 (defun initialize-linedit (instance string point modes)
   (setf (hbuf instance) (make-linedit-buffer modes))
@@ -413,10 +397,11 @@
     (+ (mark-charpos mark)
        (let ((line (line-previous (mark-line mark))))
          (if line
-             (iter
-               (while line)
-               (summing (line-length line))
-               (setf line (line-previous line)))
+             (let ((sum 0))
+               (loop while line
+                     do (incf sum (line-length line))
+                        (setf line (line-previous line)))
+               sum)
              0)))))
 
 (defmethod (setf get-point) (point (editor linedit-device))
@@ -532,15 +517,14 @@
     (region-string columns &optional (end (length region-string)))
   (let ((col 0)
         (row 0))
-    (iter
-      (for c in-vector region-string)
-      (repeat end)
-      (cond
-        ((or (eql c #\newline) (eql c #\return))
-         (incf row (1+ (floor (1+ col) columns)))
-         (setf col 0))
-        (t
-         (incf col))))
+    (loop for c across region-string
+          for j from 0 below end
+          do (cond
+               ((or (eql c #\newline) (eql c #\return))
+                (incf row (1+ (floor (1+ col) columns)))
+                (setf col 0))
+               (t
+                (incf col))))
     (values ;; 1+ includes point in row calculations
      (+ row (floor (1+ col) columns))
      (rem col columns))))
@@ -594,35 +578,30 @@
         (boldp nil)
         (previous-font -1)
         (previous-boldp :unknown))
-    (iter
-      (for i from 0)
-      (for c in-vector str)
-      (iter
-        (while fonts)
-        (let ((spec (car fonts)))
-          (while (<= (car spec) i))
-          (destructuring-bind (new-font new-boldp)
-              (cdr spec)
-            (setf font (1+ (mod (1- new-font) 8)))
-            (setf boldp new-boldp)
-            (pop fonts))))
-      (progn
-        (unless (eq boldp previous-boldp)
-          (if boldp
-              (enter-bold-mode)
-              (exit-attribute-mode)))
-        (unless (eql font previous-font)
-          (setaf font))
-        (cond
-          ((member c '(#\newline #\return))
-           (tty-write-cmd (hemlock.terminfo:tputs hemlock.terminfo:cursor-down))
-           (setf col 0))
-          ((< (char-code c) 32)
-           (device-write-string (string #\?))
-           (incf col))
-          (t
-           (device-write-string (string c))
-           (incf col)))))
+    (loop for i from 0
+          for c across str
+          do (loop while (and fonts (<= (caar fonts) i))
+                   do (let ((spec (pop fonts)))
+                        (destructuring-bind (new-font new-boldp) (cdr spec)
+                          (setf font (1+ (mod (1- new-font) 8)))
+                          (setf boldp new-boldp))))
+             (progn
+               (unless (eq boldp previous-boldp)
+                 (if boldp
+                     (enter-bold-mode)
+                     (exit-attribute-mode)))
+               (unless (eql font previous-font)
+                 (setaf font))
+               (cond
+                 ((member c '(#\newline #\return))
+                  (tty-write-cmd (hemlock.terminfo:tputs hemlock.terminfo:cursor-down))
+                  (setf col 0))
+                 ((< (char-code c) 32)
+                  (device-write-string (string #\?))
+                  (incf col))
+                 (t
+                  (device-write-string (string c))
+                  (incf col)))))
     (when boldp (exit-attribute-mode))
     (unless (eql font *default-color*) (setaf *default-color*))
     (tty-write-cmd (hemlock.terminfo:tputs hemlock.terminfo:cursor-visible))
@@ -749,14 +728,13 @@
                          :if-does-not-exist nil)
         (when s
           (let ((history (editor-history editor)))
-            (iter
-              (let ((count-line (read-line s nil)))
-                (while count-line)
-                (let* ((count (parse-integer count-line))
-                       (buf (make-string count)))
-                  (read-sequence buf s)
-                  (linedit-history-push buf history)
-                  (assert (eql #\newline (read-char s)))))))))
+            (loop for count-line = (read-line s nil)
+                  while count-line
+                  do (let* ((count (parse-integer count-line))
+                             (buf (make-string count)))
+                       (read-sequence buf s)
+                       (linedit-history-push buf history)
+                       (assert (eql #\newline (read-char s))))))))
     (file-error (c)
       (format t "Ignoring error ~A while reading history.~%" c))))
 
@@ -1247,9 +1225,8 @@ to the appropriate home directory."
       (when (eq clear-screen-before-p :prompt) (redisplay-all)))
     (ensure-in-cm-mode device)
     (unless keep-current-split-p
-      (iter
-        (while (cddr *window-list*))
-        (delete-window (next-window (current-window)))))
+      (loop while (cddr *window-list*)
+            do (delete-window (next-window (current-window)))))
     (when split-screen-p
       (setf (current-window)
             (make-window (window-display-start (current-window)))))
@@ -1440,10 +1417,8 @@ to the appropriate home directory."
   (let* ((linedit-history (editor-history editor))
          (oldval (get-string editor))
          (val (funcall fun oldval linedit-history)))
-    (iter
-      (while val)
-      (until (and (search str val) (not (equal val oldval))))
-      (setf val (funcall fun val linedit-history)))
+    (loop while (and val (not (and (search str val) (not (equal val oldval)))))
+          do (setf val (funcall fun val linedit-history)))
     (and val
          (setf (get-string editor) val))))
 
@@ -1557,7 +1532,7 @@ to the appropriate home directory."
      &optional (trailer (current-point))
      (pattern (get-search-pattern hemlock::*last-search-string* direction))
      (string hemlock::*last-search-string*))
-  (iter
+  (loop
     (let ((found-offset (find-pattern trailer pattern)))
       (when found-offset
         (return found-offset)))

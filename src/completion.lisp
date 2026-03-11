@@ -531,11 +531,12 @@
 (defun %find-symbol-completion-matches (packname symname)
   (let ((package (or (and packname (find-package (canonical-case packname)))
                      :cl)))
-    (iter:iter
-     (iter:for c in-package package)
-     (let ((str (string-downcase c)))
-       (when (starts-with-p str symname)
-         (iter:collect str))))))
+    (let ((result '()))
+      (do-symbols (c package)
+        (let ((str (string-downcase c)))
+          (when (starts-with-p str symname)
+            (push str result))))
+      result)))
 
 (defun %find-symbol-completion/request
        (show-matches-p prefix packname symname)

@@ -91,8 +91,8 @@
     ((stream shell-filter-stream) seq start end &key)
   (check-type seq string)
   (if (position #\return seq)
-      (iter:iter (iter:for i from start below end)
-                 (hi::stream-write-char stream (elt seq i)))
+      (loop for i from start below end
+            do (hi::stream-write-char stream (elt seq i)))
       (shell-filter-string-out stream seq start end)))
 
 #+scl
@@ -101,8 +101,8 @@
   (declare (ignore waitp))
   (check-type seq string)
   (if (position #\return seq)
-      (iter:iter (iter:for i from start below end)
-                 (hi::stream-write-char stream (elt seq i)))
+      (loop for i from start below end
+            do (hi::stream-write-char stream (elt seq i)))
       (shell-filter-string-out stream seq start end))
   (- end start))
 

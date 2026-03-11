@@ -41,13 +41,12 @@
 
 (defun make-buffer-with-unique-name (name &rest keys)
   (or (apply #'make-buffer name keys)
-      (iter:iter
-       (iter:for i from 2)
-       (let ((buffer (apply #'make-buffer
-                            (format nil "~A<~D>" name i)
-                            keys)))
-         (when buffer
-           (return buffer))))))
+      (loop for i from 2
+            do (let ((buffer (apply #'make-buffer
+                                    (format nil "~A<~D>" name i)
+                                    keys)))
+                 (when buffer
+                   (return buffer))))))
 
 (defmethod initialize-instance :after
     ((instance connection) &key buffer)
@@ -72,12 +71,9 @@
 
 (defun unique-connection-name (base)
   (let ((name base))
-    (iter:iter (iter:for i from 1)
-               (iter:while (find name
-                                 *all-connections*
-                                 :test #'equal
-                                 :key #'connection-name))
-               (setf name (format nil "~A<~D>" base i)))
+    (loop for i from 1
+          while (find name *all-connections* :test #'equal :key #'connection-name)
+          do (setf name (format nil "~A<~D>" base i)))
     name))
 
 (defun delete-connection-buffer (connection)
@@ -582,7 +578,7 @@
   (unwind-protect
        (let ((previous-counter (device-filter-counter device)))
          (incf (device-reading device))
-         (iter:iter (iter:while (eql previous-counter (device-filter-counter device)))
-                    (dispatch-events)))
+         (loop while (eql previous-counter (device-filter-counter device))
+               do (dispatch-events)))
     (decf (device-reading device)))
   0)

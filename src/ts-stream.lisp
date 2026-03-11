@@ -243,9 +243,8 @@
       (progn
         (hemlock.wire:remote wire (ts-buffer-ask-for-input ts))
         (hemlock.wire:wire-force-output wire))
-      (iter:iter
-       (iter:until (%ts-stream-listen stream))
-       (dispatch-events)))))
+      (loop until (%ts-stream-listen stream)
+            do (dispatch-events)))))
 
 ;;; %TS-STREAM-FLSBUF --- internal.
 ;;;
@@ -405,13 +404,13 @@
 
 (defmethod hi::stream-write-sequence
     ((stream ts-stream) (seq string) start end &key)
-  (iter:iter (iter:for i from start below end)
-             (write-char (elt seq i) stream)))
+  (loop for i from start below end
+        do (write-char (elt seq i) stream)))
 
 (defmethod hi::stream-read-sequence
     ((stream ts-stream) (seq string) start end &key)
-  (iter:iter (iter:for i from start below end)
-             (setf (elt seq i) (read-char stream))))
+  (loop for i from start below end
+        do (setf (elt seq i) (read-char stream))))
 
 ;; $Log: ts-stream.lisp,v $
 ;; Revision 1.1  2004-07-09 13:38:55  gbaumann

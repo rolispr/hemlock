@@ -296,13 +296,12 @@ GB
        :type string
        :documentation "backend to use, one of tty, clx, or qt. If not specified, checks if $DISPLAY is set, and use the first available backend; without a $DISPLAY, falls back to TTY.  See also --tty et al."
        :action ,(alexandria:curry #'keywordize :backend-type))
-      ,@(iter:iter (iter:for b in '(:tty :clx :qt))
-                   (iter:collect
-                    `(,(string-downcase b)
-                      :type boolean
-                      :documentation ,(format nil "short for --backend ~A" b)
-                      :action ,(let ((b b))
-                                 (alexandria:curry #'quick-backend b))))))))
+      ,@(loop for b in '(:tty :clx :qt)
+              collect `(,(string-downcase b)
+                        :type boolean
+                        :documentation ,(format nil "short for --backend ~A" b)
+                        :action ,(let ((b b))
+                                   (alexandria:curry #'quick-backend b)))))))
 
 #-(or cmu scl)
 (defun show-cmd-line-help ()

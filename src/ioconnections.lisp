@@ -224,10 +224,10 @@
      (isys:chdir directory))
    (let ((n (length args)))
      (cffi:with-foreign-object (argv :pointer (1+ n))
-       (iter:iter (iter:for i from 0)
-                  (iter:for arg in args)
-                  (setf (cffi:mem-aref argv :pointer i)
-                        (cffi:foreign-string-alloc arg)))
+       (loop for i from 0
+             for arg in args
+             do (setf (cffi:mem-aref argv :pointer i)
+                      (cffi:foreign-string-alloc arg)))
        (setf (cffi:mem-aref argv :pointer n) (cffi:null-pointer))
        (isys:execvp file argv)))
    (isys::exit 1)))
@@ -325,13 +325,13 @@
                                                   :local-port port)))
                 (if port
                     (doit port)
-                    (iter:iter (iter:for p from 1024 below 65536)
-                               (handler-case
-                                   (doit p)
-                                 (:no-error (socket)
-                                   (setf port p)
-                                   (return socket))
-                                 (error (c) (warn "~A" c))))))))
+                    (loop for p from 1024 below 65536
+                          do (handler-case
+                                 (doit p)
+                               (:no-error (socket)
+                                 (setf port p)
+                                 (return socket))
+                               (error (c) (warn "~A" c))))))))
       (setf fd (iolib.sockets:socket-os-fd socket)))
     (set-iolib-server-handlers instance)))
 

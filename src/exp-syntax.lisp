@@ -398,19 +398,20 @@
 (defun recompute-tags-up-to (end-line)
   (let* ((level (buffer-tag-line-number (line-buffer end-line)))
          (start-line
-          (iter (for line initially end-line then prev)
-                (for prev = (line-previous line))
-                (let ((validp (< (line-number line) level)))
-                  (finding line such-that (or validp (null prev)))))))
+          (loop for line = end-line then prev
+                for prev = (line-previous line)
+                for validp = (< (line-number line) level)
+                when (or validp (null prev))
+                  return line)))
     (unless (line-previous start-line)
       (let ((tag (make-tag :syntax-info (empty-syntax-info))))
         (setf (%line-tag start-line) tag)
         (setf (tag-syntax-info tag) (recompute-syntax-marks start-line tag)))
       (setf start-line (line-next start-line)))
-    (iter (for line initially start-line then (line-next line))
-          (while line)
-          (recompute-line-tag line)
-          (until (eq line end-line)))))
+    (loop for line = start-line then (line-next line)
+          while line
+          do (recompute-line-tag line)
+          until (eq line end-line))))
 
 (defmacro cache-scanner (regex)
   ;; help compilers that don't support compiler macros

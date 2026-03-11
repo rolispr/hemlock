@@ -47,7 +47,6 @@
                   :bordeaux-threads
                   :conium
                   :trivial-gray-streams
-                  :iterate
                   :prepl
                   :osicat
                   :iolib

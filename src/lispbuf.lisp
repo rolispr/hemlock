@@ -54,9 +54,8 @@
 (defun get-prompt ()
   (let* ((p (in-lisp *package*))
          (short-nick
-          (iterate:iter
-           (iterate:for nick in (cons (package-name p) (package-nicknames p)))
-           (iterate:finding nick minimizing (length nick)))))
+          (reduce (lambda (a b) (if (<= (length a) (length b)) a b))
+                  (cons (package-name p) (package-nicknames p)))))
     (format nil "~A> " short-nick)))
 
 (defun show-prompt (&optional (stream *standard-output*))

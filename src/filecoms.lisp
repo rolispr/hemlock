@@ -963,11 +963,12 @@
          (result nil)
          (n (length contents)))
     (format t "Directory of ~A:~%" (namestring pathname))
-    (iter:iter (iter:for file in contents)
-               (iter:for i from 0)
+    (loop for file in contents
+          for i from 0
+          do (progn
                (when (zerop (mod i 100))
                  (message "Dired: reading files (~D/~D)" i n))
-      (let* ((namestring (iolib.pathnames:file-path-namestring file))
+               (let* ((namestring (iolib.pathnames:file-path-namestring file))
              (tail (subseq namestring
                            (1+ (or (position #\/ namestring
                                              :from-end t
@@ -1012,7 +1013,7 @@
                           ;; of the code base (which still expects standard
                           ;; Common Lisp pathnames) from the new iolib world.
                           namestring)
-                      result)))))))
+                      result))))))))
     (clear-echo-area)
     (message "Dired: ~D files read" n)
     (nreverse result)))
