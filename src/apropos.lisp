@@ -135,11 +135,24 @@
 (defun slave-apropos (str)
   (hemlock::eval-in-slave `(%apropos ',str)))
 
+(defun %describe-symbol-for-hemlock (sym)
+  "Return (kind) or (kind docstring) for SYM, matching parse-apropos-entry format."
+  (let* ((kind (cond ((macro-function sym) :macro)
+                     ((special-operator-p sym) :special-operator)
+                     ((fboundp sym) :function)
+                     ((boundp sym) :variable)
+                     (t :unknown)))
+         (doc (ignore-errors
+                (documentation sym (if (member kind '(:function :macro :special-operator))
+                                       'function
+                                       'variable)))))
+    (if doc (list kind doc) (list kind))))
+
 (defun %apropos (str)
   (let ((data
          (mapcar (lambda (sym)
                    (cons (make-slave-symbol sym)
-                         (conium:describe-symbol-for-emacs sym)))
+                         (%describe-symbol-for-hemlock sym)))
                  (apropos-list str))))
     (hemlock::eval-in-master `(%apropos-results ',data ',str))))
 

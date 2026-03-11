@@ -851,15 +851,13 @@
           (prepl:repl))))))
 
 (defun simple-backtrace (&optional (stream *standard-output*))
-  (conium:call-with-debugging-environment
-   (lambda ()
-     (let ((i 0))
-       (mapcar (lambda (frame)
-                 (format stream "~D: " i)
-                 (conium:print-frame frame stream)
-                 (terpri stream)
-                 (incf i))
-               (conium:compute-backtrace 0 most-positive-fixnum))))))
+  (let ((i 0))
+    (sb-debug:map-backtrace
+     (lambda (frame)
+       (format stream "~D: " i)
+       (sb-debug::print-frame-call frame stream)
+       (terpri stream)
+       (incf i)))))
 
 (defun start-slave (&rest args)
   (let ((prepl:*entering-prepl-debugger-hook* nil)

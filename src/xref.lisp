@@ -121,14 +121,55 @@
         (character-offset (current-point) (1- position)))
       t)))
 
+;;; sb-introspect-based definition finding.
+
+(defun %ds-to-xref-alist (name ds)
+  "Convert a definition-source to make-xref-entry alist format."
+  (let ((path (ignore-errors (sb-introspect:definition-source-pathname ds))))
+    (when path
+      (let ((truepath (ignore-errors (truename path)))
+            (offset (sb-introspect:definition-source-character-offset ds)))
+        (when truepath
+          (list (princ-to-string name)
+                (list :location
+                      (list :file (namestring truepath))
+                      (list :position (or offset 0)))))))))
+
+(defun %sbcl-find-definitions (sym)
+  "Find definitions of SYM using sb-introspect."
+  (loop for type in '(:function :generic-function :method :macro :compiler-macro
+                      :type :variable :constant :package :method-combination
+                      :setf-expander :special-operator)
+        nconc (loop for ds in (ignore-errors
+                                (sb-introspect:find-definition-sources-by-name sym type))
+                    for entry = (%ds-to-xref-alist
+                                 (format nil "~(~A~) ~S" type sym) ds)
+                    when entry collect entry)))
+
+(defun %sbcl-who-results (pairs)
+  "Convert sb-introspect who-* results ((fn . ds) ...) to xref alist format."
+  (loop for (fn . ds) in pairs
+        for entry = (%ds-to-xref-alist (princ-to-string fn) ds)
+        when entry collect entry))
+
+(defun %sbcl-xref-callers (sym)
+  (%sbcl-who-results (ignore-errors (sb-introspect:who-calls sym))))
+(defun %sbcl-xref-references (sym)
+  (%sbcl-who-results (ignore-errors (sb-introspect:who-references sym))))
+(defun %sbcl-xref-bindings (sym)
+  (%sbcl-who-results (ignore-errors (sb-introspect:who-binds sym))))
+(defun %sbcl-xref-sets (sym)
+  (%sbcl-who-results (ignore-errors (sb-introspect:who-sets sym))))
+(defun %sbcl-xref-macroexpands (sym)
+  (%sbcl-who-results (ignore-errors (sb-introspect:who-macroexpands sym))))
+(defun %sbcl-xref-specializes (sym)
+  (%sbcl-who-results (ignore-errors
+                       (append (sb-introspect:who-specializes-directly sym)
+                               (sb-introspect:who-specializes-generally sym)))))
+
 (defun %find-definitions (label xref-fun name)
   (let* ((sym (hemlock::resolve-slave-symbol name nil))
-         (data
-          (and sym
-               (mapcar (lambda (def)
-                         (cons (princ-to-string (car def))
-                               (cdr def)))
-                       (funcall xref-fun sym)))))
+         (data (and sym (funcall xref-fun sym))))
     (hemlock::eval-in-master `(%definitions-found ',label ',name ',data))))
 
 (defun %definitions-found (label name data)
@@ -143,7 +184,7 @@
 
 (defun find-definitions (name)
   (hemlock::eval-in-slave
-   `(%find-definitions "definition" 'conium:find-definitions ',name)))
+   `(%find-definitions "definition" '%sbcl-find-definitions ',name)))
 
 (defcommand "Find Definitions" (p)
   "" ""
@@ -163,15 +204,11 @@
           default)))))
 
 (macrolet
-    ((% (name fun conium-fun)
+    ((% (name fun sbcl-fun)
        `(progn
           (defcommand ,name (p)
             "" ""
             (let ((default (hemlock::symbol-string-at-point)))
-              ;; Fixme: MARK-SYMBOL isn't very good, meaning that often we
-              ;; will get random forms rather than a symbol.  Let's at least
-              ;; catch the case where the result is more than a line long,
-              ;; and give up.
               (when (find #\newline default)
                 (setf default nil))
               (,fun
@@ -185,11 +222,11 @@
             (hemlock::eval-in-slave
              (list '%find-definitions
                    (list 'quote ',name)
-                   (list 'quote ',conium-fun)
+                   (list 'quote ',sbcl-fun)
                    (list 'quote name)))))))
-  (% "Who Calls"        who-calls        conium:who-calls)
-  (% "Who References"   who-references   conium:who-references)
-  (% "Who Binds"        who-binds        conium:who-binds)
-  (% "Who Sets"         who-sets         conium:who-sets)
-  (% "Who Macroexpands" who-macroexpands conium:who-macroexpands)
-  (% "Who Specializes"  who-specializes  conium:who-specializes))
+  (% "Who Calls"        who-calls        %sbcl-xref-callers)
+  (% "Who References"   who-references   %sbcl-xref-references)
+  (% "Who Binds"        who-binds        %sbcl-xref-bindings)
+  (% "Who Sets"         who-sets         %sbcl-xref-sets)
+  (% "Who Macroexpands" who-macroexpands %sbcl-xref-macroexpands)
+  (% "Who Specializes"  who-specializes  %sbcl-xref-specializes))

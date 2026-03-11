@@ -83,11 +83,17 @@
 (defun debug-using-master (&optional (start 0) (end 10))
   (if prepl:*debugging-context*
       (let ((frames
-             (mapcar (lambda (frame)
-                       (cons (with-output-to-string (s)
-                               (conium:print-frame frame s))
-                             (hemlock.wire:make-remote-object frame)))
-                     (conium:compute-backtrace start end)))
+             (let ((result '()) (i -1))
+               (sb-debug:map-backtrace
+                (lambda (frame)
+                  (incf i)
+                  (when (and (>= i start) (< i end))
+                    (push (cons (with-output-to-string (s)
+                                  (sb-debug::print-frame-call frame s))
+                                (hemlock.wire:make-remote-object frame))
+                          result)))
+                :count end)
+               (nreverse result)))
             (context nil
                      #+nil (hemlock.wire:make-remote-object
                             prepl:*debugging-context*))

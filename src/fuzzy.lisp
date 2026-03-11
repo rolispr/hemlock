@@ -795,7 +795,7 @@ keywords: :BOUNDP, :FBOUNDP, :CONSTANT, :GENERIC-FUNCTION,
   (check-type symbol symbol)
   (flet ((type-specifier-p (s)
            (or (documentation s 'type)
-               (not (eq (conium:type-specifier-arglist s) :not-available)))))
+               (ignore-errors (sb-ext:valid-type-specifier-p s)))))
     (let (result)
       (when (boundp symbol)             (push (if (constantp symbol)
                                                   :constant :boundp) result))

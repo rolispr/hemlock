@@ -45,7 +45,6 @@
                         :defaults *hemlock-base-directory*)
      :depends-on (#-scl :alexandria
                   :bordeaux-threads
-                  :conium
                   :trivial-gray-streams
                   :prepl
                   :osicat

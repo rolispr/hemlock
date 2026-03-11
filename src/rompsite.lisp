@@ -488,14 +488,16 @@
   "Takes a symbol or function and returns the pathname for the file the
    function was defined in.  If it was not defined in some file, nil is
    returned."
-  (let ((location (conium:find-source-location
-                   (if (functionp function)
-                       function
-                       (fdefinition function)))))
-    (when (alexandria:starts-with :location location)
-      (let ((file (second location)))
-        (when (alexandria:starts-with :file file)
-          (pathname (second file)))))))
+  (let ((ds (ignore-errors
+              (sb-introspect:find-definition-source
+               (if (functionp function)
+                   function
+                   (fdefinition function))))))
+    (when ds
+      (let ((path (ignore-errors
+                    (sb-introspect:definition-source-pathname ds))))
+        (when path
+          (ignore-errors (truename path)))))))
 #+(or cmu scl)
 (defun fun-defined-from-pathname (function)
   "Takes a symbol or function and returns the pathname for the file the
