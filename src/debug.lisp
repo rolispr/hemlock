@@ -102,9 +102,50 @@
 
 
 ;;;; Debugger mode — interactive restart selection
+;;;
+;;; Like Dired: mode commands operate on shared state, normal command loop
+;;; handles dispatch.  invoke-restart-interactively IS the non-local exit
+;;; out of the recursive %command-loop — no catch/throw needed.
 
 (defmode "Debugger" :major-p t
   :documentation "Presents condition info and restart choices for selection.")
+
+(defvar *debugger-restarts* nil
+  "Live restart objects for a master-process error being debugged.
+Non-nil means we are inside enter-master-debugger.")
+
+(defvar *debugger-restart-count* nil
+  "Number of restarts in an agent debugger session.
+Non-nil means we are inside master-agent-debugger.")
+
+
+(defcommand "Debugger Invoke Restart" (p)
+  "Invoke the numbered restart (from digit key or prefix arg)."
+  "Invoke the numbered restart."
+  (let ((n (or p
+               (digit-char-p
+                (hemlock-ext:key-event-char *last-key-event-typed*)))))
+    (when n
+      (cond
+        ;; Master-process error: invoke restart directly (non-local exit).
+        ((and *debugger-restarts* (< n (length *debugger-restarts*)))
+         (invoke-restart-interactively (nth n *debugger-restarts*)))
+        ;; Agent error: return index to caller via restart.
+        ((and *debugger-restart-count* (< n *debugger-restart-count*))
+         (invoke-restart 'debugger-chose n))))))
+
+(defcommand "Debugger Abort" (p)
+  "Abort — invoke the ABORT restart or return NIL to agent."
+  "Abort from the debugger."
+  (declare (ignore p))
+  (cond
+    (*debugger-restarts*
+     (let ((abort (find-restart 'abort)))
+       (if abort
+           (invoke-restart abort)
+           (throw 'command-loop-catcher nil))))
+    (*debugger-restart-count*
+     (invoke-restart 'debugger-chose nil))))
 
 
 (defun render-debugger-buffer (buf condition-type condition-msg restart-strings frame-strings)
@@ -124,33 +165,19 @@
   (buffer-start (buffer-point buf)))
 
 
-(defun debugger-read-restart-choice (n-restarts)
-  "Block reading key events until user presses a valid digit (0 to n-restarts-1)
-or q for abort.  Returns the chosen index as an integer, or NIL for abort.
-Does not use a recursive command loop — just reads raw key events."
-  (loop
-    (redisplay)
-    (let* ((key (get-key-event *editor-input* t))
-           (char (hemlock-ext:key-event-char key)))
-      (cond
-        ((null char) (beep))
-        ((char-equal char #\q) (return nil))
-        ((digit-char-p char)
-         (let ((n (digit-char-p char)))
-           (if (< n n-restarts)
-               (return n)
-               (beep))))
-        (t (beep))))))
-
-
 (defun master-agent-debugger (condition-type condition-msg restart-strings frame-strings)
   "Called via wire from agent-debugger on the slave side.
 Returns the chosen restart index (integer) or NIL for abort."
   (let ((buf (or (getstring "*Agent Debugger*" *buffer-names*)
-                 (make-buffer "*Agent Debugger*" :modes '("Debugger")))))
+                 (make-buffer "*Agent Debugger*" :modes '("Debugger"))))
+        (*debugger-restart-count* (length restart-strings)))
     (render-debugger-buffer buf condition-type condition-msg restart-strings frame-strings)
     (change-to-buffer buf)
-    (debugger-read-restart-choice (length restart-strings))))
+    (restart-case
+        (hemlock.command::%command-loop)
+      (debugger-chose (n)
+        :report "Debugger restart chosen"
+        n))))
 
 
 (defun enter-master-debugger (condition)
@@ -160,7 +187,8 @@ Must be called from within a handler-bind that caught CONDITION so restarts rema
          (frames   (ignore-errors
                      (hemlock.introspect:compute-backtrace 0 20)))
          (buf (or (getstring "*Debugger*" *buffer-names*)
-                  (make-buffer "*Debugger*" :modes '("Debugger")))))
+                  (make-buffer "*Debugger*" :modes '("Debugger"))))
+         (*debugger-restarts* restarts))
     (render-debugger-buffer
      buf
      (type-of condition)
@@ -172,12 +200,4 @@ Must be called from within a handler-bind that caught CONDITION so restarts rema
                    (hemlock.introspect:print-frame f s)))
                frames)))
     (change-to-buffer buf)
-    (let ((chosen (debugger-read-restart-choice (length restarts))))
-      (cond
-        ((and (integerp chosen) (< chosen (length restarts)))
-         (invoke-restart-interactively (nth chosen restarts)))
-        (t
-         (let ((abort-restart (find-restart 'abort condition)))
-           (if abort-restart
-               (invoke-restart abort-restart)
-               (throw 'command-loop-catcher nil))))))))
+    (hemlock.command::%command-loop)))

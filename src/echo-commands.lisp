@@ -165,6 +165,7 @@
       (:file
        (file-completion-action typein))
       (:keyword
+       (setf *completion-candidates* nil)
        (let ((spacep
                ;; due to the use of spaces in command names, let's special
                ;; case on spaces here: The space key both completes and
@@ -197,6 +198,56 @@
 
 (defvar *echo-history-pointer* 0
   "This is our current position to the ring during a historical exploration.")
+
+(defvar *completion-candidates* nil
+  "List of completion candidates for cycling.")
+(defvar *completion-index* -1
+  "Current index into *completion-candidates*.")
+(defvar *completion-base-input* nil
+  "The input text that generated the current candidate list.")
+
+(defun ensure-completion-candidates ()
+  "Ensure *completion-candidates* is populated for the current input.
+   Recomputes if the input has changed from *completion-base-input*."
+  (let ((typein (region-to-string *parse-input-region*)))
+    (unless (and *completion-base-input*
+                 (string= typein *completion-base-input*))
+      (setf *completion-base-input* typein
+            *completion-candidates* (find-all-completions typein *parse-string-tables*)
+            *completion-index* -1))
+    *completion-candidates*))
+
+(defcommand "Next Completion" (p)
+  "Cycle to the next completion candidate."
+  "Replace the echo area input with the next matching candidate."
+  (declare (ignore p))
+  (unless (eq *parse-type* :keyword)
+    (editor-error "Cannot cycle completions for this prompt."))
+  (let ((candidates (ensure-completion-candidates)))
+    (unless candidates
+      (editor-error "No completions."))
+    (setf *completion-index*
+          (mod (1+ *completion-index*) (length candidates)))
+    (let ((candidate (nth *completion-index* candidates)))
+      (delete-region *parse-input-region*)
+      (insert-string (region-start *parse-input-region*) candidate)
+      (setf *completion-base-input* candidate))))
+
+(defcommand "Previous Completion" (p)
+  "Cycle to the previous completion candidate."
+  "Replace the echo area input with the previous matching candidate."
+  (declare (ignore p))
+  (unless (eq *parse-type* :keyword)
+    (editor-error "Cannot cycle completions for this prompt."))
+  (let ((candidates (ensure-completion-candidates)))
+    (unless candidates
+      (editor-error "No completions."))
+    (setf *completion-index*
+          (mod (1- *completion-index*) (length candidates)))
+    (let ((candidate (nth *completion-index* candidates)))
+      (delete-region *parse-input-region*)
+      (insert-string (region-start *parse-input-region*) candidate)
+      (setf *completion-base-input* candidate))))
 
 (defcommand "Confirm Parse" (p)
   "Terminate echo-area input.

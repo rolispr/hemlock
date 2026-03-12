@@ -392,6 +392,21 @@
 
 (bind-key "Debug Quit" #k"q" :mode "Debug")
 
+
+;;;; Debugger mode (restart selection UI)
+
+(bind-key "Debugger Invoke Restart" #k"0" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"1" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"2" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"3" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"4" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"5" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"6" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"7" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"8" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"9" :mode "Debugger")
+(bind-key "Debugger Abort"          #k"q" :mode "Debugger")
+
 
 ;;;; More Miscellaneous bindings.
 

@@ -125,9 +125,11 @@
 ;;;; Collect window HTML lines
 
 (defun collect-window-lines (window cursor-hunk cursor-x cursor-y)
-  "Return a vector of HTML <div> strings for each display line of WINDOW."
+  "Return a vector of HTML <div> strings for each display line of WINDOW.
+   Pads with empty <div> rows up to the window height so the screen is full."
   (let* ((hunk   (window-hunk window))
-         (result (make-array 0 :adjustable t :fill-pointer 0))
+         (height (window-height window))
+         (result (make-array height :fill-pointer 0))
          (i      0))
     (do ((dl (cdr (window-first-line window)) (cdr dl)))
         ((eq dl the-sentinel))
@@ -136,6 +138,9 @@
              (inner (dis-line->html (car dl) cursor-col)))
         (vector-push-extend (format nil "<div>~A</div>" inner) result))
       (incf i))
+    ;; Pad remaining rows with empty divs (like ~ lines in a terminal).
+    (loop while (< (fill-pointer result) height)
+          do (vector-push-extend "<div> </div>" result))
     result))
 
 (defun lines-to-json (vec)
@@ -200,21 +205,7 @@
                               dom-id
                               (lines-to-json lines)
                               ml)))
-              (format *error-output*
-                      "~&[device-force-output] win=~S dom=~S lines=~D ml=~S~%~&[JS] ~A~%"
-                      win dom-id (length lines) ml js)
-              (finish-output *error-output*)
-              ;; DEBUG: skip updateWindow, write diagnostic directly to the div
-              (webui:webui-run win
-               (format nil "document.getElementById('~A').innerHTML='<div style=\"color:lime\">~A L=~D ML=~D first50=['+~S+']</div>';"
-                       dom-id dom-id (length lines) (length ml)
-                       (if (plusp (length lines))
-                           (subseq (aref lines 0) 0 (min 80 (length (aref lines 0))))
-                           "EMPTY")))
-              ;; Also show modeline in the ml bar
-              (webui:webui-run win
-               (format nil "document.getElementById('~A-ml').textContent=~S;"
-                       dom-id ml))))))
+              (webui:webui-run win js))))))
       (setf (webui-device-dirty-windows device) nil))))
 
 (defmethod device-finish-output ((device webui-device) window)
