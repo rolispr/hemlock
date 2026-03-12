@@ -113,7 +113,8 @@
               :pathname "src/"
               :depends-on (root-2 core-1 wire)
               :components
-              ((:file "echo-commands")
+              ((:file "completion-source")
+               (:file "echo-commands" :depends-on ("completion-source"))
                (:file "command")
                (:file "kbd-macro")
                (:file "undo")

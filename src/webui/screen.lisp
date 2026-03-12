@@ -187,17 +187,51 @@ window.addEventListener('resize', _measureGrid);
        (webui-device-pipe-read-fd device)
        :input (let ((dev device))
                 (lambda (fd) (webui-drain-events dev fd))))
-      ;; Disable show_wait_connection so webui_show returns immediately instead
-      ;; of blocking until the WebSocket handshake completes.  The command loop
-      ;; will block in serve-event until hemlock_resize fires (browser load),
-      ;; which is the correct place to wait.
-      (webui:webui-set-config webui:+show-wait-connection+ nil)
-      (webui:webui-show win *webui-initial-html*)
-      ;; webui-wait blocks until all windows are closed; run it off the main thread.
-      (sb-thread:make-thread (lambda () (webui:webui-wait)) :name "webui-wait"))))
+      ;; Show the window. webui-wait is called on the main OS thread by
+      ;; run-with-webui-event-loop (required by Cocoa/WebKit on macOS).
+      (webui:webui-show win *webui-initial-html*))))
 
 (defmethod device-exit ((device webui-device))
   nil)
+
+
+;;;; run-with-webui-event-loop
+
+;;; Run the Hemlock command loop (FUN) on a background thread while
+;;; webui_wait runs on the calling thread.  On macOS, webui_wait uses
+;;; Cocoa and WebKit internally and must run on the main OS thread;
+;;; this function is called from call-with-editor instead of the
+;;; normal (catch 'hemlock-exit (funcall fun)) form.
+;;;
+;;; Dynamic variables that the command loop needs are captured here
+;;; (inside the let-bindings set up by call-with-editor and
+;;; site-wrapper-macro) and re-bound in the background thread.
+;;;
+(defun run-with-webui-event-loop (fun)
+  (let ((in-editor      *in-the-editor*)
+        (default-backend *default-backend*))
+    (let ((cmd-thread
+           (sb-thread:make-thread
+            (lambda ()
+              (let ((*in-the-editor*    in-editor)
+                    (*default-backend* default-backend))
+                (catch 'hemlock-exit (funcall fun)))
+              ;; Command loop exited — signal webui to shut down so
+              ;; webui-wait returns on the main thread.
+              (webui:webui-exit))
+            :name "hemlock-command-loop")))
+      ;; Main thread: run the webui event loop (required on macOS).
+      (sb-int:with-float-traps-masked (:invalid :overflow :inexact
+                                       :divide-by-zero :underflow)
+        (webui:webui-wait))
+      ;; webui-wait returned (all windows closed or webui-exit called).
+      ;; Stop the command loop if it is still running.
+      (when (sb-thread:thread-alive-p cmd-thread)
+        (handler-case
+            (sb-thread:interrupt-thread cmd-thread
+                                        (lambda () (throw 'hemlock-exit nil)))
+          (sb-thread:interrupt-thread-error ())))
+      (sb-thread:join-thread cmd-thread :timeout 5 :default nil))))
 
 
 ;;;; device-clear

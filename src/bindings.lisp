@@ -277,6 +277,8 @@
 (bind-key "Echo Area Backward Word" #k"meta-b" :mode "Echo Area")
 (bind-key "Next Parse" #k"meta-n" :mode "Echo Area")
 (bind-key "Previous Parse" #k"meta-p" :mode "Echo Area")
+(bind-key "Next Completion" #k"downarrow" :mode "Echo Area")
+(bind-key "Previous Completion" #k"uparrow" :mode "Echo Area")
 
 ;;; Remove some dangerous standard bindings.
 ;;;

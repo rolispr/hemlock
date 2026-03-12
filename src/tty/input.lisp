@@ -47,6 +47,26 @@
   (process-editor-tty-input)
   nil)
 
+(defvar *tty-input-log-stream* nil
+  "When non-nil, a stream to write raw input debug lines to.")
+
+(defun enable-tty-input-logging (&optional (path "/tmp/hemlock-input-debug.log"))
+  "Log all raw TTY input bytes/events to PATH for debugging."
+  (when *tty-input-log-stream* (close *tty-input-log-stream*))
+  (setf *tty-input-log-stream*
+        (open path :direction :output :if-exists :append :if-does-not-exist :create)))
+
+(defun disable-tty-input-logging ()
+  (when *tty-input-log-stream*
+    (close *tty-input-log-stream*)
+    (setf *tty-input-log-stream* nil)))
+
+(defun tty-input-log (fmt &rest args)
+  (when *tty-input-log-stream*
+    (apply #'format *tty-input-log-stream* fmt args)
+    (terpri *tty-input-log-stream*)
+    (finish-output *tty-input-log-stream*)))
+
 (defvar *tty-translations* (make-hash-table :test #'equal))
 
 (defun register-tty-translations ()
@@ -237,21 +257,36 @@
           (incf i)
           ;; Dispatch mouse event as a Hemlock key event.
           ;; Column px and row py are 1-based in the SGR protocol.
-          (let ((pressed (char= final #\M))
-                (button  (logand b 3))
-                (scroll  (or (= (logand b 63) 64) (= (logand b 63) 65))))
+          (let* ((pressed  (char= final #\M))
+                 (button   (logand b 3))
+                 (shift-p  (logbitp 2 b))
+                 (meta-p   (logbitp 3 b))
+                 (ctrl-p   (logbitp 4 b))
+                 (motion-p (logbitp 5 b))
+                 (scroll   (or (= (logand b 63) 64) (= (logand b 63) 65))))
+            (tty-input-log "mouse: b=~A btn=~A shift=~A meta=~A ctrl=~A motion=~A pressed=~A x=~A y=~A"
+                           b button shift-p meta-p ctrl-p motion-p pressed px py)
             (cond
               (scroll
                (let ((sym (if (= (logand b 63) 64) #k"WheelUp" #k"WheelDown")))
                  (when sym (q-event *real-editor-input* sym))))
-              ((and pressed (zerop button))
-               ;; Left button press — store coords and fire Mouse1.
+              ((and pressed (zerop button) (not motion-p))
+               ;; Left button press — store coords and fire Mouse1 (with modifiers).
                (setf *last-mouse-x* (1- px)
                      *last-mouse-y* (1- py))
-               (q-event *real-editor-input* #k"Mouse1")))
+               (let ((sym (cond
+                            ((and ctrl-p shift-p) #k"Shift-Control-Mouse1")
+                            ((and ctrl-p meta-p)  #k"Meta-Control-Mouse1")
+                            ((and shift-p meta-p) #k"Shift-Meta-Mouse1")
+                            (ctrl-p               #k"Control-Mouse1")
+                            (meta-p               #k"Meta-Mouse1")
+                            (shift-p              #k"Shift-Mouse1")
+                            (t                    #k"Mouse1"))))
+                 (q-event *real-editor-input* sym))))
             i))))))
 
 (defun tty-key-event (data)
+  (tty-input-log "raw: ~S" data)
   (loop with start = 0
         with length = (length data)
         while (< start length)

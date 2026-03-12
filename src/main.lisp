@@ -464,8 +464,10 @@ GB
               (setq *editor-has-been-entered* t)
               ;; Pick up user initializations to be done after initialization.
               (invoke-hook (reverse *after-editor-initializations-funs*)))
-            (catch 'hemlock-exit
-              (funcall fun))))))))
+            (if (eq backend-type :webui)
+                (hemlock.webui::run-with-webui-event-loop fun)
+                (catch 'hemlock-exit
+                  (funcall fun)))))))))
 
 (defun process-command-line-argument (x)
   (catch 'editor-top-level-catcher

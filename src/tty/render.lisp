@@ -36,6 +36,12 @@
 (defparameter *bg-cyan*           "46")
 (defparameter *bg-white*          "47")
 (defparameter *bg-bright-black*   "100")
+(defparameter *bg-bright-red*     "101")
+(defparameter *bg-bright-green*   "102")
+(defparameter *bg-bright-yellow*  "103")
+(defparameter *bg-bright-blue*    "104")
+(defparameter *bg-bright-magenta* "105")
+(defparameter *bg-bright-cyan*    "106")
 (defparameter *bg-bright-white*   "107")
 
 
@@ -43,6 +49,44 @@
 
 (defun ansi-reset () (format nil "~C[0m" #\Escape))
 (defun sgr (codes) (format nil "~C[~{~A~^;~}m" #\Escape codes))
+
+(defun color-256 (n &key (foreground t))
+  "256-color SGR: ESC[38;5;Nm (fg) or ESC[48;5;Nm (bg)."
+  (format nil "~C[~A;5;~Am" #\Escape (if foreground 38 48) n))
+
+(defun color-rgb (r g b &key (foreground t))
+  "24-bit truecolor SGR: ESC[38;2;R;G;Bm (fg) or ESC[48;2;R;G;Bm (bg)."
+  (format nil "~C[~A;2;~A;~A;~Am" #\Escape (if foreground 38 48) r g b))
+
+(defun parse-hex-color (hex &key (foreground t))
+  "Parse #RRGGBB or #RGB hex string into a truecolor SGR code string."
+  (let* ((s (string-left-trim "#" hex))
+         (len (length s))
+         r g b)
+    (cond
+      ((= len 6)
+       (setf r (parse-integer s :start 0 :end 2 :radix 16)
+             g (parse-integer s :start 2 :end 4 :radix 16)
+             b (parse-integer s :start 4 :end 6 :radix 16)))
+      ((= len 3)
+       (let ((rh (digit-char-p (char s 0) 16))
+             (gh (digit-char-p (char s 1) 16))
+             (bh (digit-char-p (char s 2) 16)))
+         (setf r (+ (* rh 16) rh)
+               g (+ (* gh 16) gh)
+               b (+ (* bh 16) bh))))
+      (t (error "Invalid hex color: ~S" hex)))
+    (color-rgb r g b :foreground foreground)))
+
+(defun detect-color-support ()
+  "Return :truecolor, :256color, :16color, or :monochrome based on env vars."
+  (let ((colorterm (uiop:getenv "COLORTERM"))
+        (term      (uiop:getenv "TERM")))
+    (cond
+      ((or (equal colorterm "truecolor") (equal colorterm "24bit")) :truecolor)
+      ((and term (search "256color" term))                          :256color)
+      ((and term (or (search "color" term) (equal term "xterm")))   :16color)
+      (t :monochrome))))
 
 
 ;;;; Character display width

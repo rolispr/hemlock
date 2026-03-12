@@ -75,6 +75,14 @@
 
 (defvar *parse-type* :string "A hack. :String, :File or :Keyword.")
 
+;;; Completion display hooks — set by echo-commands.lisp after loading.
+(defvar *completion-display-start-fn* nil
+  "Function called with no args to open the completion candidate window.")
+(defvar *completion-display-stop-fn* nil
+  "Function called with no args to close the completion candidate window.")
+(defvar *completions-window* nil
+  "The window currently showing completion candidates, or nil.")
+
 
 
 ;;;; MESSAGE and CLEAR-ECHO-AREA:
@@ -164,7 +172,11 @@
     (setf (current-window) *echo-area-window*)
     (unwind-protect
      (use-buffer *echo-area-buffer*
+       (when (and *completion-display-start-fn*
+                  (member *parse-type* '(:keyword :file)))
+         (funcall *completion-display-start-fn*))
        (recursive-edit nil))
+      (when *completion-display-stop-fn* (funcall *completion-display-stop-fn*))
       (setf (current-window) start-window)
       (change-to-buffer start-buffer))))
 
