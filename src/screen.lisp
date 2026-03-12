@@ -6,6 +6,10 @@
 (in-package :hemlock.command)
 
 
+(defun get-terminal-name ()
+  (or (uiop:getenv "TERM") "vt100"))
+
+
 ;;;; Screen management initialization.
 
 (declaim (special *echo-area-buffer*))
@@ -24,11 +28,6 @@
   (setf (buffer-modeline-fields *echo-area-buffer*)
         (value hemlock::default-status-line-fields)))
 
-(defmethod %init-screen-manager ((backend-type (eql :tty)) (display t))
-  (init-tty-screen-manager (make-tty-device (get-terminal-name))))
-
-(defmethod %init-screen-manager ((backend-type (eql :mini)) (display t))
-  (init-tty-screen-manager (make-linedit-device (get-terminal-name))))
 
 
 ;;;; Window operations.

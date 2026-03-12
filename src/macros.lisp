@@ -70,12 +70,7 @@
 ;;; Convert the symbol name 'string to the standard character case for the
 ;;; lisp implementation which is uppercase for standard CL.
 (defun canonical-case (string)
-  #-scl
-  (nstring-upcase string)
-  #+scl
-  (if (eq ext:*case-mode* :upper)
-      (nstring-upcase string)
-      (nstring-downcase string)))
+  (nstring-upcase string))
 
 (defun bash-string-to-symbol (name suffix)
   (intern (nsubstitute #\- #\space (canonical-case
@@ -667,6 +662,13 @@
      ,@body))
 
 (defvar *connection-backend* :sb-sys)
+
+(defgeneric invoke-with-new-event-loop (backend fun))
+(defgeneric make-event-loop (backend))
+(defgeneric invoke-with-existing-event-loop (backend loop fun))
+(defgeneric dispatch-events-with-backend (backend))
+(defgeneric dispatch-events-no-hang-with-backend (backend))
+(defgeneric invoke-later (backend fun))
 
 (defmacro with-new-event-loop ((&optional) &body body)
   `(invoke-with-new-event-loop *connection-backend* (lambda () ,@body)))

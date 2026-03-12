@@ -4,6 +4,8 @@
 ;;; Stuff to do a little lisp hacking in the editor's Lisp environment.
 ;;;
 
+(in-package :hemlock)
+
 (defmacro in-lisp (&body body)
   "Evaluates body inside HANDLE-LISP-ERRORS.  *package* is bound to the package
    named by \"Current Package\" if it is non-nil."
@@ -497,14 +499,10 @@
          ;; it does not work on HEMLOCK-REGION-STREAM (but it can be
          ;; added back later if CMUCL starts using user-extensible
          ;; streams internally.)
-         #-scl
          (funcall (compile nil `(lambda ()
                                   ,@(loop for form = (read stream nil stream)
                                       until (eq form stream)
                                       collect form))))
-         #+scl
-         ;; TODO: add position information to the source-info.
-         (c::compile-from-stream stream :source-info pathname)
          )))))
 
 (defcommand "Editor Evaluate Defun" (p)
@@ -630,7 +628,7 @@
                              (buffer-default-pathname (current-buffer))
                              :prompt "File to compile: ")))
     (with-output-to-window (*error-output* "Compiler Warnings")
-      (in-lisp (compile-file (namestring pn) #+cmu :error-file #+cmu nil)))))
+      (in-lisp (compile-file (namestring pn))))))
 
 
 (defun older-or-non-existent-fasl-p (pathname &optional definitely)
@@ -660,21 +658,21 @@
                                     (namestring pn))))
              (write-buffer-file buf pn)
              (with-output-to-window (*error-output* "Compiler Warnings")
-               (in-lisp (compile-file (namestring pn) #+cmu :error-file #+cmu nil)))))
+               (in-lisp (compile-file (namestring pn))))))
           ((older-or-non-existent-fasl-p pn p)
            (when (or (not (value compile-buffer-file-confirm))
                      (prompt-for-y-or-n
                       :default t :default-string "Y"
                       :prompt (list "Compile file ~A? " (namestring pn))))
              (with-output-to-window (*error-output* "Compiler Warnings")
-               (in-lisp (compile-file (namestring pn) #+cmu :error-file #+cmu nil)))))
+               (in-lisp (compile-file (namestring pn))))))
           (t (when (or p
                        (prompt-for-y-or-n
                         :default t :default-string "Y"
                         :prompt
                         "Fasl file up to date, compile source anyway? "))
                (with-output-to-window (*error-output* "Compiler Warnings")
-                 (in-lisp (compile-file (namestring pn) #+cmu :error-file #+cmu nil))))))))
+                 (in-lisp (compile-file (namestring pn)))))))))
 
 (defcommand "Editor Compile Group" (p)
   "Compile each file in the current group which needs it in the editor Lisp.
@@ -694,7 +692,7 @@
                (message "File ~A not found." (namestring file)))
               ((older-or-non-existent-fasl-p tn p)
                (with-output-to-window (*error-output* "Compiler Warnings")
-                 (in-lisp (compile-file (namestring tn) #+cmu :error-file #+cmu nil)))))))))
+                 (in-lisp (compile-file (namestring tn))))))))))
 
 (defcommand "List Compile Group" (p)
   "List any files that would be compiled by \"Compile Group\".  All Modified

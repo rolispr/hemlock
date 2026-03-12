@@ -5,7 +5,7 @@
 ;;;
 ;;;
 
-
+(in-package :hemlock)
 
 ;; (declaim (optimize (speed 2))); turn off byte compilation.
 

@@ -1,11 +1,5 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
-;;; ---------------------------------------------------------------------------
-;;;     Title: experimental syntax highlighting
-;;;   Created: 2004-07-09
-;;;    Author: Gilbert Baumann <gilbert@base-electronic.de>
-;;;       $Id: exp-syntax.lisp,v 1.1 2004-07-09 15:16:14 gbaumann Exp $
-;;; ---------------------------------------------------------------------------
-;;;  (c) copyright 2004 by Gilbert Baumann
+;;; Syntax highlighting.
 
 (in-package :hemlock.command)
 

@@ -1,10 +1,5 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
-;;; fuzzy.lisp --- fuzzy symbol completion
-;;
-;;          Tobias C. Rittweiler <tcr@freebits.de>
-;;          and others
-;;
-;;
+;;; Fuzzy symbol completion
 
 (in-package :hemlock)
 

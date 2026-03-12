@@ -423,20 +423,6 @@
 (defmethod stream-fd ((stream sb-sys:fd-stream))
   (sb-sys:fd-stream-fd stream))
 
-#+cmu
-(defmethod stream-fd ((stream system:fd-stream))
-  (system:fd-stream-fd stream))
-
-#+scl
-(defmethod stream-fd ((stream stream))
-  (system:fd-stream-fd stream))
-
-#+openmcl
-(defmethod stream-fd ((stream ccl::basic-stream))
-  (ccl::ioblock-device (ccl::stream-ioblock stream t)))
-#+openmcl
-(defmethod stream-fd ((stream ccl::fd-stream))
-  (ccl::ioblock-device (ccl::stream-ioblock stream t)))
 
 #+clisp
 (defmethod stream-fd ((stream stream))

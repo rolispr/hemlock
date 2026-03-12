@@ -250,8 +250,7 @@ GB
 
 ;;;; ED.
 
-(defvar *editor-has-been-entered* ()
-  "True if and only if the editor has been entered.")
+;;; *editor-has-been-entered* is defined in rompsite.lisp (hemlock.command).
 (defvar *in-the-editor* ()
   "True if we are inside the editor.  This is used to prevent ill-advised
    \"recursive\" edits.")
@@ -435,11 +434,12 @@ GB
   ;; fixme: pass DISPLAY to WITH-EVENT-LOOP, so that Qt can pick it up
   ;; in case the user wants a DISPLAY != $DISPLAY
   (let* ((backend-type (or backend-type (choose-backend-type display)))
+         (display (if (member backend-type '(:webui :tty :mini)) nil display))
          (*default-backend* backend-type))
     (setf *connection-backend*
           (ecase backend-type
             (:qt :qt)
-            ((:tty :clx :mini) :sb-sys)))
+            ((:tty :clx :mini :webui) :sb-sys)))
     (with-existing-event-loop
         (or *main-event-base*
             (setf *main-event-base*

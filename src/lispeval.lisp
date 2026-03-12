@@ -581,22 +581,8 @@
                    :name name)))
 
 (defun casify-char (char)
-  "Convert CHAR accoring to readtable-case."
-  #-scl
-  (char-upcase char)
-  #+scl
-  (if (eq ext:*case-mode* :upper)
-      (char-upcase char)
-      (char-downcase char))
-  ;; fixme: need to do this on the slave side
-  #+nil
-  (ecase (readtable-case *readtable*)
-    (:preserve char)
-    (:upcase   (char-upcase char))
-    (:downcase (char-downcase char))
-    (:invert (if (upper-case-p char)
-                 (char-downcase char)
-                 (char-upcase char)))))
+  "Convert CHAR according to readtable-case."
+  (char-upcase char))
 
 (defun tokenize-symbol-thoroughly (string)
   "This version of TOKENIZE-SYMBOL handles escape characters."

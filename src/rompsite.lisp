@@ -205,6 +205,9 @@
 
 (defgeneric backend-init-raw-io (backend-type display))
 
+;;; Forward declaration: defined in tty/input.lisp (hemlock.tty inherits this symbol).
+(declaim (ftype (function (&key (:fd t)) t) make-tty-editor-input))
+
 (defmethod backend-init-raw-io ((backend (eql :tty)) display)
   (declare (ignore display))
   ;; The editor's file descriptor is Unix standard input (0).
@@ -322,6 +325,9 @@
 
 (declaim (special *gc-notify-before*
                   *gc-notify-after*))
+
+(defvar *editor-has-been-entered* nil
+  "True if the editor has been entered at least once.")
 
 ;; fixme: this is neither site-specific nor should it be a macro.
 (defmacro site-wrapper-macro (&body body)
@@ -478,7 +484,6 @@
 ;;; returns a pathname for the file the function was defined in.  If it was
 ;;; not defined in some file, then nil is returned.
 ;;;
-#-(or cmu scl)
 (defun fun-defined-from-pathname (function)
   "Takes a symbol or function and returns the pathname for the file the
    function was defined in.  If it was not defined in some file, nil is
@@ -493,32 +498,9 @@
                     (sb-introspect:definition-source-pathname ds))))
         (when path
           (ignore-errors (truename path)))))))
-#+(or cmu scl)
-(defun fun-defined-from-pathname (function)
-  "Takes a symbol or function and returns the pathname for the file the
-   function was defined in.  If it was not defined in some file, nil is
-   returned."
-  (flet ((frob (code)
-              (let ((info (kernel:%code-debug-info code)))
-                     (when info
-                              (let ((sources (c::debug-info-source info)))
-                                 (when sources
-                                      (let ((source (car sources)))
-                                             (when (eq (c::debug-source-from source) :file)
-                                                      (c::debug-source-name source)))))))))
-    (typecase function
-      (symbol (fun-defined-from-pathname (fdefinition function)))
-      (kernel:byte-closure
-       (fun-defined-from-pathname (kernel:byte-closure-function function)))
-      (kernel:byte-function
-       (frob (c::byte-function-component function)))
-      (function
-       (frob (kernel:function-code-header (kernel:%function-self function))))
-      (t nil))))
 
 
-(defvar *editor-describe-stream*
-  (#+CMU system:make-indenting-stream #-CMU progn *standard-output*))
+(defvar *editor-describe-stream* *standard-output*)
 
 ;;; EDITOR-DESCRIBE-FUNCTION has to mess around to get indenting streams to
 ;;; work.  These apparently work fine for DESCRIBE, for which they were defined,

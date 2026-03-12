@@ -1,9 +1,5 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;;
-;;; Reluctantly written by Christopher Hoover
-;;; Supporting cast includes Rob and Bill.
-;;;
 ;;; This file defines a data structure, analogous to a Common Lisp
 ;;; hashtable, which translates strings to values and facilitates
 ;;; recognition and completion of these strings.

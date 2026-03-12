@@ -54,6 +54,26 @@
    #:declfun
    ;; device-hunk class and accessors (struct.lisp)
    #:device-hunk
+   ;; tty-device class and accessors (struct.lisp)
+   #:tty-device #:%make-tty-device
+   #:tty-device-dumbp #:tty-device-lines #:tty-device-columns
+   #:tty-device-display-string #:tty-device-standout-init #:tty-device-standout-end
+   #:tty-device-clear-lines #:tty-device-clear-to-eol #:tty-device-clear-to-eow
+   #:tty-device-open-line #:tty-device-delete-line #:tty-device-insert-string
+   #:tty-device-delete-char #:tty-device-cursor-x #:tty-device-cursor-y
+   #:tty-device-standout-init-string #:tty-device-standout-end-string
+   #:tty-device-clear-to-eol-string #:tty-device-clear-string
+   #:tty-device-open-line-string #:tty-device-delete-line-string
+   #:tty-device-insert-init-string #:tty-device-insert-char-init-string
+   #:tty-device-insert-char-end-string #:tty-device-insert-end-string
+   #:tty-device-delete-init-string #:tty-device-delete-char-string
+   #:tty-device-delete-end-string #:tty-device-init-string
+   #:tty-device-screen-image #:tty-device-speed
+   #:tty-device-cm-string #:tty-device-cm-one-origin #:tty-device-cm-reversep
+   #:tty-device-cm-x-pad #:tty-device-cm-y-pad #:tty-device-cm-end-string
+   #:tty-device-cm-x-add-char #:tty-device-cm-y-add-char
+   #:tty-device-cm-x-condx-char #:tty-device-cm-y-condx-char
+   #:tty-device-cm-x-condx-add-char #:tty-device-cm-y-condx-add-char
    ;; value-node struct (table.lisp)
    #:value-node
    #:value-node-proper
@@ -1267,15 +1287,37 @@
    #:%init-syntax-table
    #:%init-line-image
    ;; rompsite.lisp — entry-point functions used from main.lisp (hemlock pkg)
+   ;; display constants (winimage.lisp) — re-exported through hemlock.display to hemlock.tty
+   #:unaltered-bits #:changed-bit #:moved-bit #:new-bit #:the-sentinel
    #:site-wrapper-macro
    #:init-raw-io
    #:*illegal-read-stream*
    #:*default-backend*
+   #:*available-backends*
+   #:*editor-has-been-entered*
    #:validate-backend-type
    #:choose-backend-type
+   ;; tty input helpers defined in rompsite.lisp, used by tty backend
+   #:get-terminal-name
+   #:make-tty-editor-input
+   #:process-editor-tty-input
+   #:tty-beep
+   #:translate-tty-event
+   #:register-tty-translation
+   #:tty-key-event
+   #:editor-tty-listen
+   #:*tty-translations*
    ;; macros.lisp — used from main.lisp
    #:*connection-backend*
    #:with-existing-event-loop
+   #:with-new-event-loop
+   #:invoke-with-new-event-loop
+   #:invoke-with-existing-event-loop
+   #:make-event-loop
+   #:dispatch-events-with-backend
+   #:dispatch-events-no-hang-with-backend
+   #:invoke-later
+   #:later
    #:lisp-error-error-handler
    ;; key-dispatch.lisp — used from main.lisp
    #:%command-loop
@@ -1301,12 +1343,26 @@
    #:*parse-help*
    #:*parse-type*
 
-   ;; editor-input internals
+   ;; editor-input internals (input.lisp) — used by tty backend
    #:*real-editor-input*
+   #:*free-input-events*
+   #:*screen-image-trashed*
+   #:*editor-windowed-input*
+   #:%editor-input-method
+   #:q-event #:un-event #:dq-event
+   #:editor-input-head #:editor-input-tail
+   #:input-event-next #:input-event-key-event
+   #:input-event-x #:input-event-y #:input-event-hunk #:input-event-unread-p
+   #:new-event #:editor-abort-key-events #:abort-key-event-p
+   #:more-read-key-event
+   #:*in-hemlock-stream-input-method*
 
    ;; window image internals
    #:setup-modeline-image
    #:canonical-case
+   #:setup-window-image
+   #:change-window-image-height
+   #:internal-redisplay
 
    ;; display functions forward-declared
    #:random-typeout-redisplay
@@ -1325,14 +1381,6 @@
   (:use :common-lisp
         :hemlock-interface)
   (:shadow #:char-code-limit)
-  #+(or scl cmu)
-  (:import-from :ext #:complete-file ; #:default-directory
-                #:ambiguous-files
-                #:delq #:memq #:assq
-                #:fixnump
-                #:file-writable
-                #:print-directory
-                )
   ;; Import key-event symbols from hemlock.text for backward compat
   (:import-from :hemlock.text
                 #:key-event #:key-event-p #:key-event-bits #:key-event-keysym
@@ -1345,7 +1393,6 @@
   ;;
   (:export
    #:without-interrupts
-   #:without-gcing
    #:define-setf-method
    #:getenv
 
@@ -1397,19 +1444,10 @@
 
 (defpackage :hemlock-internals
   (:use :common-lisp :hemlock.text :hemlock.command
-        #-(or cmu scl) :command-line-arguments)
+        :command-line-arguments
+        :trivial-gray-streams)
   (:nicknames :hi)
   (:shadow #:char-code-limit #:show-option-help)
-  #-scl
-  (:use :trivial-gray-streams)
-  #+scl
-  (:import-from :ext
-                #:stream-write-char #:stream-write-chars #:stream-line-column
-                #:stream-line-length #:stream-clear-output #:stream-pathname
-                #:stream-force-output #:stream-finish-output
-                #:stream-read-char #:stream-unread-char
-                #:stream-read-char-no-hang #:stream-listen
-                #:stream-clear-input #:stream-file-position)
   (:import-from :hemlock-ext
                 #:delq #:memq #:assq)
   (:shadowing-import-from :hemlock-ext #:concat)
@@ -1717,10 +1755,15 @@
            #:set-terminal))
 
 (defpackage :hemlock.tty
-  (:use :common-lisp :hemlock.text :hemlock.command :hemlock :hemlock.display :hemlock.terminfo
+  (:use :common-lisp :hemlock.text :hemlock.command :hemlock :hemlock.display
         :trivial-gray-streams)
   (:shadowing-import-from :hemlock.text #:char-code-limit)
   (:nicknames :tty))
+
+(defpackage :hemlock.webui
+  (:use :common-lisp :hemlock.text :hemlock.command :hemlock :hemlock.display)
+  (:shadowing-import-from :hemlock.text #:char-code-limit))
+
 
 ;; $Log: package.lisp,v $
 ;; Revision 1.4  2004-09-03 23:06:51  abakic

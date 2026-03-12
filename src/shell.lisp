@@ -53,9 +53,8 @@
 ;;;    alias pushd 'pushd \!* ; echo ""`pwd`"/"'
 ;;;
 
-(defclass shell-filter-stream (#-scl hi::trivial-gray-stream-mixin
-                               #-scl hi::fundamental-character-output-stream
-                               #+scl ext:character-output-stream)
+(defclass shell-filter-stream (hi::trivial-gray-stream-mixin
+                               hi::fundamental-character-output-stream)
   ((buffer
     :initform nil
     :initarg :buffer
@@ -69,7 +68,6 @@
 
 (defun make-shell-filter-stream (buffer hemlock-stream)
   (make-instance 'shell-filter-stream
-                 #+scl #+scl :out-buffer (lisp::make-stream-buffer 'base-char)
                  :buffer buffer
                  :hemlock-stream hemlock-stream))
 
@@ -88,64 +86,13 @@
             do (hi::stream-write-char stream (elt seq i)))
       (shell-filter-string-out stream seq start end)))
 
-#+scl
-(defmethod ext:stream-write-chars
-    ((stream shell-filter-stream) seq start end waitp)
-  (declare (ignore waitp))
-  (check-type seq string)
-  (if (position #\return seq)
-      (loop for i from start below end
-            do (hi::stream-write-char stream (elt seq i)))
-      (shell-filter-string-out stream seq start end))
-  (- end start))
-
-#+scl
-(defmethod hi::stream-finish-output ((stream shell-filter-stream))
-  (finish-output (shell-filter-stream-hemlock-stream stream)))
-
-#+scl
-(defmethod hi::stream-force-output ((stream shell-filter-stream))
-  (force-output (shell-filter-stream-hemlock-stream stream)))
-
-#+scl
-(defmethod hi::stream-clear-output ((stream shell-filter-stream))
-  (clear-output (shell-filter-stream-hemlock-stream stream)))
 
 (defmethod hi::stream-line-length ((stream shell-filter-stream))
   (hi::stream-line-length (shell-filter-stream-hemlock-stream stream)))
 
 (defmethod hi::stream-line-column ((stream shell-filter-stream))
-  #-scl (hi::stream-line-column (shell-filter-stream-hemlock-stream stream))
-  #+scl (ext:line-column (shell-filter-stream-hemlock-stream stream))
-  )
+  (hi::stream-line-column (shell-filter-stream-hemlock-stream stream)))
 
-#+scl
-(defmethod file-length ((stream shell-filter-stream))
-  (ext:flush-output stream)
-  (file-length (shell-filter-stream-hemlock-stream stream)))
-
-#+scl
-(defmethod ext:stream-file-position ((stream shell-filter-stream) &optional position)
-  (file-position (shell-filter-stream-hemlock-stream stream) position))
-
-#+scl
-(defmethod interactive-stream-p ((stream shell-filter-stream))
-  (interactive-stream-p (shell-filter-stream-hemlock-stream stream)))
-
-#+scl
-(defmethod (setf interactive-stream-p) (value (stream shell-filter-stream))
-  (let ((stream (shell-filter-stream-hemlock-stream stream)))
-    (setf (interactive-stream-p stream) value)))
-
-#+scl
-(defmethod file-string-length ((stream shell-filter-stream) object)
-  (let ((stream (shell-filter-stream-hemlock-stream stream)))
-    (file-string-length stream object)))
-
-#+scl
-(defmethod ext:stream-pathname ((stream shell-filter-stream))
-  (let ((stream (shell-filter-stream-hemlock-stream stream)))
-    (ext:stream-pathname stream)))
 
 #+(or)
 (defmethod print-object ((object shell-filter-stream) stream)

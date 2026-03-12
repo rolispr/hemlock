@@ -1,8 +1,5 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;;
-;;;    Designed by Bill Chiles and Rob Maclachlan
-;;;
 ;;; This file contains the code to grow the spelling dictionary in system
 ;;; space by reading a text file of entries or adding one at a time.  This
 ;;; code relies on implementation dependent code found in Spell-RT.Lisp.

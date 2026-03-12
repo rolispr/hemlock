@@ -12,18 +12,14 @@
      :depends-on (:hemlock.base)
     :components
     ((:module tty-1
-              :pathname #.(merge-pathnames
-                           (make-pathname
-                            :directory '(:relative "src"))
-                           *hemlock-base-directory*)
+              :pathname "src/tty/"
               :components
               ((:file "render")
-               (:file "ioconnections")
                (:file "terminfo")
                (:file "termcap" :depends-on ("terminfo"))
-               (:file "tty-disp-rt" :depends-on ("render"))
-               (:file "tty-display" :depends-on ("terminfo" "tty-disp-rt"))
-               (:file "tty-screen" :depends-on ("terminfo" "tty-disp-rt"))
-               (:file "tty-stuff")
-               (:file "tty-input" :depends-on ("terminfo" "render" "tty-screen"))
-               (:file "linedit" :depends-on ("tty-display"))))))
+               (:file "output" :depends-on ("render"))
+               (:file "display" :depends-on ("terminfo" "output"))
+               (:file "screen" :depends-on ("terminfo" "output"))
+               (:file "device")
+               (:file "input" :depends-on ("terminfo" "render" "screen"))
+               (:file "linedit" :depends-on ("display"))))))
