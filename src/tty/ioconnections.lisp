@@ -169,7 +169,8 @@
 
 (defmethod initialize-instance :after
     ((instance process-connection/sb-sys) &key)
-  (with-slots (read-fd write-fd process command directory slave-fd) instance
+  (with-slots (read-fd write-fd process command directory
+               (slave-fd hemlock.command::slave-fd)) instance
     (connection-note-event instance :initialized)
     (when (stringp command)
       (setf command (cl-ppcre:split " " command)))
@@ -182,13 +183,21 @@
           ;; The pipelike-connection reads/writes the master side, so we do NOT
           ;; set read-fd/write-fd or install a read handler here.
           (let* ((slave-stream (sb-sys:make-fd-stream slave-fd :input t :output t
+                                                      :external-format :utf-8
                                                       :name "PTY slave"))
+                 (env (remove-if (lambda (s)
+                                   (or (uiop:string-prefix-p "TERM=" s)
+                                       (uiop:string-prefix-p "COLORTERM=" s)))
+                                 (sb-ext:posix-environ)))
                  (proc (sb-ext:run-program prog args
                                            :input  slave-stream
                                            :output slave-stream
                                            :error  slave-stream
                                            :wait   nil
                                            :pty    nil
+                                           :environment
+                                           (list* "TERM=dumb"
+                                                  env)
                                            :directory (or directory
                                                          (uiop:getcwd)))))
             ;; Don't close slave-stream here — sb-ext:run-program dups the fd

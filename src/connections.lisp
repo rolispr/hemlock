@@ -136,6 +136,53 @@
     (when stream
       (apply #'format stream fmt args))))
 
+(defun strip-ansi-escapes (string)
+  "Remove ANSI escape sequences (CSI, OSC, and ESC single-char) from STRING."
+  (let ((len (length string)))
+    ;; Fast path: no escape character means nothing to strip.
+    (unless (position #\Escape string)
+      (return-from strip-ansi-escapes string))
+    (let ((result (make-array len :element-type 'character :fill-pointer 0))
+          (i 0))
+      (loop while (< i len)
+            do (let ((ch (char string i)))
+                 (cond
+                   ((char= ch #\Escape)
+                    (incf i)
+                    (when (< i len)
+                      (let ((next (char string i)))
+                        (cond
+                          ;; CSI: ESC [ ... final byte (@ through ~)
+                          ((char= next #\[)
+                           (incf i)
+                           (loop while (and (< i len)
+                                            (let ((c (char string i)))
+                                              (not (and (char>= c #\@)
+                                                        (char<= c #\~)))))
+                                 do (incf i))
+                           (when (< i len) (incf i)))
+                          ;; OSC: ESC ] ... ST (ESC \ or BEL)
+                          ((char= next #\])
+                           (incf i)
+                           (loop while (< i len)
+                                 do (let ((c (char string i)))
+                                      (cond ((char= c #\Bel) (incf i) (return))
+                                            ((and (char= c #\Escape)
+                                                  (< (1+ i) len)
+                                                  (char= (char string (1+ i)) #\\))
+                                             (incf i 2) (return))
+                                            (t (incf i))))))
+                          ;; ESC ( X — designate character set
+                          ((char= next #\()
+                           (incf i)
+                           (when (< i len) (incf i)))
+                          ;; Other ESC + single char
+                          (t (incf i))))))
+                   (t
+                    (vector-push ch result)
+                    (incf i)))))
+      (coerce result 'simple-string))))
+
 (defun insert-into-connection-buffer-or-stream (connection str)
   (let ((buffer (connection-buffer connection))
         (stream (connection-stream connection)))
@@ -177,6 +224,8 @@
        :eof)
       (t
        (let* ((characters (filter-incoming-data connection bytes))
+              (characters (and characters (strip-ansi-escapes characters)))
+              (characters (and characters (remove #\Return characters)))
               (buffer (connection-buffer connection))
               (stream (connection-stream connection)))
          (when (and characters (or buffer stream))

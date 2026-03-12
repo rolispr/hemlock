@@ -81,7 +81,13 @@
           (emit-range chars pos length 0 cursor-col out))
         ;; Cursor at EOL: append a highlighted space.
         (when (and cursor-col (>= cursor-col length))
-          (write-string "<span class=\"cursor\"> </span>" out))))))
+          (write-string "<span class=\"cursor\"> </span>" out))
+        ;; Ensure empty lines (no content and no cursor) still occupy
+        ;; a visual row.  Without this, <div></div> collapses to zero
+        ;; height under white-space:pre, and surrounding lines shift
+        ;; when the cursor moves onto the empty line.
+        (when (and (zerop length) (null cursor-col) (zerop pos))
+          (write-string " " out))))))
 
 ;;; Build flat (font start end) list from the font-change linked list.
 (defun collect-font-spans (changes length)
