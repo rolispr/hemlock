@@ -658,6 +658,7 @@
 ;;; Mode
 
 (defvar *completelist-entries* nil)
+(defvar *completelist-entries-end* 0)
 ;;;
 
 (defun make-completelist-entry (str)
@@ -688,6 +689,7 @@
         (delete-buffer-if-possible *completelist-buffer*)))
 
 (defun completelist-entry-from-mark (mark)
+  (declare (ignore mark))
   (array-element-from-mark (current-point) *completelist-entries*))
 
 (defcommand "Completelist Find Definition" (p)

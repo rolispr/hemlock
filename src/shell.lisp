@@ -192,7 +192,7 @@
       (concatenate 'simple-string
                    (if (or (= (length name) 1)
                            (char= (schar name 1) #\/))
-                       (cdr (assoc :home *environment-list*))
+                       (uiop:getenv "HOME")
                        "/usr/")
                  (subseq name 1))
       name))

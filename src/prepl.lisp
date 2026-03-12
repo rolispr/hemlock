@@ -31,6 +31,25 @@
         (*query-io*        (make-synonym-stream '*terminal-io*)))
     (funcall fun)))
 
+(defun call-with-typeout-for-thread-debugger (cont)
+  (with-new-event-loop ()
+    (let ((*in-hemlock-slave-p* t)
+          (hemlock.wire:*current-wire* :not-yet))
+      (connect-to-editor-for-background-thread
+       (car *master-machine-and-port*)
+       (cadr *master-machine-and-port*))
+      (dispatch-events-no-hang)
+      (do ()
+          ((not (eq hemlock.wire:*current-wire* :not-yet)))
+        (dispatch-events)
+        (write-line "Thread waiting for connection to master..."
+                    *original-terminal-io*)
+        (force-output *original-terminal-io*))
+      (with-typeout-pop-up-in-master
+          (*terminal-io* (format nil "Slave thread ~A"
+                                 (bt:thread-name (bt:current-thread))))
+        (call-with-standard-synonym-streams cont)))))
+
 
 ;;;; Filesystem utilities
 

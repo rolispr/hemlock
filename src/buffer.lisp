@@ -59,7 +59,8 @@
   "Return Buffer's string name."
   (buffer-%name buffer))
 
-(declaim (special *buffer-names*))
+(defvar *buffer-names* nil
+  "String table of buffer names and their corresponding objects.")
 
 (defun (setf buffer-name) (name buffer)
   "Sets the name of a specified buffer, invoking the Buffer Name Hook."

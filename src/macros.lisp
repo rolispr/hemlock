@@ -428,6 +428,7 @@
                     (,n-change ,change-window)
                     (,bind (prompt-for-key-event* ,n-prompt ,n-change))
                     (,bind-char (hemlock-ext:key-event-char ,bind)))
+               (declare (ignorable ,bind-char))
                (tagbody
                 ,again
                 (return-from

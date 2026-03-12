@@ -403,7 +403,13 @@ Uses the DECSCUSR escape sequence (xterm and most modern terminals)."
   ;; Exit alternate screen buffer — restores the user's terminal state.
   (tty-write-cmd (format nil "~C[?1049l" #\Escape))
   (device-force-output device)
-  (reset-input))
+  (reset-input)
+  ;; Restore global output streams so post-exit printing goes to the terminal.
+  (when hemlock::*original-standard-output*
+    (setf *standard-output* hemlock::*original-standard-output*
+          *error-output*    hemlock::*original-error-output*
+          *trace-output*    hemlock::*original-trace-output*)
+    (setf hemlock::*original-standard-output* nil)))
 
 
 ;;;; Screen image line hacks.

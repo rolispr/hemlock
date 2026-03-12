@@ -3,6 +3,23 @@
 
 (in-package :hemlock)
 
+;;; fuzzylist-entry struct: defined early so both completion.lisp (loaded
+;;; before this file) and the mode commands below can reference its accessors.
+(defstruct (fuzzylist-entry
+            (:conc-name fuzz-)
+            (:constructor internal-make-fuzzylist-entry
+                          (completed-string
+                           score
+                           chunks
+                           classification-string)))
+  completed-string
+  score
+  chunks
+  classification-string)
+
+(defun parse-fuzzylist-entry (slot-list)
+  (apply #'internal-make-fuzzylist-entry slot-list))
+
 (defun %fuzzy-complete-symbol (prefix)
   (multiple-value-bind (packname symname)
                        (let ((p (position #\: prefix)))
@@ -82,6 +99,7 @@
                                completion))))))))
 
 (defun fuzzy-complete-symbol (&optional show-matches)
+  (declare (ignore show-matches))
   (%fuzzy-complete-symbol (symbol-string-at-point)))
 
 ;;; For nomenclature of the fuzzy completion section, please read
@@ -809,22 +827,8 @@ keywords: :BOUNDP, :FBOUNDP, :CONSTANT, :GENERIC-FUNCTION,
 ;;; Mode
 
 (defvar *fuzzylist-entries* nil)
+(defvar *fuzzylist-entries-end* 0)
 ;;;
-
-(defstruct (fuzzylist-entry
-            (:conc-name fuzz-)
-            (:constructor internal-make-fuzzylist-entry
-                          (completed-string
-                           score
-                           chunks
-                           classification-string)))
-  completed-string
-  score
-  chunks
-  classification-string)
-
-(defun parse-fuzzylist-entry (slot-list)
-  (apply #'internal-make-fuzzylist-entry slot-list))
 
 ;;; This is the fuzzylist buffer if it exists.
 ;;;
@@ -850,6 +854,7 @@ keywords: :BOUNDP, :FBOUNDP, :CONSTANT, :GENERIC-FUNCTION,
   (when *fuzzylist-buffer* (delete-buffer-if-possible *fuzzylist-buffer*)))
 
 (defun fuzzylist-entry-from-mark (mark)
+  (declare (ignore mark))
   (array-element-from-mark (current-point) *fuzzylist-entries*))
 
 (defcommand "Fuzzylist Find Definition" (p)

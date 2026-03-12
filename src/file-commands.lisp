@@ -373,12 +373,12 @@
                       :key #'buffer-pathname :test #'equal)))
     (cond ((not found)
            (let ((kind (cond ((uiop:directory-exists-p trial-pathname) :directory)
-                             ((probe-file trial-pathname) :regular-file)
+                             ((uiop:file-exists-p trial-pathname) :regular-file)
                              (t nil))))
              (case kind
                (:directory
                 (dired-guts nil nil trial-pathname))
-               (:regular-file
+               ((:regular-file nil)
                 (let* ((name (pathname-to-buffer-name trial-pathname))
                        (found (getstring name *buffer-names*))
                        (use (if found
@@ -394,10 +394,10 @@
                              (prompt-for-y-or-n :prompt
                                                 "Buffer is modified, save it? "))
                     (save-file-command () buffer))
-                  (read-buffer-file pathname buffer)
-                  (values buffer (stringp use))))
-               (t
-                (editor-error "cannot open a file of type ~A" kind)))))
+                  (when (eq kind :regular-file)
+                    (read-buffer-file pathname buffer))
+                  (setf (buffer-pathname buffer) trial-pathname)
+                  (values buffer (stringp use)))))))
           ((check-disk-version-consistent pathname found)
            (values found nil))
           (t
@@ -914,7 +914,7 @@
         (print-directory-formatted pathname all return-list))))
 
 #-(or cmu scl)
-(defun %directory (directory &optional all)
+(defun list-directory (directory &optional all)
   (setf directory (directory-namestring directory))
   (sort (remove-if (if all
                        (constantly nil)
@@ -922,9 +922,12 @@
                          (let ((name (file-namestring p)))
                            (and (plusp (length name))
                                 (char= #\. (char name 0))))))
-                   (uiop:directory-files directory))
+                   (mapcar (lambda (f)
+                             (merge-pathnames (namestring f) directory))
+                           (append (uiop:directory-files directory)
+                                   (uiop:subdirectories directory))))
         #'string<
-        :key #'namestring))
+        :key #'file-namestring))
 
 #-(or cmu scl)
 (defun write-file-mode (mode)
@@ -951,7 +954,7 @@
 
 #-(or cmu scl)
 (defun print-directory-verbose (pathname all return-list)
-  (let* ((contents (%directory pathname all))
+  (let* ((contents (list-directory pathname all))
          (result nil)
          (n (length contents)))
     (format t "Directory of ~A:~%" (namestring pathname))
@@ -996,10 +999,10 @@
                                       sb-posix:s-ifdir)
                                    (pathname (concatenate 'string namestring "/"))
                                    namestring)
-                               result)))))))
-             (clear-echo-area)
-             (message "Dired: ~D files read" n)
-             (nreverse result))))
+                               result))))))))
+    (clear-echo-area)
+    (message "Dired: ~D files read" n)
+    (nreverse result)))
 
 #-(or cmu scl)
 (defconstant unix-to-universal-time 2208988800)
@@ -1021,7 +1024,7 @@
         (names ())
         (cnt 0)
         (max-len 0)
-        (result (%directory pathname all)))
+        (result (list-directory pathname all)))
     (declare (list names) (fixnum max-len cnt))
     ;;
     ;; Get the data.

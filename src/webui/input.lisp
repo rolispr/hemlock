@@ -49,6 +49,9 @@
   (let ((buf (make-array 64 :element-type '(unsigned-byte 8))))
     (cffi:with-pointer-to-vector-data (p buf)
       (cffi:foreign-funcall "read" :int fd :pointer p :size 64 :long)))
+  (format *error-output* "~&[webui-drain-events] resize-pending=~S~%"
+          (webui-device-resize-pending device))
+  (finish-output *error-output*)
   ;; Push queued key-events into hemlock's editor-input.
   (loop for ke = (sb-concurrency:dequeue (webui-device-input-queue device))
         while ke
@@ -130,7 +133,8 @@
            (setf shift t str (subseq str 6)))
           (t (return))))
       (let ((ke (or (gethash str *webui-key-translations*)
-                    (when (= (length str) 1)
+                    (when (and (= (length str) 1)
+                               (< (char-code (char str 0)) 256))
                       (char-key-event (char str 0))))))
         (when ke
           (if (or ctrl meta shift)

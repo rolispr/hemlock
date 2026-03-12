@@ -80,8 +80,9 @@ GB
 ;;;
 ;;; buffer.lisp
 (defvar hemlock.command::*mode-names* (make-string-table) "A String Table of Mode names.")
-(defvar hemlock.command::*buffer-names* (make-string-table)
-  "A String Table of Buffer names and their corresponding objects.")
+;; *buffer-names* is declared in buffer.lisp (defvar nil); initialize it here
+;; once make-string-table (from table.lisp) is available.
+(setf hemlock.command::*buffer-names* (make-string-table))
 ;;;
 ;;; interp.lisp
 (defvar hemlock.command::*command-names* (make-string-table) "String table of command names.")
@@ -259,6 +260,25 @@ GB
   "True if we are inside the editor.  This is used to prevent ill-advised
    \"recursive\" edits.")
 
+;;; Saved original stream values so device-exit can restore them.
+(defvar *original-standard-output* nil)
+(defvar *original-error-output* nil)
+(defvar *original-trace-output* nil)
+
+;;; After editor init: redirect global output streams to a hemlock buffer so
+;;; that stray writes from background threads (or usercode) don't write raw
+;;; bytes to the terminal while Hemlock owns the display.
+(after-editor-initializations
+ (let* ((buf (or (getstring "*Standard Output*" *buffer-names*)
+                 (make-buffer "*Standard Output*" :modes '("Fundamental"))))
+        (stream (make-hemlock-output-stream (buffer-end-mark buf) :full)))
+   (setf *original-standard-output* *standard-output*
+         *original-error-output*    *error-output*
+         *original-trace-output*    *trace-output*)
+   (setf *standard-output* stream
+         *error-output*    stream
+         *trace-output*    stream)))
+
 (defvar *after-editor-initializations-funs* nil
   "A list of functions to be called after the editor has been initialized upon
    entering the first time.")
@@ -269,6 +289,9 @@ GB
    forms supplied with previous uses."
   `(push #'(lambda () ,@forms)
          *after-editor-initializations-funs*))
+
+#-(or cmu scl)
+(defvar *command-line-options* nil)
 
 #-(or cmu scl)
 (defparameter *command-line-spec*
@@ -346,9 +369,9 @@ GB
 
 
 #-(or cmu scl)
-(defun main (&optional (arg-list (get-command-line-arguments)))
+(defun main (&optional (arg-list (command-line-arguments:get-command-line-arguments)))
   (multiple-value-bind (keys rest)
-                       (process-command-line-options
+                       (command-line-arguments:process-command-line-options
                         *command-line-spec*
                         arg-list)
     (destructuring-bind (&key slave help &allow-other-keys)

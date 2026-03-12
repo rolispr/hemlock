@@ -40,8 +40,7 @@
   <div id=\"echo\"  class=\"hem-echo\"></div>
   <div id=\"echo-ml\" class=\"hem-ml\"></div>
 </div><script>
-function updateWindow(id, linesJson, ml) {
-  var lines = JSON.parse(linesJson);
+function updateWindow(id, lines, ml) {
   var el = document.getElementById(id);
   if (el) el.innerHTML = lines.join('\\n');
   var m = document.getElementById(id + '-ml');
@@ -66,9 +65,9 @@ document.addEventListener('keydown', function(e) {
   webui.call('hemlock_key', m + k).catch(function(){});
   e.preventDefault();
 });
-function _measureGrid() {
+function _getGridSize() {
   var el = document.querySelector('.hem-window');
-  if (!el) return;
+  if (!el) return null;
   var style = window.getComputedStyle(el);
   var fs  = parseFloat(style.fontSize) || 14;
   var lh  = parseFloat(style.lineHeight) || (fs * 1.2);
@@ -78,9 +77,25 @@ function _measureGrid() {
   var cw = ctx.measureText('M').width || 8;
   var cols = Math.max(20, Math.floor(window.innerWidth / cw));
   var rows = Math.max(4,  Math.floor(window.innerHeight / lh));
-  webui.call('hemlock_resize', cols + ' ' + rows).catch(function(){});
+  return cols + ' ' + rows;
 }
-window.addEventListener('load',   _measureGrid);
+function _measureGrid() {
+  var sz = _getGridSize();
+  if (!sz) return;
+  webui.call('hemlock_resize', sz).catch(function(){});
+}
+// Retry sending the resize until the WebSocket connection is ready.
+// webui.call rejects if the socket is not yet open; keep retrying.
+function _measureGridWithRetry(attemptsLeft) {
+  var sz = _getGridSize();
+  if (!sz) return;
+  webui.call('hemlock_resize', sz).catch(function() {
+    if (attemptsLeft > 0) {
+      setTimeout(function() { _measureGridWithRetry(attemptsLeft - 1); }, 150);
+    }
+  });
+}
+window.addEventListener('load',   function() { _measureGridWithRetry(40); });
 window.addEventListener('resize', _measureGrid);
 </script></body></html>")
 
@@ -165,31 +180,46 @@ window.addEventListener('resize', _measureGrid);
 ;;;; device-init / device-exit
 
 (defmethod device-init ((device webui-device))
+  (format *error-output* "~&[device-init] called~%") (finish-output *error-output*)
   (sb-int:with-float-traps-masked (:invalid :overflow :inexact :divide-by-zero
                                    :underflow)
     (let ((win (webui:webui-new-window)))
+      (format *error-output* "~&[device-init] new-window id=~S~%" win)
+      (finish-output *error-output*)
       (setf (webui-device-window-id device) win)
       ;; Bind callbacks BEFORE webui-show so no events are lost if the
       ;; browser connects and fires hemlock_resize before we get here.
-      (webui:webui-bind win "hemlock_key"
-        (lambda (event)
-          (sb-int:with-float-traps-masked (:invalid :overflow :inexact
-                                           :divide-by-zero :underflow)
-            (when *webui-device*
-              (webui-key-callback *webui-device* event)))))
-      (webui:webui-bind win "hemlock_resize"
-        (lambda (event)
-          (sb-int:with-float-traps-masked (:invalid :overflow :inexact
-                                           :divide-by-zero :underflow)
-            (when *webui-device*
-              (webui-resize-callback *webui-device* event)))))
-      (sb-sys:add-fd-handler
-       (webui-device-pipe-read-fd device)
-       :input (let ((dev device))
-                (lambda (fd) (webui-drain-events dev fd))))
+      (let ((key-id (webui:webui-bind win "hemlock_key"
+                      (lambda (event)
+                        (format *error-output* "~&[hemlock_key callback fired]~%")
+                        (finish-output *error-output*)
+                        (sb-int:with-float-traps-masked (:invalid :overflow :inexact
+                                                         :divide-by-zero :underflow)
+                          (when *webui-device*
+                            (webui-key-callback *webui-device* event))))))
+            (resize-id (webui:webui-bind win "hemlock_resize"
+                         (lambda (event)
+                           (format *error-output* "~&[hemlock_resize callback fired]~%")
+                           (finish-output *error-output*)
+                           (sb-int:with-float-traps-masked (:invalid :overflow :inexact
+                                                            :divide-by-zero :underflow)
+                             (when *webui-device*
+                               (webui-resize-callback *webui-device* event)))))))
+        (format *error-output* "~&[device-init] key-bind-id=~S resize-bind-id=~S~%"
+                key-id resize-id)
+        (finish-output *error-output*))
+      ;; NOTE: do NOT call sb-sys:add-fd-handler here.
+      ;; *descriptor-handlers* is thread-local in SBCL.  device-init runs on
+      ;; the main OS thread, but dispatch-events/serve-event run on the
+      ;; hemlock command-loop background thread.  The handler is registered
+      ;; in run-with-webui-event-loop, on the background thread, so that
+      ;; serve-event actually polls the fd.
+      ;;
       ;; Show the window. webui-wait is called on the main OS thread by
       ;; run-with-webui-event-loop (required by Cocoa/WebKit on macOS).
-      (webui:webui-show win *webui-initial-html*))))
+      (let ((ok (webui:webui-show win *webui-initial-html*)))
+        (format *error-output* "~&[device-init] webui-show returned ~S~%" ok)
+        (finish-output *error-output*)))))
 
 (defmethod device-exit ((device webui-device))
   nil)
@@ -215,15 +245,28 @@ window.addEventListener('resize', _measureGrid);
             (lambda ()
               (let ((*in-the-editor*    in-editor)
                     (*default-backend* default-backend))
+                ;; sb-sys:*descriptor-handlers* is thread-local in SBCL.
+                ;; Register the self-pipe handler HERE so that serve-event
+                ;; (called from dispatch-events on this thread) actually
+                ;; polls the fd.  device-init runs on the main OS thread,
+                ;; so the registration done there would be invisible here.
+                (let ((dev *webui-device*))
+                  (sb-sys:add-fd-handler
+                   (webui-device-pipe-read-fd dev)
+                   :input (lambda (fd) (webui-drain-events dev fd))))
                 (catch 'hemlock-exit (funcall fun)))
               ;; Command loop exited — signal webui to shut down so
               ;; webui-wait returns on the main thread.
               (webui:webui-exit))
             :name "hemlock-command-loop")))
       ;; Main thread: run the webui event loop (required on macOS).
+      (format *error-output* "~&[run-with-webui-event-loop] calling webui-wait~%")
+      (finish-output *error-output*)
       (sb-int:with-float-traps-masked (:invalid :overflow :inexact
                                        :divide-by-zero :underflow)
         (webui:webui-wait))
+      (format *error-output* "~&[run-with-webui-event-loop] webui-wait returned~%")
+      (finish-output *error-output*)
       ;; webui-wait returned (all windows closed or webui-exit called).
       ;; Stop the command loop if it is still running.
       (when (sb-thread:thread-alive-p cmd-thread)
@@ -349,6 +392,9 @@ window.addEventListener('resize', _measureGrid);
 ;;; *window-list* or buffer-windows, unlike setup-window-image).  Then
 ;;; set *screen-image-trashed* so the next redisplay pass does a full repaint.
 (defun webui-apply-resize (device)
+  (format *error-output* "~&[webui-apply-resize] called rows=~S cols=~S~%"
+          (webui-device-lines device) (webui-device-columns device))
+  (finish-output *error-output*)
   (let* ((new-rows    (webui-device-lines   device))
          (new-cols    (webui-device-columns device))
          (echo-height (value hemlock::echo-area-height))
@@ -386,6 +432,9 @@ window.addEventListener('resize', _measureGrid);
          (sp (position #\Space s))
          (cols (when sp (parse-integer s :end sp)))
          (rows (when sp (parse-integer s :start (1+ sp)))))
+    (format *error-output* "~&[webui-resize-callback] s=~S cols=~S rows=~S~%"
+            s cols rows)
+    (finish-output *error-output*)
     (when (and cols rows (> cols 0) (> rows 0))
       (setf (webui-device-columns device) cols
             (webui-device-lines   device) rows)

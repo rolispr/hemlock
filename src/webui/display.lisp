@@ -196,11 +196,15 @@
                                        :underflow)
         (dolist (entry (nreverse (webui-device-dirty-windows device)))
           (destructuring-bind (dom-id lines ml) entry
-            (webui:webui-run win
-              (format nil "updateWindow(~S,~A,~S);"
-                      dom-id
-                      (lines-to-json lines)
-                      ml)))))
+            (let ((js (format nil "updateWindow(~S,~A,~S);"
+                              dom-id
+                              (lines-to-json lines)
+                              ml)))
+              (format *error-output*
+                      "~&[device-force-output] win=~S dom=~S lines=~D ml=~S~%"
+                      win dom-id (length lines) ml)
+              (finish-output *error-output*)
+              (webui:webui-run win js)))))
       (setf (webui-device-dirty-windows device) nil))))
 
 (defmethod device-finish-output ((device webui-device) window)

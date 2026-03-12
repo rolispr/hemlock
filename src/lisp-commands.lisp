@@ -515,8 +515,14 @@
       (with-input-from-region (stream (defun-region (current-point)))
         (clear-echo-area)
         (in-lisp
-         (message "Editor Evaluation returned ~S"
-                  (eval (read stream)))))))
+         (let ((*standard-output* *echo-area-stream*)
+               (*error-output*    *echo-area-stream*)
+               (*trace-output*    *echo-area-stream*)
+               (*debug-io*        *echo-area-stream*)
+               (*query-io*        *echo-area-stream*)
+               (*terminal-io*     *echo-area-stream*))
+           (message "Editor Evaluation returned ~S"
+                    (eval (read stream))))))))
 
 (defcommand "Editor Evaluate Region" (p)
   "Evaluates lisp forms between the point and the mark in the editor Lisp."
@@ -527,10 +533,16 @@
     (write-string "Evaluating region in the editor ..." *echo-area-stream*)
     (finish-output *echo-area-stream*)
     (in-lisp
-     (do ((object (read stream nil lispbuf-eof)
-                  (read stream nil lispbuf-eof)))
-         ((eq object lispbuf-eof))
-       (eval object)))
+     (let ((*standard-output* *echo-area-stream*)
+           (*error-output*    *echo-area-stream*)
+           (*trace-output*    *echo-area-stream*)
+           (*debug-io*        *echo-area-stream*)
+           (*query-io*        *echo-area-stream*)
+           (*terminal-io*     *echo-area-stream*))
+       (do ((object (read stream nil lispbuf-eof)
+                    (read stream nil lispbuf-eof)))
+           ((eq object lispbuf-eof))
+         (eval object))))
     (message "Evaluation complete.")))
 
 (defcommand "Editor Re-evaluate Defvar" (p)
@@ -542,7 +554,13 @@
   (with-input-from-region (stream (defun-region (current-point)))
     (clear-echo-area)
     (in-lisp
-     (let ((form (read stream)))
+     (let ((*standard-output* *echo-area-stream*)
+           (*error-output*    *echo-area-stream*)
+           (*trace-output*    *echo-area-stream*)
+           (*debug-io*        *echo-area-stream*)
+           (*query-io*        *echo-area-stream*)
+           (*terminal-io*     *echo-area-stream*)
+           (form (read stream)))
        (unless (eq (car form) 'defvar) (editor-error "Not a DEFVAR."))
        (makunbound (cadr form))
        (message "Evaluation returned ~S" (eval form))))))
@@ -571,10 +589,16 @@
   "Prompt for an expression to evaluate in the editor Lisp."
   (declare (ignore p))
   (in-lisp
-   (multiple-value-call #'message "=> ~@{~#[~;~S~:;~S, ~]~}"
-     (eval (prompt-for-expression
-            :prompt "Editor Eval: "
-            :help "Expression to evaluate")))))
+   (let ((*standard-output* *echo-area-stream*)
+         (*error-output*    *echo-area-stream*)
+         (*trace-output*    *echo-area-stream*)
+         (*debug-io*        *echo-area-stream*)
+         (*query-io*        *echo-area-stream*)
+         (*terminal-io*     *echo-area-stream*))
+     (multiple-value-call #'message "=> ~@{~#[~;~S~:;~S, ~]~}"
+       (eval (prompt-for-expression
+              :prompt "Editor Eval: "
+              :help "Expression to evaluate"))))))
 
 (defcommand "Editor Evaluate Buffer" (p)
   "Evaluates the text in the current buffer in the editor Lisp."

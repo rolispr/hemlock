@@ -296,7 +296,6 @@
   (declare (ignore p))
   (send-oob-to-slave "S"))
 
-#+NIL
 (defun send-oob-to-slave (string)
   (let* ((ts (typescript-data-or-lose))
          (wire (ts-data-wire ts))

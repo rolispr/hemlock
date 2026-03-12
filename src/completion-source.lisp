@@ -127,10 +127,6 @@ nil otherwise.  Higher scores mean tighter matches."
        candidates))))
 
 
-;;;; Default style list — set after function definitions
-
 (setf *completion-styles*
       (list #'completion-style-prefix
-            #'completion-style-substring
-            #'completion-style-fuzzy-chars
             #'completion-style-orderless))

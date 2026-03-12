@@ -164,12 +164,12 @@
        (self-insert-command p))
       (:file
        ;; With live completion: insert the selected candidate.
-       (if (and *completions-window* *completion-candidates*)
+       (if (and *candidates-start-mark* *completion-candidates*)
            (insert-completion-candidate)
            (file-completion-action typein)))
       (:keyword
        ;; With live completion: insert the selected candidate.
-       (if (and *completions-window* *completion-candidates*)
+       (if (and *candidates-start-mark* *completion-candidates*)
            (insert-completion-candidate)
            (let ((spacep
                   ;; due to the use of spaces in command names, let's special
@@ -210,6 +210,7 @@
   "If no input has been given, exits the recursive edit with the default,
   otherwise calls the verification function."
   (declare (ignore p))
+  (stop-completion-display)
   (let* ((string (region-to-string *parse-input-region*))
          (empty (zerop (length string))))
     (declare (simple-string string))
@@ -340,20 +341,23 @@
 
 ;;;; Live completion display
 ;;;
-;;; Shows a narrowing candidate list in a window while the user types
-;;; in a keyword or file prompt.  Candidates update after every keystroke;
-;;; arrow keys move the selection; Tab inserts the selected candidate.
+;;; Candidates are written directly into the echo area buffer, below
+;;; the prompt/input line, so they appear in the same large space the
+;;; user already sees.  A left-inserting mark (*candidates-start-mark*)
+;;; is placed right after the last user-typed character; the
+;;; parse-input-region's end is redirected to that mark so that
+;;; region-to-string never returns the candidate lines as part of the
+;;; typed input.
 
-(defvar *completions-window* nil
-  "The window currently showing completion candidates, or nil.")
+(defvar *candidates-start-mark* nil
+  "Left-inserting mark in the echo area buffer separating user input
+from the displayed candidate lines.  Nil when no completion display is active.")
+(defvar *completions-saved-region-end* nil
+  "The original end mark of *parse-input-region*, restored on stop.")
 (defvar *completion-candidates* nil
   "Current filtered list of candidate strings.")
 (defvar *completion-selection* 0
   "Index into *completion-candidates* of the highlighted candidate.")
-(defvar *completions-buffer* nil
-  "Buffer used to render the candidate list.")
-(defvar *completions-saved-buffer* nil
-  "Buffer that occupied *completions-window* before we took it over.")
 
 ;;; --- candidate collection ---
 
@@ -363,8 +367,8 @@
     (:keyword
      (find-all-completions "" *parse-string-tables*))
     (:file
-     (let ((pns (ambiguous-files (or *parse-default* "") *parse-default*)))
-       (mapcar #'namestring pns)))
+     (mapcar #'namestring
+             (ambiguous-files (or *parse-default* "") *parse-default*)))
     (t nil)))
 
 (defun get-filtered-candidates (pattern)
@@ -374,81 +378,84 @@
         (filter-completions pattern all)
         all)))
 
-;;; --- buffer rendering ---
-
-(defun ensure-completions-buffer ()
-  "Return the *Completions* buffer, creating it if necessary."
-  (or (and *completions-buffer*
-           (find *completions-buffer* *buffer-list*))
-      (setf *completions-buffer*
-            (make-buffer "* Completions *" :modes '("Fundamental")))))
+;;; --- echo area rendering ---
 
 (defun redraw-completions ()
-  "Rewrite *completions-buffer* to reflect current candidates and selection."
-  (when (and *completions-buffer* *completions-window*)
-    (let ((buf *completions-buffer*)
-          (cands *completion-candidates*)
-          (sel *completion-selection*))
-      (delete-region (buffer-region buf))
-      (let ((point (buffer-point buf))
-            (shown (min 10 (length cands))))
-        (loop for i from 0 below shown
-              for c in cands
-              do (insert-string point
-                                (if (= i sel) (format nil "▶ ~A~%" c)
-                                    (format nil "  ~A~%" c)))))
-      (buffer-start (buffer-point buf))
-      (setf (buffer-modified buf) nil))))
+  "Delete old candidate lines from the echo area and write new ones."
+  (when *candidates-start-mark*
+    ;; Delete from the separator mark to the buffer end.
+    (let ((end (buffer-end-mark *echo-area-buffer*)))
+      (unless (mark= *candidates-start-mark* end)
+        (delete-region (region *candidates-start-mark* end))))
+    ;; Write new candidate lines after the separator mark.
+    (let ((cands *completion-candidates*)
+          (sel   *completion-selection*)
+          (pt    (buffer-end-mark *echo-area-buffer*)))
+      (when cands
+        (insert-character pt #\newline)
+        (let ((shown (min 10 (length cands))))
+          (loop for i from 0 below shown
+                for c in cands
+                do (insert-string pt (if (= i sel)
+                                         (format nil "▶ ~A~%" c)
+                                         (format nil "  ~A~%" c)))))))))
 
 ;;; --- update (called after every echo-area keystroke) ---
 
 (defun update-completion-display (pattern)
-  "Recompute candidates from PATTERN and redraw the completion window."
+  "Recompute candidates from PATTERN and redraw them in the echo area."
   (let ((cands (get-filtered-candidates pattern)))
-    (setf *completion-candidates* cands)
-    (setf *completion-selection*
-          (if cands (min *completion-selection* (1- (length cands))) 0)))
+    (setf *completion-candidates* cands
+          *completion-selection*  (if cands
+                                      (min *completion-selection*
+                                           (1- (length cands)))
+                                      0)))
   (redraw-completions))
 
-;;; --- insert selected candidate into the echo area ---
+;;; --- insert selected candidate ---
 
 (defun insert-completion-candidate ()
-  "Replace echo-area input with the currently selected candidate."
+  "Replace the typed input with the currently selected candidate."
   (when *completion-candidates*
     (let ((chosen (nth *completion-selection* *completion-candidates*)))
       (delete-region *parse-input-region*)
       (insert-string (region-start *parse-input-region*) chosen))))
 
-;;; --- open / close the completion window ---
+;;; --- start / stop ---
 
 (defun start-completion-display ()
-  "Open the completion candidate window and show initial candidates."
-  (ensure-completions-buffer)
-  (let ((win (find-if-not (lambda (w) (eq w *echo-area-window*))
-                          *window-list*)))
-    (when win
-      (setf *completions-saved-buffer* (window-buffer win))
-      (setf *completions-window* win)
-      (setf (window-buffer win) *completions-buffer*)
-      (setf *completion-selection* 0)
-      (update-completion-display (region-to-string *parse-input-region*)))))
+  "Place the candidate separator mark and show initial candidates."
+  (unless *candidates-start-mark*
+    ;; Left-inserting: stays before candidates when we insert them after it.
+    (setf *candidates-start-mark*
+          (copy-mark (buffer-end-mark *echo-area-buffer*) :left-inserting))
+    ;; Redirect parse-input-region's end so candidates aren't parsed.
+    (setf *completions-saved-region-end* (region-end *parse-input-region*))
+    (setf (region-end *parse-input-region*) *candidates-start-mark*)
+    (setf *completion-selection* 0)
+    (update-completion-display (region-to-string *parse-input-region*))))
 
 (defun stop-completion-display ()
-  "Close the completion candidate window and restore its previous buffer."
-  (when *completions-window*
-    (when (and *completions-saved-buffer*
-               (member *completions-saved-buffer* *buffer-list*))
-      (setf (window-buffer *completions-window*) *completions-saved-buffer*))
-    (setf *completions-window* nil
-          *completions-saved-buffer* nil
-          *completion-candidates* nil
-          *completion-selection* 0)))
+  "Remove candidate lines from the echo area and restore parse state."
+  (when *candidates-start-mark*
+    ;; Delete candidate lines.
+    (let ((end (buffer-end-mark *echo-area-buffer*)))
+      (unless (mark= *candidates-start-mark* end)
+        (delete-region (region *candidates-start-mark* end))))
+    ;; Restore parse-input-region's end.
+    (when *completions-saved-region-end*
+      (setf (region-end *parse-input-region*) *completions-saved-region-end*)
+      (setf *completions-saved-region-end* nil))
+    (delete-mark *candidates-start-mark*)
+    (setf *candidates-start-mark*  nil
+          *completion-candidates*  nil
+          *completion-selection*   0)))
 
 ;;; --- navigation commands ---
 
 (defcommand "Next Completion" (p)
-  "Move selection down one candidate in the completion window."
-  "Move *completion-selection* forward by one, wrapping around."
+  "Move selection down one candidate in the echo area list."
+  "Advance *completion-selection* by one, wrapping around."
   (declare (ignore p))
   (when *completion-candidates*
     (setf *completion-selection*
@@ -456,20 +463,20 @@
     (redraw-completions)))
 
 (defcommand "Previous Completion" (p)
-  "Move selection up one candidate in the completion window."
-  "Move *completion-selection* backward by one, wrapping around."
+  "Move selection up one candidate in the echo area list."
+  "Retreat *completion-selection* by one, wrapping around."
   (declare (ignore p))
   (when *completion-candidates*
     (setf *completion-selection*
           (mod (1- *completion-selection*) (length *completion-candidates*)))
     (redraw-completions)))
 
+;;; Ensure candidates are cleaned up when the parse is confirmed or aborted.
+(add-hook abort-hook 'stop-completion-display)
+
 ;;; Wrap *invoke-hook* once at load time.
-;;; After every command:
-;;;  • If we're in a keyword/file echo-area prompt and no window is open yet,
-;;;    open one (handles the first keystroke after the prompt appears).
-;;;  • If the window is open, refresh the candidate list.
-;;;  • If we've left the echo-area buffer, close the window.
+;;; After each echo-area command: open or refresh the candidate list.
+;;; After leaving the echo area: close it.
 (let ((prev *invoke-hook*))
   (setf *invoke-hook*
         (lambda (command p)
@@ -478,10 +485,9 @@
               (cond
                 ((and (eq (current-buffer) *echo-area-buffer*)
                       (member *parse-type* '(:keyword :file)))
-                 (unless *completions-window*
-                   (start-completion-display))
+                 (start-completion-display)  ; no-op if already open
                  (update-completion-display
                   (region-to-string *parse-input-region*)))
-                (*completions-window*
+                (*candidates-start-mark*
                  (stop-completion-display)))
             (error ())))))

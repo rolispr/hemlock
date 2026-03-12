@@ -59,7 +59,7 @@
   "T iff we are currenly working on an operation. A catcher for the tag
    abort-operation will be established whenever this is T.")
 
-(defconstant *slave-connect-wait* 300)
+(defparameter *slave-connect-wait* 300)
 
 ;;; Used internally for communications.
 ;;;
@@ -385,9 +385,7 @@
                            *error-output*
                            *debug-io*
                            *query-io*
-                           *trace-output*
-                           *background-io*
-                           cl-user::*io*)
+                           *trace-output*)
                (start-slave :slave t
                             :editor editor-name
                             :backend-type backend-type
@@ -863,7 +861,7 @@
 ;;; Do the actual connect to the editor.
 ;;;
 (defun connect-to-editor (machine port &optional (slave nil) (background nil))
-  (declare (ignorable slave background)) ;???
+  (declare (ignore slave background))
   (connect-to-remote-server
    machine
    port

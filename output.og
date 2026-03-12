@@ -1,0 +1,1237 @@
+This is SBCL 2.5.9, an implementation of ANSI Common Lisp.
+More information about SBCL is available at <http://www.sbcl.org/>.
+
+SBCL is free software, provided as is, with absolutely no warranty.
+It is mostly in the public domain; some portions are provided under
+BSD-style licenses.  See the CREDITS and COPYING files in the
+distribution for more information.
+
+; file: /Users/bret.horne/.sbclrc
+; in: SETQ SLIME-LOAD-FAILED-FASL
+;     (SETQ SLIME-LOAD-FAILED-FASL 'NEVER)
+; 
+; caught WARNING:
+;   undefined variable: COMMON-LISP-USER::SLIME-LOAD-FAILED-FASL
+; 
+; compilation unit finished
+;   Undefined variable:
+;     SLIME-LOAD-FAILED-FASL
+;   caught 1 WARNING condition
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/main.lisp" (written 12 MAR 2026 01:02:12 AM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/main.lisp
+; in: DEFUN HEMLOCK
+;     (DEFUN HEMLOCK-INTERNALS:HEMLOCK
+;            (
+;             &OPTIONAL HEMLOCK::X
+;             &KEY (HEMLOCK::LOAD-USER-INIT T) HEMLOCK::BACKEND-TYPE
+;             (HEMLOCK::DISPLAY (SB-POSIX:GETENV "DISPLAY")))
+;       #<(SIMPLE-ARRAY CHARACTER
+;          (733)) Invokes the editor, Hemlock.  If X is supplied and is a symbol, the
+;      definition of X is put into a buffer, and that buffer is selected.  If X is
+;      a pathname, the file specified by X is visited in ... {7008A2B2EF}>
+;       (COND
+;        (HEMLOCK.COMMAND:*IN-THE-EDITOR*
+;         (HEMLOCK::PROCESS-COMMAND-LINE-ARGUMENT HEMLOCK::X))
+;        (HEMLOCK::*IN-HEMLOCK-SLAVE-P*
+;         (HEMLOCK.WIRE:REMOTE-VALUE (HEMLOCK::TS-STREAM-WIRE *TERMINAL-IO*)
+;                                    (HEMLOCK::PROCESS-COMMAND-LINE-ARGUMENT
+;                                     HEMLOCK::X)))
+;        (T
+;         (HEMLOCK-INTERNALS:WITH-EDITOR (:LOAD-USER-INIT HEMLOCK::LOAD-USER-INIT
+;                                         :BACKEND-TYPE HEMLOCK::BACKEND-TYPE
+;                                         :DISPLAY HEMLOCK::DISPLAY)
+;           (HEMLOCK::PROCESS-COMMAND-LINE-ARGUMENT HEMLOCK::X)
+;           (HEMLOCK.COMMAND:INVOKE-HOOK HEMLOCK::ENTRY-HOOK)
+;           (UNWIND-PROTECT # #))
+;         (UIOP/IMAGE:QUIT 0))))
+; --> SB-IMPL::%DEFUN SB-IMPL::%DEFUN SB-INT:NAMED-LAMBDA 
+; ==>
+;   #'(SB-INT:NAMED-LAMBDA HEMLOCK-INTERNALS:HEMLOCK
+;         (&OPTIONAL HEMLOCK::X &KEY (HEMLOCK::LOAD-USER-INIT T)
+;          HEMLOCK::BACKEND-TYPE (HEMLOCK::DISPLAY (SB-POSIX:GETENV "DISPLAY")))
+;       (DECLARE (SB-C::TOP-LEVEL-FORM))
+;       #<(SIMPLE-ARRAY CHARACTER
+;          (733)) Invokes the editor, Hemlock.  If X is supplied and is a symbol, the
+;    definition of X is put into a buffer, and that buffer is selected.  If X is
+;    a pathname, the file specified by X is visited in ... {7008A2B2EF}>
+;       (BLOCK HEMLOCK-INTERNALS:HEMLOCK
+;         (COND
+;          (HEMLOCK.COMMAND:*IN-THE-EDITOR*
+;           (HEMLOCK::PROCESS-COMMAND-LINE-ARGUMENT HEMLOCK::X))
+;          (HEMLOCK::*IN-HEMLOCK-SLAVE-P* (HEMLOCK.WIRE:REMOTE-VALUE # #))
+;          (T
+;           (HEMLOCK-INTERNALS:WITH-EDITOR #
+;             #
+;             #
+;             #)
+;           (UIOP/IMAGE:QUIT 0)))))
+; 
+; caught STYLE-WARNING:
+;   &OPTIONAL and &KEY found in the same lambda list: (&OPTIONAL X &KEY
+;                                                      (LOAD-USER-INIT T)
+;                                                      BACKEND-TYPE
+;                                                      (DISPLAY (GETENV DISPLAY)))
+
+; in: DEFUN PROCESS-COMMAND-LINE-ARGUMENT/2
+;     (HEMLOCK.TEXT:BUFFER-POINT HEMLOCK.TEXT:BUFFER)
+; 
+; note: deleting unreachable code
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/main-tmpGHU3ALSV.fasl
+; compilation finished in 0:00:00.093
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.base" "root-2" "main">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/prepl.lisp" (written 11 MAR 2026 09:13:47 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/prepl-tmpAAURSO1.fasl
+; compilation finished in 0:00:00.011
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/completion-source.lisp" (written 12 MAR 2026 12:54:44 AM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/completion-source-tmp5GEXGEG5.fasl
+; compilation finished in 0:00:00.014
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/echo-commands.lisp" (written 12 MAR 2026 12:20:22 AM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/echo-commands-tmpAR3FSGEY.fasl
+; compilation finished in 0:00:00.017
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/command.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/command-tmpJAIDFZTC.fasl
+; compilation finished in 0:00:00.013
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/kbd-macro.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/kbd-macro.lisp
+; in: DEFUN DEFINE-KEYBOARD-MACRO
+;     (LET* ((HEMLOCK::IN HEMLOCK::*KBDMAC-TRANSCRIPT*)
+;            (HEMLOCK-INTERNALS:*INPUT-TRANSCRIPT* HEMLOCK::IN)
+;            (HEMLOCK::*DEFINING-A-KEYBOARD-MACRO* T))
+;       (SETF (FILL-POINTER HEMLOCK::IN) 0)
+;       (SETF (FILL-POINTER HEMLOCK::*KBDMAC-INPUT*) 0)
+;       (SETQ HEMLOCK::*CURRENT-KBDMAC* NIL)
+;       (CATCH 'HEMLOCK::PUNT-KBDMAC (HEMLOCK::KBDMAC-COMMAND-LOOP))
+;       (SETF (HEMLOCK.TEXT:COMMAND-FUNCTION
+;              (HEMLOCK.TEXT:GETSTRING "Last Keyboard Macro"
+;                                      HEMLOCK.COMMAND:*COMMAND-NAMES*))
+;               (HEMLOCK::MAKE-KBDMAC)))
+; 
+; caught STYLE-WARNING:
+;   using the lexical binding of the symbol (HEMLOCK-INTERNALS:*INPUT-TRANSCRIPT*), not the
+;   dynamic binding, even though the name follows
+;   the usual naming convention (names like *FOO*) for special variables
+
+;     (HEMLOCK-INTERNALS:*INPUT-TRANSCRIPT* HEMLOCK::IN)
+; 
+; caught STYLE-WARNING:
+;   The variable *INPUT-TRANSCRIPT* is defined but never used.
+
+; in: DEFCOMMAND "Keyboard Macro Query"
+;     (HEMLOCK.COMMAND:COMMAND-CASE (:PROMPT "Keyboard Macro Query: " :HELP
+;                                    "Type one of these characters to say what to do:"
+;                                    :CHANGE-WINDOW NIL :BIND
+;                                    HEMLOCK.TEXT:KEY-EVENT)
+;       (:EXIT "Exit this keyboard macro immediately."
+;        (THROW 'HEMLOCK::EXIT-KBDMAC NIL))
+;       (:YES "Proceed with this iteration of the keyboard macro.")
+;       (:NO
+;        "Don't do this iteration of the keyboard macro, but continue to the next."
+;        (THROW 'HEMLOCK::ABORT-KBDMAC-ITERATION NIL))
+;       (:DO-ALL
+;        "Do all remaining repetitions of the keyboard macro without prompting."
+;        (SETQ HEMLOCK::*KBDMAC-DONT-ASK* T))
+;       (:DO-ONCE "Do this iteration of the keyboard macro and then exit."
+;        (SETQ HEMLOCK::*KBDMAC-DONE* T))
+;       (:RECURSIVE-EDIT "Do a recursive edit, then ask again."
+;        (HEMLOCK::DO-RECURSIVE-EDIT) (HEMLOCK.COMMAND:REPROMPT))
+;       (T
+;        (HEMLOCK.COMMAND:UNGET-KEY-EVENT HEMLOCK.TEXT:KEY-EVENT
+;                                         HEMLOCK.COMMAND:*EDITOR-INPUT*)
+;        (THROW 'HEMLOCK::EXIT-KBDMAC NIL)))
+; --> BLOCK 
+; ==>
+;   (LET* ((#:G3 "Keyboard Macro Query: ")
+;          (#:G4 NIL)
+;          (HEMLOCK.TEXT:KEY-EVENT
+;           (HEMLOCK.COMMAND::PROMPT-FOR-KEY-EVENT* #:G3 #:G4))
+;          (#:G5 (HEMLOCK.TEXT:KEY-EVENT-CHAR HEMLOCK.TEXT:KEY-EVENT)))
+;     (TAGBODY
+;      #:G2
+;       (RETURN-FROM #:G1
+;         (COND (# #) (#) (# #) (# #) (# #) (# # #) (# #) (# # #) (T # #)))))
+; 
+; caught STYLE-WARNING:
+;   The variable #:G5 is assigned but never read.
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/kbd-macro-tmp8V3J6PE9.fasl
+; compilation finished in 0:00:00.030
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.base" "user-1" "kbd-macro">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/undo.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/undo-tmp9V47YWQF.fasl
+; compilation finished in 0:00:00.009
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/kill-commands.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/kill-commands-tmp9BN22RMA.fasl
+; compilation finished in 0:00:00.015
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/file-commands.lisp" (written 12 MAR 2026 12:48:17 AM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/file-commands-tmp1CXFJSK9.fasl
+; compilation finished in 0:00:00.073
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/indent.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/indent-tmpX4BRKI0R.fasl
+; compilation finished in 0:00:00.010
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/search-commands.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/search-commands.lisp
+; in: DEFUN QUERY-REPLACE-LOOP
+;     (HEMLOCK.COMMAND:COMMAND-CASE (:PROMPT "Query replace: " :HELP
+;                                    "Type one of the following single-character commands:"
+;                                    :CHANGE-WINDOW NIL :BIND
+;                                    HEMLOCK.TEXT:KEY-EVENT)
+;       (:YES "Replace this occurrence."
+;        (HEMLOCK::REPLACE-THAT-CASE HEMLOCK::REPLACEMENT HEMLOCK::CAP
+;         HEMLOCK::UPPER HEMLOCK::POINT LENGTH HEMLOCK::DUMB))
+;       (:NO "Don't replace this occurrence, but continue.")
+;       (:DO-ALL "Replace this and all remaining occurrences."
+;        (HEMLOCK::REPLACE-THAT-CASE HEMLOCK::REPLACEMENT HEMLOCK::CAP
+;         HEMLOCK::UPPER HEMLOCK::POINT LENGTH HEMLOCK::DUMB)
+;        (SETQ HEMLOCK::DOING-ALL? T))
+;       (:DO-ONCE "Replace this occurrence, then exit."
+;        (HEMLOCK::REPLACE-THAT-CASE HEMLOCK::REPLACEMENT HEMLOCK::CAP
+;         HEMLOCK::UPPER HEMLOCK::POINT LENGTH HEMLOCK::DUMB)
+;        (RETURN NIL))
+;       (:RECURSIVE-EDIT "Go into a recursive edit at the current position."
+;        (HEMLOCK::DO-RECURSIVE-EDIT)
+;        (HEMLOCK.TEXT:GET-SEARCH-PATTERN HEMLOCK::TARGET :FORWARD))
+;       (:EXIT "Exit immediately." (RETURN NIL))
+;       (T
+;        (HEMLOCK.COMMAND:UNGET-KEY-EVENT HEMLOCK.TEXT:KEY-EVENT
+;                                         HEMLOCK.COMMAND:*EDITOR-INPUT*)
+;        (RETURN NIL)))
+; --> BLOCK 
+; ==>
+;   (LET* ((#:G8 "Query replace: ")
+;          (#:G9 NIL)
+;          (HEMLOCK.TEXT:KEY-EVENT
+;           (HEMLOCK.COMMAND::PROMPT-FOR-KEY-EVENT* #:G8 #:G9))
+;          (#:G10 (HEMLOCK.TEXT:KEY-EVENT-CHAR HEMLOCK.TEXT:KEY-EVENT)))
+;     (TAGBODY
+;      #:G7
+;       (RETURN-FROM #:G6
+;         (COND (# #) (#) (# # #) (# # #) (# # #) (# #) (# #) (# # #) (T # #)))))
+; 
+; caught STYLE-WARNING:
+;   The variable #:G10 is assigned but never read.
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/search-commands-tmpQ371UGST.fasl
+; compilation finished in 0:00:00.017
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.base" "user-1" "search-commands">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/grep.lisp" (written 11 MAR 2026 07:43:19 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/grep-tmp2OWI3Q7U.fasl
+; compilation finished in 0:00:00.002
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/apropos.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/apropos.lisp
+; in: DEFUN APROPOS-ENTRY-FROM-MARK
+;     (DEFUN HEMLOCK::APROPOS-ENTRY-FROM-MARK (HEMLOCK.TEXT:MARK))
+; --> SB-IMPL::%DEFUN SB-IMPL::%DEFUN SB-INT:NAMED-LAMBDA 
+; ==>
+;   #'(SB-INT:NAMED-LAMBDA HEMLOCK::APROPOS-ENTRY-FROM-MARK
+;         (HEMLOCK.TEXT:MARK)
+;       (DECLARE (SB-C::TOP-LEVEL-FORM))
+;       (BLOCK HEMLOCK::APROPOS-ENTRY-FROM-MARK))
+; 
+; caught STYLE-WARNING:
+;   The variable MARK is defined but never used.
+
+; in: DEFCOMMAND "Apropos Find Definition"
+;     (HEMLOCK::CHANGE-TO-DEFINITION HEMLOCK::ENTRY)
+; 
+; note: deleting unreachable code
+
+; in: DEFCOMMAND "Apropos Describe"
+;     (HEMLOCK::CHANGE-TO-DEFINITION HEMLOCK::ENTRY)
+; 
+; note: deleting unreachable code
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/apropos-tmp9KKTJMYV.fasl
+; compilation finished in 0:00:00.009
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.base" "user-1" "apropos">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/more-commands.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/more-commands-tmpJU0JWO19.fasl
+; compilation finished in 0:00:00.032
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/help-commands.lisp" (written 11 MAR 2026 08:47:15 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/help-commands-tmpZX2WN8N4.fasl
+; compilation finished in 0:00:00.027
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/source-compare.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/source-compare-tmpOU81XRV0.fasl
+; compilation finished in 0:00:00.014
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/group.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/group.lisp
+; in: DEFCOMMAND "Group Search"
+;     (HEMLOCK.COMMAND:COMMAND-CASE (:PROMPT "Group Search: " :HELP
+;                                    "Type a character indicating the action to perform."
+;                                    :CHANGE-WINDOW NIL)
+;       (:NO "Search for the next occurrence.")
+;       (:DO-ALL "Go on to the next file in the group." (RETURN NIL))
+;       ((:EXIT :YES) "Exit the search."
+;        (RETURN-FROM HEMLOCK::GROUP-SEARCH-COMMAND))
+;       (:RECURSIVE-EDIT "Enter a recursive edit." (HEMLOCK::DO-RECURSIVE-EDIT)
+;        (HEMLOCK.TEXT:GET-SEARCH-PATTERN STRING :FORWARD)))
+; --> BLOCK 
+; ==>
+;   (LET* ((#:G23 "Group Search: ")
+;          (#:G24 NIL)
+;          (#:G20 (HEMLOCK.COMMAND::PROMPT-FOR-KEY-EVENT* #:G23 #:G24))
+;          (#:G25 (HEMLOCK.TEXT:KEY-EVENT-CHAR #:G20)))
+;     (TAGBODY
+;      #:G22
+;       (RETURN-FROM #:G21 (COND (#) (# #) (# #) (# # #) (# #) (# # #) (T # #)))))
+; 
+; caught STYLE-WARNING:
+;   The variable #:G25 is assigned but never read.
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/group-tmpY2ML9CFA.fasl
+; compilation finished in 0:00:00.009
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.base" "user-1" "group">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/fill.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/fill-tmpX2JYJDQE.fasl
+; compilation finished in 0:00:00.021
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/text.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/text-tmpOPCILR65.fasl
+; compilation finished in 0:00:00.017
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/lispmode.lisp" (written 11 MAR 2026 07:24:03 PM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/lispmode.lisp
+; in: DEFUN SETUP-LISP-MODE
+;     (DEFUN HEMLOCK::SETUP-LISP-MODE (HEMLOCK.TEXT:BUFFER))
+; --> SB-IMPL::%DEFUN SB-IMPL::%DEFUN SB-INT:NAMED-LAMBDA 
+; ==>
+;   #'(SB-INT:NAMED-LAMBDA HEMLOCK::SETUP-LISP-MODE
+;         (HEMLOCK.TEXT:BUFFER)
+;       (DECLARE (SB-C::TOP-LEVEL-FORM))
+;       (BLOCK HEMLOCK::SETUP-LISP-MODE))
+; 
+; caught STYLE-WARNING:
+;   The variable BUFFER is defined but never used.
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/lispmode-tmpRV9F8A9A.fasl
+; compilation finished in 0:00:00.107
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.base" "user-1" "lispmode">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/repl-buf.lisp" (written 12 MAR 2026 01:03:43 AM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/repl-buf.lisp
+; in: DEFUN SEND-OOB-TO-SLAVE
+;     (DEFUN HEMLOCK::SEND-OOB-TO-SLAVE (STRING)
+;       (LET* ((HEMLOCK::TS (HEMLOCK::TYPESCRIPT-DATA-OR-LOSE))
+;              (HEMLOCK::WIRE (HEMLOCK::TS-DATA-WIRE HEMLOCK::TS))
+;              (HEMLOCK::SOCKET (HEMLOCK.WIRE:WIRE-FD HEMLOCK::WIRE)))
+;         (UNLESS HEMLOCK::SOCKET
+;           (HEMLOCK.TEXT:EDITOR-ERROR "The slave is no longer alive."))
+;         (ERROR "SEND-OOB-TO-SLAVE seeks an implementation.")))
+; --> SB-IMPL::%DEFUN SB-IMPL::%DEFUN SB-INT:NAMED-LAMBDA 
+; ==>
+;   #'(SB-INT:NAMED-LAMBDA HEMLOCK::SEND-OOB-TO-SLAVE
+;         (STRING)
+;       (DECLARE (SB-C::TOP-LEVEL-FORM))
+;       (BLOCK HEMLOCK::SEND-OOB-TO-SLAVE
+;         (LET* ((HEMLOCK::TS #) (HEMLOCK::WIRE #) (HEMLOCK::SOCKET #))
+;           (UNLESS HEMLOCK::SOCKET
+;             (HEMLOCK.TEXT:EDITOR-ERROR "The slave is no longer alive."))
+;           (ERROR "SEND-OOB-TO-SLAVE seeks an implementation."))))
+; 
+; caught STYLE-WARNING:
+;   The variable STRING is defined but never used.
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/repl-buf-tmpK2ZAJT4I.fasl
+; compilation finished in 0:00:00.012
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.base" "user-1" "repl-buf">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/repl-stream.lisp" (written 11 MAR 2026 07:39:13 PM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/repl-stream.lisp
+; in: DEFUN WAIT-FOR-TYPESCRIPT-INPUT
+;     (HEMLOCK::WIRE (HEMLOCK::TS-STREAM-WIRE STREAM))
+; 
+; caught STYLE-WARNING:
+;   The variable WIRE is defined but never used.
+
+;     (HEMLOCK::TS (HEMLOCK::TS-STREAM-TYPESCRIPT STREAM))
+; 
+; caught STYLE-WARNING:
+;   The variable TS is defined but never used.
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/repl-stream-tmpUX5S4ADN.fasl
+; compilation finished in 0:00:00.038
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.base" "user-1" "repl-stream">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/request.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/request-tmp10401X32.fasl
+; compilation finished in 0:00:00.004
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/eval-server.lisp" (written 12 MAR 2026 01:04:19 AM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/eval-server.lisp
+; in: DEFSTRUCT SERVER-INFO
+;     (DEFSTRUCT
+;         (HEMLOCK::SERVER-INFO (:PRINT-FUNCTION HEMLOCK::PRINT-SERVER-INFO))
+;       HEMLOCK::NAME
+;       HEMLOCK::WIRE
+;       HEMLOCK::NOTES
+;       HEMLOCK::SLAVE-INFO
+;       HEMLOCK::SLAVE-BUFFER
+;       HEMLOCK::BACKGROUND-INFO
+;       HEMLOCK::BACKGROUND-BUFFER
+;       (HEMLOCK::ERRORS (MAKE-ARRAY 16 :ADJUSTABLE T :FILL-POINTER 0))
+;       HEMLOCK::ERROR-INDEX
+;       HEMLOCK::IMPLEMENTATION-TYPE
+;       ...)
+; --> EVAL-WHEN 
+; ==>
+;   (SB-KERNEL::%COMPILER-DEFSTRUCT
+;    '#<SB-KERNEL:DEFSTRUCT-DESCRIPTION HEMLOCK::SERVER-INFO {70078A1113}>
+;    '#(#<SB-KERNEL:LAYOUT for T {70030338E3}>
+;       #<SB-KERNEL:LAYOUT (ID=1) for STRUCTURE-OBJECT {7003033963}>))
+; 
+; caught STYLE-WARNING:
+;   Previously compiled call to HEMLOCK::SERVER-INFO-SLAVE-BUFFER could not be
+;   inlined because the structure definition for HEMLOCK::SERVER-INFO was not yet
+;   seen. To avoid this warning, DEFSTRUCT should precede references to the
+;   affected functions, or they must be declared locally notinline at each call
+;   site.
+
+; in: DEFUN GET-CURRENT-EVAL-SERVER
+;     (SETF (HEMLOCK.COMMAND:VALUE HEMLOCK::CURRENT-EVAL-SERVER)
+;             (HEMLOCK::MAYBE-CREATE-SERVER))
+; 
+; note: deleting unreachable code
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/eval-server-tmpZ7CBRM0G.fasl
+; compilation finished in 0:00:00.096
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.base" "user-1" "eval-server">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/lisp-commands.lisp" (written 11 MAR 2026 08:47:26 PM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/lisp-commands.lisp
+; in: DEFUN EDITOR-COMPILE-REGION
+;     (PATHNAME (HEMLOCK.TEXT:BUFFER-PATHNAME (HEMLOCK.TEXT:CURRENT-BUFFER)))
+; 
+; caught STYLE-WARNING:
+;   The variable PATHNAME is defined but never used.
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/lisp-commands-tmp9OZEQ0G2.fasl
+; compilation finished in 0:00:00.050
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.base" "user-1" "lisp-commands">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/lispeval.lisp" (written 11 MAR 2026 11:16:44 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/lispeval-tmpB2JTL1W9.fasl
+; compilation finished in 0:00:00.074
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/spell-rt.lisp" (written 11 MAR 2026 08:08:51 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/spell-rt-tmpP3BI68WQ.fasl
+; compilation finished in 0:00:00.007
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/spell-corr.lisp" (written 11 MAR 2026 07:23:05 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/spell-corr-tmpQDARA81Z.fasl
+; compilation finished in 0:00:00.094
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/spell-aug.lisp" (written 11 MAR 2026 07:22:27 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/spell-aug-tmpYEMMM7SE.fasl
+; compilation finished in 0:00:00.017
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/spell-commands.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/spell-commands-tmp73HU0RPK.fasl
+; compilation finished in 0:00:00.043
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/comments.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/comments-tmpIO5N7K88.fasl
+; compilation finished in 0:00:00.026
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/overwrite.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/overwrite-tmpCM21U60Z.fasl
+; compilation finished in 0:00:00.003
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/italic-mode.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/italic-mode-tmp9DT7SEFG.fasl
+; compilation finished in 0:00:00.003
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/char-syntax.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/char-syntax-tmp8065ESJT.fasl
+; compilation finished in 0:00:00.005
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/edit-defs.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/edit-defs-tmp7S8Z6FGF.fasl
+; compilation finished in 0:00:00.011
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/auto-save.lisp" (written 11 MAR 2026 07:13:03 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/auto-save-tmpSIT3QPKP.fasl
+; compilation finished in 0:00:00.014
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/register.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/register-tmpE0PA0714.fasl
+; compilation finished in 0:00:00.012
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/x-commands.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/x-commands-tmpJRWHHVG0.fasl
+; compilation finished in 0:00:00.001
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/highlight.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/highlight-tmp4WZVROCX.fasl
+; compilation finished in 0:00:00.005
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/dired.lisp" (written 11 MAR 2026 08:08:44 PM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/dired.lisp
+; in: DEFUN DO-THE-COPY
+;     (DEFUN DIRED::DO-THE-COPY (DIRED::SES-NAME1 DIRED::SES-NAME2 DIRED::SECS1)
+;       (WITH-OPEN-FILE
+;           (DIRED::INPUT DIRED::SES-NAME1 :ELEMENT-TYPE '(UNSIGNED-BYTE 8)
+;            :DIRECTION :INPUT)
+;         (WITH-OPEN-FILE
+;             (DIRED::OUTPUT DIRED::SES-NAME2 :ELEMENT-TYPE
+;              '(DIRED::UNSINGED-BYTE 8) :DIRECTION :OUTPUT :IF-EXISTS :SUPERSEDE)
+;           (LOOP
+;            (LET #
+;              #
+;              #))))
+;       (FUNCALL DIRED:*REPORT-FUNCTION* "~&~S  ==>~%  ~S~%" DIRED::SES-NAME1
+;                DIRED::SES-NAME2))
+; --> SB-IMPL::%DEFUN SB-IMPL::%DEFUN SB-INT:NAMED-LAMBDA 
+; ==>
+;   #'(SB-INT:NAMED-LAMBDA DIRED::DO-THE-COPY
+;         (DIRED::SES-NAME1 DIRED::SES-NAME2 DIRED::SECS1)
+;       (DECLARE (SB-C::TOP-LEVEL-FORM))
+;       (BLOCK DIRED::DO-THE-COPY
+;         (WITH-OPEN-FILE
+;             (DIRED::INPUT DIRED::SES-NAME1 :ELEMENT-TYPE '(UNSIGNED-BYTE 8)
+;              :DIRECTION :INPUT)
+;           (WITH-OPEN-FILE
+;               (DIRED::OUTPUT DIRED::SES-NAME2 :ELEMENT-TYPE '# :DIRECTION
+;                :OUTPUT :IF-EXISTS :SUPERSEDE)
+;             (LOOP #)))
+;         (FUNCALL DIRED:*REPORT-FUNCTION* "~&~S  ==>~%  ~S~%" DIRED::SES-NAME1
+;                  DIRED::SES-NAME2)))
+; 
+; caught STYLE-WARNING:
+;   The variable SECS1 is defined but never used.
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/dired-tmpA0I3UKX8.fasl
+; compilation finished in 0:00:00.037
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.base" "user-1" "dired">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/dired-commands.lisp" (written 11 MAR 2026 09:21:32 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/dired-commands-tmp267Y2N80.fasl
+; compilation finished in 0:00:00.032
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/buflist.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/buflist-tmpOUPE5FSJ.fasl
+; compilation finished in 0:00:00.023
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/connections-ui.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/connections-ui-tmpIGHCU6ZA.fasl
+; compilation finished in 0:00:00.009
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/xref.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/xref-tmpBO0TUGLK.fasl
+; compilation finished in 0:00:00.014
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/completion.lisp" (written 12 MAR 2026 01:02:27 AM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/completion-tmpIIXPIQNW.fasl
+; compilation finished in 0:00:00.031
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/symbol-completion.lisp" (written 11 MAR 2026 09:25:06 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/symbol-completion-tmpOHM494YR.fasl
+; compilation finished in 0:00:00.027
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/fuzzy.lisp" (written 12 MAR 2026 01:03:29 AM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/fuzzy.lisp
+; in: DEFSTRUCT FUZZYLIST-ENTRY
+;     (DEFSTRUCT
+;         (HEMLOCK::FUZZYLIST-ENTRY (:CONC-NAME HEMLOCK::FUZZ-)
+;          (:CONSTRUCTOR HEMLOCK::INTERNAL-MAKE-FUZZYLIST-ENTRY
+;           (HEMLOCK::COMPLETED-STRING HEMLOCK::SCORE HEMLOCK::CHUNKS
+;            HEMLOCK::CLASSIFICATION-STRING)))
+;       HEMLOCK::COMPLETED-STRING
+;       HEMLOCK::SCORE
+;       HEMLOCK::CHUNKS
+;       HEMLOCK::CLASSIFICATION-STRING)
+; --> EVAL-WHEN 
+; ==>
+;   (SB-KERNEL::%COMPILER-DEFSTRUCT
+;    '#<SB-KERNEL:DEFSTRUCT-DESCRIPTION HEMLOCK::FUZZYLIST-ENTRY {70054D1D43}>
+;    '#(#<SB-KERNEL:LAYOUT for T {70030338E3}>
+;       #<SB-KERNEL:LAYOUT (ID=1) for STRUCTURE-OBJECT {7003033963}>))
+; 
+; caught STYLE-WARNING:
+;   Previously compiled calls to HEMLOCK::FUZZ-COMPLETED-STRING and
+;   HEMLOCK::FUZZ-CLASSIFICATION-STRING could not be inlined because the structure
+;   definition for HEMLOCK::FUZZYLIST-ENTRY was not yet seen. To avoid this
+;   warning, DEFSTRUCT should precede references to the affected functions, or they
+;   must be declared locally notinline at each call site.
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/fuzzy-tmpOVFB07XF.fasl
+; compilation finished in 0:00:00.053
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.base" "user-1" "fuzzy">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/shell.lisp" (written 12 MAR 2026 01:03:36 AM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/shell-tmpG6VFGMYP.fasl
+; compilation finished in 0:00:00.016
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/debug.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/debug.lisp
+; in: DEFUN SLAVE-STACK-FRAME-FROM-MARK
+;     (DEFUN HEMLOCK::SLAVE-STACK-FRAME-FROM-MARK (HEMLOCK.TEXT:MARK))
+; --> SB-IMPL::%DEFUN SB-IMPL::%DEFUN SB-INT:NAMED-LAMBDA 
+; ==>
+;   #'(SB-INT:NAMED-LAMBDA HEMLOCK::SLAVE-STACK-FRAME-FROM-MARK
+;         (HEMLOCK.TEXT:MARK)
+;       (DECLARE (SB-C::TOP-LEVEL-FORM))
+;       (BLOCK HEMLOCK::SLAVE-STACK-FRAME-FROM-MARK))
+; 
+; caught STYLE-WARNING:
+;   The variable MARK is defined but never used.
+
+; in: DEFUN MAKE-DEBUG-BUFFER
+;     (FORMAT NIL "Slave Debugger ~A" HEMLOCK::IMPL HEMLOCK::THREAD)
+; 
+; caught STYLE-WARNING:
+;   Too many arguments (2) to FORMAT "Slave Debugger ~A": uses at most 1.
+;   See also:
+;     The ANSI Standard, Section 22.3.10.2
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/debug-tmp4QIPRMOF.fasl
+; compilation finished in 0:00:00.020
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.base" "user-1" "debug">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/dabbrev.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/dabbrev-tmpGW0QV22K.fasl
+; compilation finished in 0:00:00.003
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/bindings.lisp" (written 11 MAR 2026 11:58:37 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/bindings-tmp2K9J0HSR.fasl
+; compilation finished in 0:00:00.021
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/tty/render.lisp" (written 12 MAR 2026 12:00:16 AM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/tty/render-tmpP44I4E0Y.fasl
+; compilation finished in 0:00:00.058
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/tty/terminfo.lisp" (written 11 MAR 2026 07:23:38 PM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/tty/terminfo.lisp
+; in: DEFMETHOD PRINT-OBJECT (TERMINFO T)
+;     (DEFMETHOD PRINT-OBJECT
+;                ((HEMLOCK.TERMINFO::OBJECT HEMLOCK.TERMINFO::TERMINFO) STREAM)
+;       (PRINT-UNREADABLE-OBJECT
+;           (HEMLOCK.TERMINFO::OBJECT STREAM :TYPE T :IDENTITY T)
+;         (FORMAT STREAM "~A"
+;                 (FIRST
+;                  (HEMLOCK.TERMINFO::TERMINFO-NAMES HEMLOCK.TERMINFO::OBJECT)))))
+; --> EVAL-WHEN 
+; ==>
+;   (SB-PCL::%DEFMETHOD-EXPANDER PRINT-OBJECT NIL
+;                                ((HEMLOCK.TERMINFO::OBJECT
+;                                  HEMLOCK.TERMINFO::TERMINFO)
+;                                 STREAM)
+;                                ((PRINT-UNREADABLE-OBJECT
+;                                     (HEMLOCK.TERMINFO::OBJECT STREAM :TYPE T
+;                                      :IDENTITY T)
+;                                   (FORMAT STREAM "~A" (FIRST #)))))
+; 
+; caught STYLE-WARNING:
+;   Cannot find type for specializer HEMLOCK.TERMINFO::TERMINFO when executing
+;   SB-PCL:SPECIALIZER-TYPE-SPECIFIER for a STANDARD-METHOD of a
+;   STANDARD-GENERIC-FUNCTION.
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/tty/terminfo-tmp63LQ7EX6.fasl
+; compilation finished in 0:00:00.384
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.tty" "tty-1" "terminfo">
+STYLE-WARNING:
+   Previously compiled call to HEMLOCK.TERMINFO::TERMINFO-NAMES could not be
+   inlined because the structure definition for HEMLOCK.TERMINFO::TERMINFO was
+   not yet seen. To avoid this warning, DEFSTRUCT should precede references to
+   the affected functions, or they must be declared locally notinline at each
+   call site.
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/tty/termcap.lisp" (written 11 MAR 2026 07:06:16 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/tty/termcap-tmp86F1A8FB.fasl
+; compilation finished in 0:00:00.008
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/tty/output.lisp" (written 11 MAR 2026 08:08:56 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/tty/output-tmpH7D4HL98.fasl
+; compilation finished in 0:00:00.038
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/tty/display.lisp" (written 11 MAR 2026 08:08:20 PM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/tty/display.lisp
+; in: DEFUN FIND-IDENTICAL-PREFIX
+;     (HEMLOCK.TTY::DL-LEN (HEMLOCK.TEXT:DIS-LINE-LENGTH HEMLOCK.TEXT:DIS-LINE))
+; 
+; caught STYLE-WARNING:
+;   The variable DL-LEN is defined but never used.
+
+;     (HEMLOCK.TTY::SI-LEN (HEMLOCK.TTY::SI-LINE-LENGTH HEMLOCK.TTY::SI-LINE))
+; 
+; caught STYLE-WARNING:
+;   The variable SI-LEN is defined but never used.
+
+; in: DEFUN DO-SEMI-DUMB-LINE-WRITES
+;     (LET* ((HEMLOCK.TTY::DL HEMLOCK.TTY::FIRST-CHANGED)
+;            HEMLOCK.TTY::FLAGS
+;            HEMLOCK.TTY::PREV)
+;       (LET ((HEMLOCK.TEXT:DEVICE
+;              (HEMLOCK.TEXT:DEVICE-HUNK-DEVICE HEMLOCK.TTY::HUNK)))
+;         (LOOP
+;          (HEMLOCK.TTY::TTY-SEMI-DUMB-LINE-REDISPLAY HEMLOCK.TEXT:DEVICE
+;           HEMLOCK.TTY::HUNK (CAR HEMLOCK.TTY::DL))
+;          (HEMLOCK.TEXT:DEVICE-FORCE-OUTPUT HEMLOCK.TEXT:DEVICE)
+;          (HEMLOCK.TTY::NEXT-DIS-LINE)
+;          (WHEN (EQ HEMLOCK.TTY::PREV HEMLOCK.TTY::LAST-CHANGED) (RETURN)))))
+; 
+; caught STYLE-WARNING:
+;   The variable FLAGS is assigned but never read.
+
+; in: DEFUN CURSOR-MOTION
+;     (DEFUN HEMLOCK.TTY::CURSOR-MOTION
+;            (HEMLOCK.TEXT:DEVICE HEMLOCK.TTY::X HEMLOCK.TTY::Y)
+;       (HEMLOCK.TTY::TTY-WRITE-CMD
+;        (HEMLOCK.TERMINFO:TPUTS
+;         (HEMLOCK.TERMINFO:TPARM HEMLOCK.TERMINFO:CURSOR-ADDRESS HEMLOCK.TTY::Y
+;                                 HEMLOCK.TTY::X))))
+; --> SB-IMPL::%DEFUN SB-IMPL::%DEFUN SB-INT:NAMED-LAMBDA 
+; ==>
+;   #'(SB-INT:NAMED-LAMBDA HEMLOCK.TTY::CURSOR-MOTION
+;         (HEMLOCK.TEXT:DEVICE HEMLOCK.TTY::X HEMLOCK.TTY::Y)
+;       (DECLARE (SB-C::TOP-LEVEL-FORM))
+;       (BLOCK HEMLOCK.TTY::CURSOR-MOTION
+;         (HEMLOCK.TTY::TTY-WRITE-CMD
+;          (HEMLOCK.TERMINFO:TPUTS
+;           (HEMLOCK.TERMINFO:TPARM HEMLOCK.TERMINFO:CURSOR-ADDRESS
+;                                   HEMLOCK.TTY::Y HEMLOCK.TTY::X)))))
+; 
+; caught STYLE-WARNING:
+;   The variable DEVICE is defined but never used.
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/tty/display-tmpCDM7YXYI.fasl
+; compilation finished in 0:00:00.088
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.tty" "tty-1" "display">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/tty/screen.lisp" (written 11 MAR 2026 09:58:32 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/tty/screen-tmpLM57P5P.fasl
+; compilation finished in 0:00:00.018
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/tty/device.lisp" (written 11 MAR 2026 09:02:54 PM):
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/tty/device-tmpZE69DN33.fasl
+; compilation finished in 0:00:00.006
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/tty/input.lisp" (written 12 MAR 2026 12:00:41 AM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/tty/input.lisp
+; in: DEFMETHOD BACKEND-INIT-RAW-IO ((EQL :MINI) T)
+;     (HEMLOCK.COMMAND:BACKEND-INIT-RAW-IO :TTY HEMLOCK.TTY::DISPLAY)
+; 
+; caught STYLE-WARNING:
+;   reading an ignored variable: DISPLAY
+
+; in: DEFUN PARSE-SGR-MOUSE
+;     (LET ((HEMLOCK.TTY::SYM
+;            (IF (= # 64)
+;                (HEMLOCK.TEXT:MAKE-KEY-EVENT "WheelUp" 0)
+;                (HEMLOCK.TEXT:MAKE-KEY-EVENT "WheelDown" 0))))
+;       (WHEN HEMLOCK.TTY::SYM
+;         (HEMLOCK.COMMAND:Q-EVENT HEMLOCK.COMMAND:*REAL-EDITOR-INPUT*
+;                                  HEMLOCK.TTY::SYM)))
+; 
+; note: deleting unreachable code
+; 
+; note: deleting unreachable code
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/tty/input-tmpG8099TO3.fasl
+; compilation finished in 0:00:00.039
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.tty" "tty-1" "input">
+; compiling file "/Users/bret.horne/git/cl/hemlock-port/src/tty/linedit.lisp" (written 11 MAR 2026 09:13:14 PM):
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/tty/linedit.lisp
+; in: DEFUN LINEDIT-REDISPLAY
+;     (HEMLOCK.TTY::ROWS
+;      (HEMLOCK.TTY::FIND-ROW-AND-COL HEMLOCK.TTY::OLD HEMLOCK.TTY::COLUMNS))
+; 
+; caught STYLE-WARNING:
+;   The variable ROWS is defined but never used.
+
+;     (MULTIPLE-VALUE-BIND (HEMLOCK.TTY::POINT-ROW HEMLOCK.TTY::POINT-COL)
+;         (HEMLOCK.TTY::FIND-ROW-AND-COL HEMLOCK.TTY::NEW HEMLOCK.TTY::COLUMNS
+;          HEMLOCK.TTY::POINT)
+;       (LET* ((HEMLOCK.TTY::DIFF 0)
+;              (HEMLOCK.TTY::START
+;               (HEMLOCK.TTY::MIN* HEMLOCK.TTY::OLD-POINT HEMLOCK.TTY::POINT
+;                HEMLOCK.TTY::DIFF HEMLOCK.TTY::END)))
+;         (MULTIPLE-VALUE-BIND (HEMLOCK.TTY::START-ROW HEMLOCK.TTY::START-COL)
+;             (HEMLOCK.TTY::FIND-ROW-AND-COL HEMLOCK.TTY::NEW HEMLOCK.TTY::COLUMNS
+;              HEMLOCK.TTY::START)
+;           (MULTIPLE-VALUE-BIND (HEMLOCK.TTY::ROW HEMLOCK.TTY::COL)
+;               (HEMLOCK.TTY::FIND-ROW-AND-COL HEMLOCK.TTY::NEW
+;                HEMLOCK.TTY::COLUMNS)
+;             (MULTIPLE-VALUE-BIND # # # # # #)))))
+; ==>
+;   #'(LAMBDA
+;         (
+;          &OPTIONAL HEMLOCK.TTY::POINT-ROW HEMLOCK.TTY::POINT-COL
+;          &REST #:IGNORE)
+;       (DECLARE (IGNORE #:IGNORE))
+;       (LET* ((HEMLOCK.TTY::DIFF 0)
+;              (HEMLOCK.TTY::START
+;               (HEMLOCK.TTY::MIN* HEMLOCK.TTY::OLD-POINT HEMLOCK.TTY::POINT
+;                HEMLOCK.TTY::DIFF HEMLOCK.TTY::END)))
+;         (MULTIPLE-VALUE-BIND (HEMLOCK.TTY::START-ROW HEMLOCK.TTY::START-COL)
+;             (HEMLOCK.TTY::FIND-ROW-AND-COL HEMLOCK.TTY::NEW
+;              HEMLOCK.TTY::COLUMNS HEMLOCK.TTY::START)
+;           (MULTIPLE-VALUE-BIND (HEMLOCK.TTY::ROW HEMLOCK.TTY::COL)
+;               (HEMLOCK.TTY::FIND-ROW-AND-COL HEMLOCK.TTY::NEW
+;                HEMLOCK.TTY::COLUMNS)
+;             (MULTIPLE-VALUE-BIND # # # # # #)))))
+; 
+; caught STYLE-WARNING:
+;   The variable POINT-ROW is defined but never used.
+; 
+; caught STYLE-WARNING:
+;   The variable POINT-COL is defined but never used.
+
+;     (MULTIPLE-VALUE-BIND (HEMLOCK.TTY::START-ROW HEMLOCK.TTY::START-COL)
+;         (HEMLOCK.TTY::FIND-ROW-AND-COL HEMLOCK.TTY::NEW HEMLOCK.TTY::COLUMNS
+;          HEMLOCK.TTY::START)
+;       (MULTIPLE-VALUE-BIND (HEMLOCK.TTY::ROW HEMLOCK.TTY::COL)
+;           (HEMLOCK.TTY::FIND-ROW-AND-COL HEMLOCK.TTY::NEW HEMLOCK.TTY::COLUMNS)
+;         (MULTIPLE-VALUE-BIND (HEMLOCK.TTY::POINT-ROW HEMLOCK.TTY::POINT-COL)
+;             (HEMLOCK.TTY::FIND-ROW-AND-COL HEMLOCK.TTY::NEW HEMLOCK.TTY::COLUMNS
+;              HEMLOCK.TTY::POINT)
+;           (HEMLOCK.TTY::MOVE-CURSOR :COL 0 :VERTICAL HEMLOCK.TTY::OLD-ROW
+;            :CURRENT-COL HEMLOCK.TTY::OLD-COL :CLEAR-TO-EOS T)
+;           (HEMLOCK.TTY::MINI-WRITE-STRING HEMLOCK.TTY::NEW HEMLOCK.TTY::START-COL
+;            HEMLOCK.TTY::COLUMNS HEMLOCK.TTY::FONTS)
+;           (HEMLOCK.TTY::MOVE-CURSOR :COL HEMLOCK.TTY::POINT-COL :VERTICAL
+;            (- HEMLOCK.TTY::ROW HEMLOCK.TTY::POINT-ROW) :CURRENT-COL
+;            HEMLOCK.TTY::COL)
+;           (SETF # HEMLOCK.TTY::POINT-COL
+;                 # HEMLOCK.TTY::POINT-ROW
+;                 # NIL))))
+; ==>
+;   #'(LAMBDA
+;         (
+;          &OPTIONAL HEMLOCK.TTY::START-ROW HEMLOCK.TTY::START-COL
+;          &REST #:IGNORE)
+;       (DECLARE (IGNORE #:IGNORE))
+;       (MULTIPLE-VALUE-BIND (HEMLOCK.TTY::ROW HEMLOCK.TTY::COL)
+;           (HEMLOCK.TTY::FIND-ROW-AND-COL HEMLOCK.TTY::NEW HEMLOCK.TTY::COLUMNS)
+;         (MULTIPLE-VALUE-BIND (HEMLOCK.TTY::POINT-ROW HEMLOCK.TTY::POINT-COL)
+;             (HEMLOCK.TTY::FIND-ROW-AND-COL HEMLOCK.TTY::NEW
+;              HEMLOCK.TTY::COLUMNS HEMLOCK.TTY::POINT)
+;           (HEMLOCK.TTY::MOVE-CURSOR :COL 0 :VERTICAL HEMLOCK.TTY::OLD-ROW
+;            :CURRENT-COL HEMLOCK.TTY::OLD-COL :CLEAR-TO-EOS T)
+;           (HEMLOCK.TTY::MINI-WRITE-STRING HEMLOCK.TTY::NEW
+;            HEMLOCK.TTY::START-COL HEMLOCK.TTY::COLUMNS HEMLOCK.TTY::FONTS)
+;           (HEMLOCK.TTY::MOVE-CURSOR :COL HEMLOCK.TTY::POINT-COL :VERTICAL
+;            (- HEMLOCK.TTY::ROW HEMLOCK.TTY::POINT-ROW) :CURRENT-COL
+;            HEMLOCK.TTY::COL)
+;           (SETF # HEMLOCK.TTY::POINT-COL
+;                 # HEMLOCK.TTY::POINT-ROW
+;                 # NIL))))
+; 
+; caught STYLE-WARNING:
+;   The variable START-ROW is defined but never used.
+
+; in: DEFUN EDITOR-REPLACE-WORD
+;     (HEMLOCK.TTY::WITH-EDITOR-POINT-AND-STRING ((HEMLOCK.TTY::POINT STRING)
+;                                                 HEMLOCK.TTY::EDITOR)
+;       (LET ((HEMLOCK.TTY::START
+;              (HEMLOCK.TTY::EDITOR-WORD-START HEMLOCK.TTY::EDITOR))
+;             (HEMLOCK.TTY::END (HEMLOCK.TTY::EDITOR-WORD-END HEMLOCK.TTY::EDITOR)))
+;         (SETF (HEMLOCK.TTY::GET-STRING HEMLOCK.TTY::EDITOR)
+;                 (HEMLOCK.COMMAND:CONCAT # HEMLOCK.TTY::WORD #)
+;               (HEMLOCK.TTY::GET-POINT HEMLOCK.TTY::EDITOR)
+;                 (+ HEMLOCK.TTY::START #))))
+; 
+; caught STYLE-WARNING:
+;   The variable POINT is defined but never used.
+
+; in: DEFCOMMAND "Linedit Test"
+;     (HEMLOCK.COMMAND:DEFCOMMAND "Linedit Test"
+;         (HEMLOCK.TTY::P &OPTIONAL
+;          (HEMLOCK.TTY::SYM (HEMLOCK::SLAVE-SYMBOL-AT-POINT)))
+;         ""
+;         ""
+;       (DECLARE (IGNORE HEMLOCK.TTY::P))
+;       (HEMLOCK.TTY::TTY-EXCURSION
+;        (LAMBDA () (HEMLOCK::FIND-FILE-COMMAND NIL "/etc/passwd"))))
+; --> DEFUN PROGN SB-IMPL::%DEFUN SB-IMPL::%DEFUN SB-INT:NAMED-LAMBDA 
+; ==>
+;   #'(SB-INT:NAMED-LAMBDA HEMLOCK.TTY::LINEDIT-TEST-COMMAND
+;         (HEMLOCK.TTY::P &OPTIONAL
+;          (HEMLOCK.TTY::SYM (HEMLOCK::SLAVE-SYMBOL-AT-POINT)))
+;       (DECLARE (SB-C::TOP-LEVEL-FORM))
+;       ""
+;       (DECLARE (IGNORABLE HEMLOCK.TTY::P))
+;       (DECLARE (IGNORE HEMLOCK.TTY::P))
+;       (BLOCK HEMLOCK.TTY::LINEDIT-TEST-COMMAND
+;         (HEMLOCK.TTY::TTY-EXCURSION
+;          (LAMBDA () (HEMLOCK::FIND-FILE-COMMAND NIL "/etc/passwd")))))
+; 
+; caught STYLE-WARNING:
+;   The variable SYM is defined but never used.
+
+; in: DEFCOMMAND "Linedit Fuzzy Complete"
+;     (HEMLOCK.COMMAND:DEFCOMMAND "Linedit Fuzzy Complete"
+;         (HEMLOCK.TTY::P &OPTIONAL
+;          (HEMLOCK.TTY::SYM (HEMLOCK::SLAVE-SYMBOL-AT-POINT)))
+;         ""
+;         ""
+;       (DECLARE (IGNORE HEMLOCK.TTY::P))
+;       (HEMLOCK.TTY::TTY-EXCURSION
+;        (LAMBDA ()
+;          (HEMLOCK::FUZZY-COMPLETE-SYMBOL-COMMAND NIL)
+;          (HEMLOCK::REFRESH-SCREEN-COMMAND NIL))
+;        :NOTHING-TO-DO-MESSAGE "No completions." :CLEAR-SCREEN-BEFORE-P :PROMPT
+;        :CLEAR-SCREEN-AFTER-P T :KEEP-CURRENT-SPLIT-P NIL :SPLIT-SCREEN-P NIL))
+; --> DEFUN PROGN SB-IMPL::%DEFUN SB-IMPL::%DEFUN SB-INT:NAMED-LAMBDA 
+; ==>
+;   #'(SB-INT:NAMED-LAMBDA HEMLOCK.TTY::LINEDIT-FUZZY-COMPLETE-COMMAND
+;         (HEMLOCK.TTY::P &OPTIONAL
+;          (HEMLOCK.TTY::SYM (HEMLOCK::SLAVE-SYMBOL-AT-POINT)))
+;       (DECLARE (SB-C::TOP-LEVEL-FORM))
+;       ""
+;       (DECLARE (IGNORABLE HEMLOCK.TTY::P))
+;       (DECLARE (IGNORE HEMLOCK.TTY::P))
+;       (BLOCK HEMLOCK.TTY::LINEDIT-FUZZY-COMPLETE-COMMAND
+;         (HEMLOCK.TTY::TTY-EXCURSION
+;          (LAMBDA ()
+;            (HEMLOCK::FUZZY-COMPLETE-SYMBOL-COMMAND NIL)
+;            (HEMLOCK::REFRESH-SCREEN-COMMAND NIL))
+;          :NOTHING-TO-DO-MESSAGE "No completions." :CLEAR-SCREEN-BEFORE-P
+;          :PROMPT :CLEAR-SCREEN-AFTER-P T :KEEP-CURRENT-SPLIT-P NIL
+;          :SPLIT-SCREEN-P NIL)))
+; 
+; caught STYLE-WARNING:
+;   The variable SYM is defined but never used.
+
+
+; wrote /Users/bret.horne/.cache/common-lisp/Users/bret.horne/git/cl/hemlock-port/src/tty/linedit-tmpTASQCYAW.fasl
+; compilation finished in 0:00:00.136
+WARNING:
+   Lisp compilation had style-warnings while
+   compiling #<CL-SOURCE-FILE "hemlock.tty" "tty-1" "linedit">
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/dired.lisp
+; in: DEFUN DIRED::DO-THE-COPY
+;     (DEFUN DIRED::DO-THE-COPY (DIRED::SES-NAME1 DIRED::SES-NAME2 DIRED::SECS1)
+;       (WITH-OPEN-FILE
+;           (DIRED::INPUT DIRED::SES-NAME1 :ELEMENT-TYPE '(UNSIGNED-BYTE 8)
+;            :DIRECTION :INPUT)
+;         (WITH-OPEN-FILE
+;             (DIRED::OUTPUT DIRED::SES-NAME2 :ELEMENT-TYPE
+;              '(DIRED::UNSINGED-BYTE 8) :DIRECTION :OUTPUT :IF-EXISTS :SUPERSEDE)
+;           (LOOP
+;            (LET #
+;              #
+;              #))))
+;       (FUNCALL DIRED:*REPORT-FUNCTION* "~&~S  ==>~%  ~S~%" DIRED::SES-NAME1
+;                DIRED::SES-NAME2))
+; ==>
+;   (SB-IMPL::%DEFUN 'DIRED::DO-THE-COPY
+;                    (SB-INT:NAMED-LAMBDA DIRED::DO-THE-COPY
+;                        (DIRED::SES-NAME1 DIRED::SES-NAME2 DIRED::SECS1)
+;                      (DECLARE (SB-C::TOP-LEVEL-FORM))
+;                      (BLOCK DIRED::DO-THE-COPY
+;                        (WITH-OPEN-FILE
+;                            (DIRED::INPUT DIRED::SES-NAME1 :ELEMENT-TYPE '#
+;                             :DIRECTION :INPUT)
+;                          (WITH-OPEN-FILE # #))
+;                        (FUNCALL DIRED:*REPORT-FUNCTION* "~&~S  ==>~%  ~S~%"
+;                                 DIRED::SES-NAME1 DIRED::SES-NAME2))))
+; 
+; caught STYLE-WARNING:
+;   undefined type: (DIRED::UNSINGED-BYTE 8)
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/shell.lisp
+; in: HEMLOCK.COMMAND:DEFCOMMAND "Shell Complete Filename" => HEMLOCK-EXT:DEFAULT-DIRECTORY
+;     (HEMLOCK-EXT:DEFAULT-DIRECTORY)
+; --> FUNCALL 
+; ==>
+;   1
+; 
+; caught STYLE-WARNING:
+;   undefined function: (COMMON-LISP:SETF HEMLOCK-EXT:DEFAULT-DIRECTORY)
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/echo-commands.lisp
+; in: HEMLOCK.COMMAND:DEFCOMMAND "Complete Field"
+;     (AND HEMLOCK::*CANDIDATES-START-MARK* HEMLOCK::*COMPLETION-CANDIDATES*)
+; 
+; caught WARNING:
+;   undefined variable: HEMLOCK::*CANDIDATES-START-MARK*
+; 
+; caught WARNING:
+;   undefined variable: HEMLOCK::*CANDIDATES-START-MARK*
+; 
+; caught WARNING:
+;   undefined variable: HEMLOCK::*COMPLETION-CANDIDATES*
+; 
+; caught WARNING:
+;   undefined variable: HEMLOCK::*COMPLETION-CANDIDATES*
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/tty/linedit.lisp
+; in: DEFUN HEMLOCK.TTY::DELETE-LINEDIT-BUFFERS
+;     (MAPC #'HEMLOCK.TEXT:DELETE-BUFFER-IF-POSSIBLE HEMLOCK.TTY::*LINEDIT-BUFFERS*)
+; 
+; caught WARNING:
+;   undefined variable: HEMLOCK.TTY::*LINEDIT-BUFFERS*
+
+; in: DEFUN HEMLOCK.TTY::MAKE-LINEDIT-BUFFER
+;     (PUSH HEMLOCK.TTY::BUF HEMLOCK.TTY::*LINEDIT-BUFFERS*)
+; ==>
+;   (SETQ HEMLOCK.TTY::*LINEDIT-BUFFERS*
+;           (CONS #:ITEM HEMLOCK.TTY::*LINEDIT-BUFFERS*))
+; 
+; caught WARNING:
+;   undefined variable: HEMLOCK.TTY::*LINEDIT-BUFFERS*
+
+; in:
+;      DEFMETHOD HEMLOCK.TEXT:DEVICE-SHOW-MARK (HEMLOCK.TTY::LINEDIT-DEVICE T T T T)
+;     (ECASE HEMLOCK.TTY::*LINEDIT-REDISPLAY-MODE*
+;       ((:FULL-TTY-REDISPLAY :PARTIAL-TTY-REDISPLAY)
+;        (HEMLOCK.TTY::ENSURE-IN-CM-MODE HEMLOCK.TEXT:DEVICE)
+;        (CALL-NEXT-METHOD))
+;       ((:NO-REDISPLAY :LINEDIT-REDISPLAY)))
+; 
+; caught WARNING:
+;   undefined variable: HEMLOCK.TTY::*LINEDIT-REDISPLAY-MODE*
+
+; in: DEFUN HEMLOCK-INTERNALS:REPL
+;     (HEMLOCK.COMMAND:*EVENT-BASE* HEMLOCK.TTY::*MAIN-EVENT-BASE*)
+; 
+; caught WARNING:
+;   undefined variable: HEMLOCK.TTY::*MAIN-EVENT-BASE*
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/tty/output.lisp
+; in: DEFUN HEMLOCK.TTY::WRITE-AND-MAYBE-WAIT
+;     (HEMLOCK.COMMAND:CONNECTION-WRITE
+;      (SUBSEQ HEMLOCK.TTY::*REDISPLAY-OUTPUT-BUFFER* 0 COUNT)
+;      HEMLOCK.TTY::*TTY-CONNECTION*)
+; 
+; caught WARNING:
+;   undefined variable: HEMLOCK.TTY::*TTY-CONNECTION*
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/x-commands.lisp
+; in: HEMLOCK.COMMAND:DEFCOMMAND "Insert Cut Buffer"
+;     (HEMLOCK.TEXT:BITMAP-DEVICE-DISPLAY
+;      (HEMLOCK.TEXT:DEVICE-HUNK-DEVICE
+;       (HEMLOCK.TEXT:WINDOW-HUNK (HEMLOCK.COMMAND:CURRENT-WINDOW))))
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK.TEXT:BITMAP-DEVICE-DISPLAY
+
+; in: HEMLOCK.COMMAND:DEFCOMMAND "Region to Cut Buffer"
+;     (HEMLOCK.TEXT:BITMAP-DEVICE-DISPLAY
+;      (HEMLOCK.TEXT:DEVICE-HUNK-DEVICE
+;       (HEMLOCK.TEXT:WINDOW-HUNK (HEMLOCK.COMMAND:CURRENT-WINDOW))))
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK.TEXT:BITMAP-DEVICE-DISPLAY
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/eval-server.lisp
+; in: DEFUN HEMLOCK::SERVER-DIED
+;     (HEMLOCK::BREAKPOINT-INFO-SLAVE HEMLOCK::B)
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK::BREAKPOINT-INFO-SLAVE
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/main.lisp
+; in: DEFUN HEMLOCK-INTERNALS:CALL-WITH-EDITOR
+;     (HEMLOCK.COMMAND:SITE-WRAPPER-MACRO
+;       (UNLESS HEMLOCK.COMMAND:*EDITOR-HAS-BEEN-ENTERED*
+;         (HEMLOCK.COMMAND:%INIT-REDISPLAY HEMLOCK::BACKEND-TYPE HEMLOCK::DISPLAY)
+;         (SETQ HEMLOCK.COMMAND:*EDITOR-HAS-BEEN-ENTERED* T)
+;         (HEMLOCK.COMMAND:INVOKE-HOOK
+;          (REVERSE HEMLOCK::*AFTER-EDITOR-INITIALIZATIONS-FUNS*)))
+;       (IF (EQ HEMLOCK::BACKEND-TYPE :WEBUI)
+;           (HEMLOCK.WEBUI::RUN-WITH-WEBUI-EVENT-LOOP HEMLOCK::FUN)
+;           (CATCH 'HEMLOCK.COMMAND:HEMLOCK-EXIT (FUNCALL HEMLOCK::FUN))))
+; --> FLET BLOCK BLOCK SB-C::%WITHIN-CLEANUP RETURN-FROM PROGN LET COND IF THE 
+; --> HEMLOCK-EXT:WITH-CLX-EVENT-HANDLING 
+; ==>
+;   (HEMLOCK-EXT::CALL-WITH-CLX-EVENT-HANDLING
+;    (LAMBDA ()
+;      (UNLESS HEMLOCK.COMMAND:*EDITOR-HAS-BEEN-ENTERED*
+;        (HEMLOCK.COMMAND:%INIT-REDISPLAY HEMLOCK::BACKEND-TYPE HEMLOCK::DISPLAY)
+;        (SETQ HEMLOCK.COMMAND:*EDITOR-HAS-BEEN-ENTERED* T)
+;        (HEMLOCK.COMMAND:INVOKE-HOOK
+;         (REVERSE HEMLOCK::*AFTER-EDITOR-INITIALIZATIONS-FUNS*)))
+;      (IF (EQ HEMLOCK::BACKEND-TYPE :WEBUI)
+;          (HEMLOCK.WEBUI::RUN-WITH-WEBUI-EVENT-LOOP HEMLOCK::FUN)
+;          (CATCH 'HEMLOCK.COMMAND:HEMLOCK-EXIT (FUNCALL HEMLOCK::FUN))))
+;    HEMLOCK.COMMAND:*EDITOR-WINDOWED-INPUT*
+;    #'HEMLOCK-EXT:OBJECT-SET-EVENT-HANDLER)
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK-EXT::CALL-WITH-CLX-EVENT-HANDLING
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/symbol-completion.lisp
+; in: DEFUN HEMLOCK::COMPLETIONS-FOR-CHARACTER
+;     (HEMLOCK::CHARACTER-COMPLETION-SET HEMLOCK::PREFIX HEMLOCK::MATCHER)
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK::CHARACTER-COMPLETION-SET
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/lispeval.lisp
+; in: DEFUN HEMLOCK::DESCRIBE-FUNCTION-CALL-AUX
+;     (HEMLOCK-INTERNALS:EDITOR-DESCRIBE-FUNCTION HEMLOCK::FUN HEMLOCK::SYM)
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK-INTERNALS:EDITOR-DESCRIBE-FUNCTION
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/lisp-commands.lisp
+; in: HEMLOCK.COMMAND:DEFCOMMAND "Editor Describe Function Call"
+;     (HEMLOCK-INTERNALS:EDITOR-DESCRIBE-FUNCTION HEMLOCK::FUN HEMLOCK::SYM)
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK-INTERNALS:EDITOR-DESCRIBE-FUNCTION
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/lispeval.lisp
+; in: DEFUN HEMLOCK::FILE-COMPILE
+;     (HEMLOCK::FILE-COMPILE-TEMP-FILE HEMLOCK::FILE)
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK::FILE-COMPILE-TEMP-FILE
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/symbol-completion.lisp
+; in: DEFUN HEMLOCK::COMPLETIONS
+;     (HEMLOCK::FORMAT-COMPLETION-SET
+;      (NCONC HEMLOCK::SYMBOL-SET HEMLOCK::PACKAGE-SET) HEMLOCK::INTERNAL-P
+;      PACKAGE-NAME)
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK::FORMAT-COMPLETION-SET
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/edit-defs.lisp
+; in: DEFUN HEMLOCK::DEFINITION-EDITING-INFO
+;     (HEMLOCK-INTERNALS:FUN-DEFINED-FROM-PATHNAME HEMLOCK::MACRO)
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK-INTERNALS:FUN-DEFINED-FROM-PATHNAME
+
+; in: HEMLOCK.COMMAND:DEFCOMMAND "Edit Command Definition"
+;     (HEMLOCK-INTERNALS:FUN-DEFINED-FROM-PATHNAME
+;      (HEMLOCK.TEXT:COMMAND-FUNCTION HEMLOCK.TEXT:COMMAND))
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK-INTERNALS:FUN-DEFINED-FROM-PATHNAME
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/symbol-completion.lisp
+; in: DEFUN HEMLOCK::LONGEST-COMPOUND-PREFIX
+;     (HEMLOCK::LONGEST-COMMON-PREFIX HEMLOCK::TOKEN-LIST)
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK::LONGEST-COMMON-PREFIX
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/main.lisp
+; in: DEFUN HEMLOCK-INTERNALS:CALL-WITH-EDITOR
+;     (HEMLOCK.COMMAND:SITE-WRAPPER-MACRO
+;       (UNLESS HEMLOCK.COMMAND:*EDITOR-HAS-BEEN-ENTERED*
+;         (HEMLOCK.COMMAND:%INIT-REDISPLAY HEMLOCK::BACKEND-TYPE HEMLOCK::DISPLAY)
+;         (SETQ HEMLOCK.COMMAND:*EDITOR-HAS-BEEN-ENTERED* T)
+;         (HEMLOCK.COMMAND:INVOKE-HOOK
+;          (REVERSE HEMLOCK::*AFTER-EDITOR-INITIALIZATIONS-FUNS*)))
+;       (IF (EQ HEMLOCK::BACKEND-TYPE :WEBUI)
+;           (HEMLOCK.WEBUI::RUN-WITH-WEBUI-EVENT-LOOP HEMLOCK::FUN)
+;           (CATCH 'HEMLOCK.COMMAND:HEMLOCK-EXIT (FUNCALL HEMLOCK::FUN))))
+; --> FLET BLOCK BLOCK SB-C::%WITHIN-CLEANUP RETURN-FROM PROGN LET COND IF THE 
+; --> HEMLOCK-EXT:WITH-CLX-EVENT-HANDLING 
+; --> HEMLOCK-EXT::CALL-WITH-CLX-EVENT-HANDLING 
+; ==>
+;   #'HEMLOCK-EXT:OBJECT-SET-EVENT-HANDLER
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK-EXT:OBJECT-SET-EVENT-HANDLER
+
+;     (HEMLOCK.WEBUI::RUN-WITH-WEBUI-EVENT-LOOP HEMLOCK::FUN)
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK.WEBUI::RUN-WITH-WEBUI-EVENT-LOOP
+
+
+; file: /Users/bret.horne/git/cl/hemlock-port/src/repl-buf.lisp
+; in: DEFUN HEMLOCK::SEND-OOB-TO-SLAVE
+;     (HEMLOCK.WIRE:WIRE-FD HEMLOCK::WIRE)
+; 
+; caught STYLE-WARNING:
+;   undefined function: HEMLOCK.WIRE:WIRE-FD
+; 
+; compilation unit finished
+;   Undefined type:
+;     (DIRED::UNSINGED-BYTE 8)
+;   Undefined functions:
+;     (SETF HEMLOCK-EXT:DEFAULT-DIRECTORY) HEMLOCK.TEXT:BITMAP-DEVICE-DISPLAY HEMLOCK::BREAKPOINT-INFO-SLAVE HEMLOCK-EXT::CALL-WITH-CLX-EVENT-HANDLING HEMLOCK::CHARACTER-COMPLETION-SET HEMLOCK-INTERNALS:EDITOR-DESCRIBE-FUNCTION HEMLOCK::FILE-COMPILE-TEMP-FILE HEMLOCK::FORMAT-COMPLETION-SET HEMLOCK-INTERNALS:FUN-DEFINED-FROM-PATHNAME HEMLOCK::LONGEST-COMMON-PREFIX HEMLOCK-EXT:OBJECT-SET-EVENT-HANDLER HEMLOCK.WEBUI::RUN-WITH-WEBUI-EVENT-LOOP HEMLOCK.WIRE:WIRE-FD
+;   Undefined variables:
+;     HEMLOCK::*CANDIDATES-START-MARK* HEMLOCK::*COMPLETION-CANDIDATES* HEMLOCK.TTY::*LINEDIT-BUFFERS* HEMLOCK.TTY::*LINEDIT-REDISPLAY-MODE* HEMLOCK.TTY::*MAIN-EVENT-BASE* HEMLOCK.TTY::*TTY-CONNECTION*
+;   caught 9 WARNING conditions
+;   caught 47 STYLE-WARNING conditions
+;   printed 6 notes

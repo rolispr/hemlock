@@ -353,7 +353,7 @@
  :function #'(lambda (buffer window)
                "Returns the value of buffer's \"Current Package\" followed
                 by a colon and two spaces, or a string with one space."
-               (declare (ignore window))
+               (declare (ignore window buffer))
                (let ((package (hemlock::package-at-point)))
                  (if package
                      (format nil "~A:  " package)
