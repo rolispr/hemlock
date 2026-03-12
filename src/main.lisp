@@ -347,26 +347,21 @@ GB
 
 #-(or cmu scl)
 (defun main (&optional (arg-list (get-command-line-arguments)))
-  (handler-case
-      (with-user-abort:with-user-abort
-        (multiple-value-bind (keys rest)
-                             (process-command-line-options
-                              *command-line-spec*
-                              arg-list)
-          (destructuring-bind (&key slave help &allow-other-keys)
-                              keys
-            (cond
-             (help
-              (show-cmd-line-help)
-              (force-output))
-             (slave
-              (assert (null rest))
-              (apply #'hemlock:start-slave keys))
-             (t
-              (apply #'hemlock rest keys))))))
-    (with-user-abort:user-abort ()
-      (uiop:quit 1)))
-  (uiop:quit 0))
+  (multiple-value-bind (keys rest)
+                       (process-command-line-options
+                        *command-line-spec*
+                        arg-list)
+    (destructuring-bind (&key slave help &allow-other-keys)
+                        keys
+      (cond
+       (help
+        (show-cmd-line-help)
+        (force-output))
+       (slave
+        (assert (null rest))
+        (apply #'hemlock:start-slave keys))
+       (t
+        (apply #'hemlock rest keys))))))
 
 (defmacro with-editor
     ((&key (load-user-init t) backend-type display) &body body)
@@ -412,7 +407,8 @@ GB
        (invoke-hook hemlock::entry-hook)
        (unwind-protect
             (command-loop)
-         (invoke-hook hemlock::exit-hook))))))
+         (invoke-hook hemlock::exit-hook)))
+     (uiop:quit 0))))
 
 (defun command-loop ()
   (let ((*standard-input* *illegal-read-stream*)
