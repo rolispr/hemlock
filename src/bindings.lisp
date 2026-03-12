@@ -502,22 +502,15 @@
 (bind-key "Indent New Comment Line" #k"meta-linefeed")
 
 
-;;;; Word Abbrev Mode.
+;;;; Word Abbrev Mode. (abbrev.lisp is disabled; bindings commented out)
 
-(bind-key "Add Mode Word Abbrev" #k"control-x control-a")
-(bind-key "Add Global Word Abbrev" #k"control-x +")
-(bind-key "Inverse Add Mode Word Abbrev" #k"control-x control-h")
-(bind-key "Inverse Add Global Word Abbrev" #k"control-x \-")
-;; Removed in lieu of "Pop and Goto Mark".
-;;(bind-key "Abbrev Expand Only" #k"meta-space")
-(bind-key "Word Abbrev Prefix Mark" #k"meta-\"")
-;; (bind-key "Unexpand Last Word" #k"control-x u")
-
-(dolist (key (list #k"!" #k"~" #k"@" #k"#" #k";" #k"$" #k"%" #k"^" #k"&" #k"*"
-                   #k"\-" #k"_" #k"=" #k"+" #k"[" #k"]" #k"(" #k")" #k"/" #k"|"
-                   #k":" #k"'" #k"\"" #k"{" #k"}" #k"," #k"\<" #k"." #k"\>"
-                   #k"`" #k"\\" #k"?" #k"return" #k"newline" #k"tab" #k"space"))
-  (bind-key "Abbrev Expand Only" key :mode "Abbrev"))
+;; (bind-key "Add Mode Word Abbrev" #k"control-x control-a")
+;; (bind-key "Add Global Word Abbrev" #k"control-x +")
+;; (bind-key "Inverse Add Mode Word Abbrev" #k"control-x control-h")
+;; (bind-key "Inverse Add Global Word Abbrev" #k"control-x \-")
+;; (bind-key "Word Abbrev Prefix Mark" #k"meta-\"")
+;; (dolist (key (list ...))
+;;   (bind-key "Abbrev Expand Only" key :mode "Abbrev"))
 
 
 

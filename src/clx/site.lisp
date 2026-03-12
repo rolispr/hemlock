@@ -1,6 +1,6 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 
-(in-package :hi)
+(in-package :hemlock.x11)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar group-interesting-xevents

@@ -3,7 +3,7 @@
 ;;; Native backend: sb-sys event loop + sb-bsd-sockets + sb-ext:run-program.
 ;;; Replaces iolib entirely.
 
-(in-package :hemlock)
+(in-package :hemlock.tty)
 
 #+sbcl (declaim (optimize (speed 2)))
 
@@ -28,6 +28,10 @@
 (defmethod dispatch-events-no-hang-with-backend ((backend (eql :sb-sys)))
   (drain-pending-invocations)
   (sb-sys:serve-event 0))
+
+(defmethod dispatch-events-with-timeout-backend ((backend (eql :sb-sys)) seconds)
+  (drain-pending-invocations)
+  (sb-sys:serve-event seconds))
 
 ;;; invoke-later: push onto a list and drain at the next dispatch point.
 (defvar *pending-invocations* nil)
@@ -213,6 +217,14 @@
     (install-read-handler instance)
     (note-connected instance)))
 
+(defmethod class-for
+    ((backend (eql :sb-sys)) (type (eql 'tcp-connection-mixin)))
+  'tcp-connection/sb-sys)
+
+(defmethod class-for
+    ((backend (eql :sb-sys)) (type (eql 'process-connection-mixin)))
+  'process-connection/sb-sys)
+
 
 ;;;;
 ;;;; PIPELIKE-CONNECTION/SB-SYS
@@ -235,6 +247,14 @@
 (defclass process-with-pty-connection/sb-sys
     (process-with-pty-connection-mixin pipelike-connection/sb-sys)
   ())
+
+(defmethod class-for
+    ((backend (eql :sb-sys)) (type (eql 'pipelike-connection-mixin)))
+  'pipelike-connection/sb-sys)
+
+(defmethod class-for
+    ((backend (eql :sb-sys)) (type (eql 'process-with-pty-connection-mixin)))
+  'process-with-pty-connection/sb-sys)
 
 
 ;;;;
@@ -326,3 +346,7 @@
          (format nil "~{~A~^.~}" (coerce host 'list))
          port
          (connection-initargs connection))))))
+
+(defmethod class-for
+    ((backend (eql :sb-sys)) (type (eql 'tcp-listener-mixin)))
+  'tcp-listener/sb-sys)

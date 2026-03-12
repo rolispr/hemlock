@@ -8,6 +8,10 @@
 
 (in-package :hemlock.command)
 
+(defun concat (&rest args)
+  (apply #'concatenate 'string args))
+
+
 (declaim (special *editor-input*)) ; defined in input --amb
 
 ;;;; Macros used for manipulating Hemlock variables.
@@ -627,30 +631,33 @@
     (dotimes (i (length restarts))
       (format s "~&~2D: ~A~%" i (nth i restarts)))))
 
+(defvar *in-lisp-error-handler* nil
+  "Reentrancy guard for lisp-error-error-handler.")
+
 (defun lisp-error-error-handler (condition &optional internalp)
   (declare (ignore internalp))
-  (let ((message-only-p (typep condition 'editor-error)))
+  ;; Prevent recursive errors (e.g. from backtrace printing) from causing
+  ;; infinite recursion and heap exhaustion.
+  (when *in-lisp-error-handler*
+    (ignore-errors (beep))
+    (throw 'command-loop-catcher nil))
+  (let ((*in-lisp-error-handler* t)
+        (message-only-p (typep condition 'editor-error)))
     (cond
      (*debug-on-error*
       (invoke-debugger condition))
      ((and *stack-trace-on-error* (not message-only-p))
-      (with-pop-up-display (s :height 100)
-        (format s "An error of type ~A has been caught and ignored:~%  ~A~%~%"
-                (type-of condition)
-                condition)
-        (format s "The stack trace at the time of the error was:~%~%")
-        (hemlock::simple-backtrace s)
-        (format s "~%Restarts would have been:~%~%")
-        (simple-print-restarts s)
-        (hemlock::beginning-of-buffer-command nil))
+      (handler-case
+          (with-pop-up-display (s :height 100)
+            (format s "Error: ~A~%~%" condition)
+            (hemlock::simple-backtrace s))
+        (error ()))
       (throw 'command-loop-catcher nil))
      (message-only-p
-      (message "Error: ~A" condition)
+      (ignore-errors (message "~A" condition))
       (throw 'command-loop-catcher nil))
      (t
-      (warn "ignoring error: ~A" condition)
-      (message "Error: ~A" condition)
-      (hemlock::simple-backtrace *standard-output*)
+      (ignore-errors (message "Error: ~A" condition))
       (throw 'command-loop-catcher nil)))))
 
 (defmacro handle-lisp-errors (&body body)
@@ -668,6 +675,7 @@
 (defgeneric invoke-with-existing-event-loop (backend loop fun))
 (defgeneric dispatch-events-with-backend (backend))
 (defgeneric dispatch-events-no-hang-with-backend (backend))
+(defgeneric dispatch-events-with-timeout-backend (backend seconds))
 (defgeneric invoke-later (backend fun))
 
 (defmacro with-new-event-loop ((&optional) &body body)

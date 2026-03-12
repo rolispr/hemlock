@@ -757,14 +757,6 @@
 ;;; starting with the zero'th element (lines are numbered starting at 1).
 ;;; This must use AREF since some modes use this with extendable vectors.
 ;;;
-(defun array-element-from-mark (mark vector
-                                &optional (error-msg "Invalid line."))
-  (when (blank-line-p (mark-line mark)) (editor-error error-msg))
-  (aref vector
-         (1- (count-lines (region
-                           (buffer-start-mark (line-buffer (mark-line mark)))
-                           mark)))))
-
 ;;; DIRED-NAMIFY and DIRED-DIRECTORIFY are implementation dependent slime.
 ;;;
 (defun dired-namify (pathname)

@@ -165,21 +165,29 @@ window.addEventListener('resize', _measureGrid);
 ;;;; device-init / device-exit
 
 (defmethod device-init ((device webui-device))
-  (let ((win (webui:webui-new-window)))
-    (setf (webui-device-window-id device) win)
-    (webui:webui-show win *webui-initial-html*)
-    (webui:webui-bind win "hemlock_key"
-                      (let ((dev device))
-                        (lambda (ev) (webui-key-callback dev ev))))
-    (webui:webui-bind win "hemlock_resize"
-                      (let ((dev device))
-                        (lambda (ev) (webui-resize-callback dev ev))))
-    (sb-thread:make-thread (lambda () (webui:webui-wait))
-                           :name "webui-wait")
-    (sb-sys:add-fd-handler
-     (webui-device-pipe-read-fd device)
-     :input (let ((dev device))
-              (lambda (fd) (webui-drain-events dev fd))))))
+  (sb-int:with-float-traps-masked (:invalid :overflow :inexact :divide-by-zero
+                                   :underflow)
+    (let ((win (webui:webui-new-window)))
+      (setf (webui-device-window-id device) win)
+      (webui:webui-show win *webui-initial-html*)
+      ;; webui-wait blocks until all windows are closed; run it off the main thread.
+      (sb-thread:make-thread (lambda () (webui:webui-wait)) :name "webui-wait")
+      (webui:webui-bind win "hemlock_key"
+        (lambda (event)
+          (sb-int:with-float-traps-masked (:invalid :overflow :inexact
+                                           :divide-by-zero :underflow)
+            (when *webui-device*
+              (webui-key-callback *webui-device* event)))))
+      (webui:webui-bind win "hemlock_resize"
+        (lambda (event)
+          (sb-int:with-float-traps-masked (:invalid :overflow :inexact
+                                           :divide-by-zero :underflow)
+            (when *webui-device*
+              (webui-resize-callback *webui-device* event)))))
+      (sb-sys:add-fd-handler
+       (webui-device-pipe-read-fd device)
+       :input (let ((dev device))
+                (lambda (fd) (webui-drain-events dev fd)))))))
 
 (defmethod device-exit ((device webui-device))
   nil)
@@ -190,8 +198,10 @@ window.addEventListener('resize', _measureGrid);
 (defmethod device-clear ((device webui-device))
   (let ((win (webui-device-window-id device)))
     (when win
-      (webui:webui-run win
-       "document.querySelectorAll('.hem-window,.hem-echo,.hem-ml').forEach(function(e){e.innerHTML='';e.textContent='';});"))))
+      (sb-int:with-float-traps-masked (:invalid :overflow :inexact :divide-by-zero
+                                       :underflow)
+        (webui:webui-run win
+         "document.querySelectorAll('.hem-window,.hem-echo,.hem-ml').forEach(function(e){e.innerHTML='';e.textContent='';});")))))
 
 
 ;;;; window operations

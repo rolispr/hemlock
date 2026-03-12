@@ -51,4 +51,5 @@
    #:device-serve-requests
 
    #:dispatch-events
-   #:dispatch-events-no-hang))
+   #:dispatch-events-no-hang
+   #:dispatch-events-timeout))

@@ -338,7 +338,7 @@
                  (lambda (connection bytes)
                    (ts-buffer-output-string
                     ts
-                    (hi::default-filter connection bytes))
+                    (default-filter connection bytes))
                    nil)))
       server-info)))
 
@@ -775,7 +775,7 @@
     (install-special-variables-for-background-threads)
     (let ((machine (subseq editor 0 seperator))
           (port (parse-integer editor :start (1+ seperator)))
-          (hi::*in-hemlock-slave-p* t)
+          (*in-hemlock-slave-p* t)
           ;; override --disable-debugger from this point on:
           (*debugger-hook*
            (lambda (c orig)
@@ -1173,7 +1173,7 @@
     (name &optional (server-info (get-current-eval-server t))
                     (wire (server-info-wire server-info)))
   (let ((buffer
-         (hi::make-buffer-with-unique-name name :modes '("Lisp"))))
+         (make-buffer-with-unique-name name :modes '("Lisp"))))
     (typescriptify-buffer buffer server-info wire)
     buffer))
 

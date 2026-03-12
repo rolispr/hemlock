@@ -636,7 +636,7 @@
   (cl-ppcre:regex-replace "^SB!" (canonical-case str) "SB-"))
 
 (defun package-at-point ()
-  (hi::tag-package (hi::line-tag (mark-line (current-point)))))
+  (tag-package (line-tag (mark-line (current-point)))))
 
 (defcommand "Set Buffer Package" (p)
   "Set the package to be used by Lisp evaluation and compilation commands

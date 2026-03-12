@@ -187,41 +187,29 @@
 ;;;
 (defvar *default-backend* nil) ;if not set, use the CAR of available ones
 (defvar *available-backends* '())
+(defvar *editor-has-been-entered* nil "True if the editor has been entered at least once.")
 
 (defun validate-backend-type (want)
   (find want *available-backends*))
 
 (defun choose-backend-type (&optional display)
   (let ((want
-         (if display
-             ;; $DISPLAY is set, can use the preferred display
-             *default-backend*
-             ;; $DISPLAY unset, revert to TTY
-             :tty)))
+         (cond
+           (*default-backend* *default-backend*)
+           ;; $DISPLAY set: prefer a windowed backend, else fall back to TTY
+           (display
+            (or (find-if (lambda (b) (member b '(:clx :qt :webui))) *available-backends*)
+                :tty))
+           ;; No $DISPLAY: always use TTY
+           (t :tty))))
     (cond
       ((validate-backend-type want))
+      ((validate-backend-type :tty))
       ((car *available-backends*))
       (t (error "no Hemlock backends loaded, giving up")))))
 
 (defgeneric backend-init-raw-io (backend-type display))
 
-;;; Forward declaration: defined in tty/input.lisp (hemlock.tty inherits this symbol).
-(declaim (ftype (function (&key (:fd t)) t) make-tty-editor-input))
-
-(defmethod backend-init-raw-io ((backend (eql :tty)) display)
-  (declare (ignore display))
-  ;; The editor's file descriptor is Unix standard input (0).
-  ;; We don't need to affect system:*file-input-handlers* here
-  ;; because the init and exit methods for tty redisplay devices
-  ;; take care of this.
-  ;;
-  (setf *editor-file-descriptor* 0)
-  (setf *editor-input* (make-tty-editor-input :fd 0))
-  (setf *real-editor-input* *editor-input*))
-
-(defmethod backend-init-raw-io ((backend (eql :mini)) display)
-  (declare (ignore display))
-  (backend-init-raw-io :tty display))
 
 (defun init-raw-io (backend-type display)
   (setf *editor-windowed-input* nil)
@@ -325,9 +313,6 @@
 
 (declaim (special *gc-notify-before*
                   *gc-notify-after*))
-
-(defvar *editor-has-been-entered* nil
-  "True if the editor has been entered at least once.")
 
 ;; fixme: this is neither site-specific nor should it be a macro.
 (defmacro site-wrapper-macro (&body body)
@@ -608,6 +593,14 @@
                         (if sym
                             (hemlock-ext:make-key-event sym 0)
                             (hemlock-ext:char-key-event char))))))
+
+;;; X11 clipboard stubs — overridden by the CLX backend when loaded.
+(defun store-cut-string (display string)
+  (declare (ignore display string)))
+
+(defun fetch-cut-string (display)
+  (declare (ignore display))
+  nil)
 
 #||
 ;;; GET-EDITOR-TTY-INPUT reads from stream's Unix file descriptor queuing events

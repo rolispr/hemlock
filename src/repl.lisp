@@ -4,7 +4,7 @@
 
 ;;;; PREPL/background buffer integration
 
-(declaim (special hi::*in-hemlock-slave-p*
+(declaim (special *in-hemlock-slave-p*
                   hemlock::*master-machine-and-port*
                   hemlock::*original-terminal-io*))
 
@@ -13,7 +13,7 @@
 
 (defun call-with-typeout-for-thread-debugger (cont)
   (with-new-event-loop ()
-    (let ((hi::*in-hemlock-slave-p* t)
+    (let ((*in-hemlock-slave-p* t)
           (hemlock.wire:*current-wire* :not-yet))
       (hemlock::connect-to-editor-for-background-thread
        (car hemlock::*master-machine-and-port*)
@@ -35,7 +35,7 @@
 (defun typeout-for-thread ()
   (assert (or (not (boundp '*event-base*)) (not *event-base*)))
   (setf *event-base* (make-event-loop *connection-backend*))
-  (setf hi::*in-hemlock-slave-p* t)
+  (setf *in-hemlock-slave-p* t)
   (let ((hemlock.wire:*current-wire* :not-yet))
     (hemlock::connect-to-editor-for-background-thread
      (car hemlock::*master-machine-and-port*)

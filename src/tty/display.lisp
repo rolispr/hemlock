@@ -209,7 +209,7 @@
   (when *pending-resize*
     (setf *pending-resize* nil)
     (let* ((lines (or *pending-resize-lines*
-                      (nth-value 0 (hi::get-terminal-attributes))))
+                      (nth-value 0 (get-terminal-attributes))))
            (delta (- lines (tty-device-lines device))))
       (setf *pending-resize-lines* nil
             *pending-resize-cols*  nil)

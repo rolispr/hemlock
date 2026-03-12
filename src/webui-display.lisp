@@ -192,13 +192,15 @@
 (defmethod device-force-output ((device webui-device))
   (let ((win (webui-device-window-id device)))
     (when win
-      (dolist (entry (nreverse (webui-device-dirty-windows device)))
-        (destructuring-bind (dom-id lines ml) entry
-          (webui:webui-run win
-            (format nil "updateWindow(~S,~A,~S);"
-                    dom-id
-                    (lines-to-json lines)
-                    ml))))
+      (sb-int:with-float-traps-masked (:invalid :overflow :inexact :divide-by-zero
+                                       :underflow)
+        (dolist (entry (nreverse (webui-device-dirty-windows device)))
+          (destructuring-bind (dom-id lines ml) entry
+            (webui:webui-run win
+              (format nil "updateWindow(~S,~A,~S);"
+                      dom-id
+                      (lines-to-json lines)
+                      ml)))))
       (setf (webui-device-dirty-windows device) nil))))
 
 (defmethod device-finish-output ((device webui-device) window)

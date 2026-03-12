@@ -100,6 +100,7 @@
               ((:file "font")
                (:file "streams")
                (:file "main")
+               (:file "prepl" :depends-on ("main"))
                (:file "echo")
                (:file "undo-system")))
      (:module core-3

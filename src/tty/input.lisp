@@ -11,6 +11,16 @@
 (defun make-tty-editor-input (&rest args)
   (apply #'make-instance 'tty-editor-input args))
 
+(defmethod backend-init-raw-io ((backend (eql :tty)) display)
+  (declare (ignore display))
+  (setf *editor-file-descriptor* 0)
+  (setf *editor-input* (make-tty-editor-input :fd 0))
+  (setf *real-editor-input* *editor-input*))
+
+(defmethod backend-init-raw-io ((backend (eql :mini)) display)
+  (declare (ignore display))
+  (backend-init-raw-io :tty display))
+
 (defmethod get-key-event
     ((stream tty-editor-input) &optional ignore-abort-attempts-p)
   (%editor-input-method stream ignore-abort-attempts-p))
@@ -280,19 +290,25 @@
                  (if next
                      (setf start next)
                      ;; Incomplete — fall through to normal longest-match.
-                     (loop for end from length downto (1+ start)
-                           do (let ((event (translate-tty-event (subseq data start end))))
-                                (when event
-                                  (q-event *real-editor-input* event)
-                                  (setf start end)
-                                  (return)))))))
+                     (let ((matched nil))
+                       (loop for end from length downto (1+ start)
+                             do (let ((event (translate-tty-event (subseq data start end))))
+                                  (when event
+                                    (q-event *real-editor-input* event)
+                                    (setf start end matched t)
+                                    (return))))
+                       ;; If nothing matched, skip one char to avoid infinite loop.
+                       (unless matched (incf start))))))
               (t
-               (loop for end from length downto (1+ start)
-                     do (let ((event (translate-tty-event (subseq data start end))))
-                          (when event
-                            (q-event *real-editor-input* event)
-                            (setf start end)
-                            (return)))))))))
+               (let ((matched nil))
+                 (loop for end from length downto (1+ start)
+                       do (let ((event (translate-tty-event (subseq data start end))))
+                            (when event
+                              (q-event *real-editor-input* event)
+                              (setf start end matched t)
+                              (return))))
+                 ;; If nothing matched, skip one char to avoid infinite loop.
+                 (unless matched (incf start))))))))
 
 ;;; TTY Mouse support commands.
 

@@ -22,6 +22,13 @@
   (:use :common-lisp :trivial-gray-streams)
   (:shadow #:char-code-limit)
   (:export
+   ;; basic list utilities (struct.lisp) — used throughout all layers
+   #:delq #:memq #:assq
+   ;; string primitives (struct.lisp / char-attrs.lisp)
+   #:%sp-byte-blt
+   #:%sp-find-character-with-attribute
+   #:%sp-reverse-find-character-with-attribute
+
    ;; line.lisp / text-primitives.lisp
    #:neq
    #:byte-blt
@@ -43,6 +50,7 @@
    #:print-attribute-descriptor
    #:print-hcommand
    #:print-hwindow
+   #:%print-hwindow
    #:print-modeline-field
    #:print-modeline-field-info
    #:strlen
@@ -280,6 +288,9 @@
    #:alloc-modeline-field
    #:%make-modeline-field
    #:modeline-field-p
+   #:modeline-field-%name
+   #:modeline-field-%function
+   #:modeline-field-%width
    #:modeline-field-name
    #:modeline-field-function
    #:modeline-field-width
@@ -429,6 +440,8 @@
    #:font-change-next
    #:font-change-mark
    ;; dis-line struct (port uses dis-line- prefix, not display-line-)
+   #:dis-line
+   #:window-dis-line
    #:make-window-dis-line
    #:dis-line-chars
    #:dis-line-delta
@@ -490,8 +503,419 @@
    ))
 
 
+;;;
+;;; hemlock.command — editor framework: commands system, modes, keys,
+;;;                   display, windows, streams
+;;;
+(defpackage :hemlock.command
+  (:use :common-lisp :trivial-gray-streams :hemlock.text)
+  (:shadowing-import-from :hemlock.text #:char-code-limit)
+  (:import-from :hemlock.wire #:dispatch-events #:dispatch-events-no-hang)
+  (:export
+   #:dispatch-events #:dispatch-events-no-hang #:dispatch-events-timeout
+
+   #:current-mark
+   #:pop-buffer-mark
+   #:push-buffer-mark
+   #:change-to-buffer
+   #:previous-buffer
+   #:buffer-active-region-p
+
+   #:make-modeline-field
+   #:buffer-modeline-fields
+   #:buffer-modeline-field-p
+   #:update-modeline-fields
+   #:update-modeline-field
+
+   #:fetch-cut-string
+   #:store-cut-string
+   #:check-region-query-size
+
+   #:kill-region
+   #:kill-characters
+   #:activate-region
+   #:deactivate-region
+   #:region-active-p
+   #:check-region-active
+   #:current-region
+
+   #:current-variable-tables
+   #:defhvar
+   #:variable-value
+   #:variable-documentation
+   #:variable-hooks
+   #:variable-name
+   #:string-to-variable
+   #:hemlock-bound-p
+   #:delete-variable
+
+   #:make-command
+   #:bind-key
+   #:delete-key-binding
+   #:get-command
+   #:map-bindings
+   #:key-translation
+   #:interactive
+   #:last-command-type
+   #:prefix-argument
+   #:recursive-edit
+   #:in-recursive-edit
+   #:exit-recursive-edit
+   #:abort-recursive-edit
+
+   #:defmode
+   #:mode-documentation
+   #:buffer-major-mode
+   #:buffer-minor-mode
+   #:mode-variables
+   #:mode-major-p
+
+   ;; syntax.lisp — character attribute system
+   #:defattribute
+   #:character-attribute-name
+   #:character-attribute-documentation
+   #:character-attribute-p
+   #:shadow-attribute
+   #:unshadow-attribute
+   #:find-attribute
+   #:reverse-find-attribute
+   #:character-attribute-hooks
+
+   #:current-window
+   #:make-window
+   #:delete-window
+   #:window-display-start
+   #:window-display-end
+   #:window-display-recentering
+   #:center-window
+   #:scroll-window
+   #:displayed-p
+   #:next-window
+   #:previous-window
+   #:mark-to-cursorpos
+   #:cursorpos-to-mark
+   #:last-key-event-cursorpos
+   #:mark-column
+   #:move-to-column
+   #:show-mark
+   #:redisplay
+   #:redisplay-all
+   #:editor-finish-output
+
+   #:define-logical-key-event
+   #:logical-key-event-key-events
+   #:logical-key-event-p
+
+   #:clear-echo-area
+   #:message
+   #:loud-message
+   #:prompt-for-buffer
+   #:prompt-for-key-event
+   #:prompt-for-key
+   #:prompt-for-file
+   #:prompt-for-integer
+   #:prompt-for-keyword
+   #:prompt-for-expression
+   #:prompt-for-string
+   #:prompt-for-variable
+   #:prompt-for-y-or-n
+   #:prompt-for-yes-or-no
+
+   #:process-file-options
+   #:pathname-to-buffer-name
+   #:buffer-default-pathname
+   #:read-file
+   #:write-file
+   #:write-buffer-file
+   #:read-buffer-file
+   #:find-file-buffer
+
+   #:get-key-event
+   #:unget-key-event
+   #:clear-editor-input
+   #:listen-editor-input
+
+   #:make-hemlock-output-stream
+   #:hemlock-output-stream-p
+   #:make-hemlock-region-stream
+   #:hemlock-region-stream-p
+   #:make-kbdmac-stream
+   #:modify-kbdmac-stream
+
+   #:add-definition-dir-translation
+   #:delete-definition-dir-translation
+   #:schedule-event
+   #:remove-scheduled-event
+   #:in-lisp
+
+   #:indent-region
+   #:indent-region-for-commands
+   #:delete-horizontal-space
+   #:pre-command-parse-check
+   #:form-offset
+   #:top-level-offset
+   #:mark-top-level-form
+   #:defun-region
+   #:inside-defun-p
+   #:start-defun-p
+   #:forward-up-list
+   #:backward-up-list
+   #:valid-spot
+   #:defindent
+   #:word-offset
+   #:sentence-offset
+   #:paragraph-offset
+   #:mark-paragraph
+   #:goto-page
+   #:page-offset
+   #:page-directory
+   #:display-page-directory
+   #:fill-region
+   #:fill-region-by-paragraphs
+
+   #:save-for-undo
+   #:make-region-undo
+   #:supply-generic-pointer-up-function
+
+   ;; Macros from the CIM:
+   #:with-writable-buffer
+   #:value
+   #:setv
+   #:add-hook
+   #:remove-hook
+   #:invoke-hook
+   #:defcommand
+   #:use-buffer
+   #:command-case
+   #:define-file-option
+   #:define-file-type-hook
+   #:do-active-group
+   #:with-input-from-region
+   #:with-output-to-mark
+   #:with-pop-up-display
+   #:handle-lisp-errors
+   #:do-strings
+
+   ;; Later, possibly ill-advised additions
+   #:goto-buffer-start
+   #:goto-buffer-end
+
+   ;; device interface
+   #:device                             ;[class]
+   #:device-init
+   #:device-make-window
+   #:device-exit
+   #:device-smart-redisplay
+   #:device-dumb-redisplay
+   #:device-after-redisplay
+   #:device-clear
+   #:device-note-read-wait
+   #:device-force-output
+   #:device-finish-output
+   #:device-put-cursor
+   #:device-show-mark
+   #:device-next-window
+   #:device-previous-window
+   #:device-delete-window
+   #:device-random-typeout-full-more
+   #:device-random-typeout-line-more
+   #:device-random-typeout-setup
+   #:device-random-typeout-cleanup
+   #:device-beep
+   ;;
+   #:random-typeout-stream
+   #:with-mark
+
+   ;; variables
+   #:*current-buffer*
+   #:*current-window*
+   #:*echo-area-buffer*
+   #:*random-typeout-buffers*
+   #:*random-typeout-ml-fields*
+   #:*window-list*
+
+   ;; functions
+   #:hlet
+   #:random-typeout-stream-mark
+   #:default-font
+   #:window                             ;as a type
+
+   #:editor-input
+   #:*editor-input*
+   #:*real-editor-input*
+
+   #:list-all-connections
+   #:connection
+   #:connection-name
+   #:connection-buffer
+   #:connection-sentinel
+   #:connection-filter
+   #:connection-encoding
+   #:delete-connection
+   #:connection-listen
+   #:connection-write
+   #:tcp-connection
+   #:make-tcp-connection
+   #:process-connection
+   #:connection-command
+   #:make-process-connection
+   #:make-pipelike-connection
+   #:make-process-with-pty-connection
+   #:connection-exit-status
+   #:connection-exit-code
+   #:file-connection
+   #:connection-port
+   #:connection-host
+   #:make-file-connection
+   #:conection-filename
+   #:descriptor-connection
+   #:connection-descriptor
+   #:make-descriptor-connection
+   #:io-connection
+   #:tcp-connection-mixin
+   #:process-connection-mixin
+   #:tcp-listener-mixin
+   #:connection-initargs
+   #:listening-connection
+   #:make-tcp-listener
+   #:make-connection-device
+   #:connection-note-event
+   #:filter-connection-output
+   #:note-connected
+   #:process-incoming-data
+   #:connection-input-buffer
+   #:%read
+   #:process-incoming-connection
+   #:convert-pending-connection
+
+   ;; additional public API
+   #:directoryp
+   #:reprompt
+   #:exit-hemlock
+   #:pause-hemlock
+   #:merge-relative-pathnames
+   #:*beep-function* #:beep
+   #:*last-key-event-typed* #:*key-event-history*
+   #:*global-variable-names* #:*character-attribute-names*
+   #:*mode-names* #:*buffer-names* #:*command-names* #:*buffer-list*
+   #:*default-modeline-fields*
+   #:maximum-modeline-pathname-length-hook
+   #:site-init
+   #:%init-syntax-table
+   #:%init-line-image
+   ;; rompsite.lisp — entry-point functions used from main.lisp (hemlock pkg)
+   ;; display constants (winimage.lisp) — re-exported through hemlock.display to hemlock.tty
+   #:unaltered-bits #:changed-bit #:moved-bit #:new-bit #:the-sentinel
+   #:site-wrapper-macro
+   #:init-raw-io
+   #:%init-screen-manager
+   #:backend-init-raw-io
+   #:*illegal-read-stream*
+   #:*default-backend*
+   #:*available-backends*
+   #:*editor-has-been-entered*
+   #:validate-backend-type
+   #:choose-backend-type
+   #:get-terminal-name
+   #:*editor-file-descriptor*
+   #:process-editor-tty-input
+   ;; macros.lisp — used from main.lisp
+   #:*connection-backend*
+   #:with-existing-event-loop
+   #:with-new-event-loop
+   #:invoke-with-new-event-loop
+   #:invoke-with-existing-event-loop
+   #:make-event-loop
+   #:dispatch-events-with-backend
+   #:dispatch-events-no-hang-with-backend
+   #:dispatch-events-with-timeout-backend
+   #:invoke-later
+   #:later
+   #:lisp-error-error-handler
+   ;; catch/throw tags shared across hemlock and hemlock.command
+   #:command-loop-catcher
+   #:editor-top-level-catcher
+   #:hemlock-exit
+   ;; key-dispatch.lisp — used from main.lisp
+   #:*invoke-hook*
+   #:%command-loop
+   ;; window.lisp — used from main.lisp
+   #:%init-redisplay
+   ;; echo.lisp — referenced via hi:: from user-layer files
+   #:display-prompt-nicely
+   #:key-event-case
+   #:after-editor-initializations
+   ;; symbols referenced via hi:: from user-layer or tty files
+   #:line-tag
+   #:default-filter
+   #:queue-buffer-change
+   #:make-buffer-with-unique-name
+   #:*prompt-key*
+   #:update-modelines-for-buffer
+   #:*debug-on-error*
+   #:*editor-input*
+   #:stream-fd
+   #:*event-base*
+   #:make-input-event
+   #:class-for
+   #:pipelike-connection-mixin
+   #:process-with-pty-connection-mixin
+   #:device-enlarge-window
+   #:*background-image*
+
+   ;; parse/echo variables
+   #:*echo-area-stream*
+   #:*echo-area-window*
+   #:*parse-starting-mark*
+   #:*parse-input-region*
+   #:*parse-verification-function*
+   #:*parse-string-tables*
+   #:*parse-value-must-exist*
+   #:*parse-default*
+   #:*parse-default-string*
+   #:*parse-prompt*
+   #:*parse-help*
+   #:*parse-type*
+
+   ;; editor-input internals (input.lisp) — used by tty backend
+   #:*real-editor-input*
+   #:*free-input-events*
+   #:*screen-image-trashed*
+   #:*editor-windowed-input*
+   #:%editor-input-method
+   #:q-event #:un-event #:dq-event
+   #:editor-input-head #:editor-input-tail
+   #:input-event-next #:input-event-key-event
+   #:input-event-x #:input-event-y #:input-event-hunk #:input-event-unread-p
+   #:new-event #:editor-abort-key-events #:abort-key-event-p
+   #:more-read-key-event
+   #:*in-hemlock-stream-input-method*
+
+   ;; window image internals
+   #:setup-modeline-image
+   #:canonical-case
+   #:setup-window-image
+   #:*line-wrap-char*
+   #:change-window-image-height
+   #:internal-redisplay
+   #:prepare-window-for-redisplay
+
+   ;; display functions forward-declared
+   #:random-typeout-redisplay
+   #:update-window-image
+   #:maybe-recenter-window
+   #:wait-for-more
+
+   ;; misc
+   #:input-waiting
+   #:concat
+   #:setup-initial-buffer
+   ))
+
+
 (defpackage :hemlock-interface
-    (:use :hemlock.text)
+    (:use :hemlock.text :hemlock.command)
+  (:shadowing-import-from :hemlock.text #:char-code-limit)
   (:export
    ;; Functions from the CIM:
    #:linep
@@ -996,385 +1420,7 @@
    #:make-tcp-listener
    #:make-connection-device)
   (:import-from :hemlock.wire #:dispatch-events #:dispatch-events-no-hang)
-  (:export #:dispatch-events #:dispatch-events-no-hang))
-
-
-;;;
-;;; hemlock.command — editor framework: commands system, modes, keys,
-;;;                   display, windows, streams
-;;;
-(defpackage :hemlock.command
-  (:use :common-lisp :trivial-gray-streams :hemlock.text)
-  (:shadowing-import-from :hemlock.text #:char-code-limit)
-  (:import-from :hemlock.wire #:dispatch-events #:dispatch-events-no-hang)
-  (:export
-   #:dispatch-events #:dispatch-events-no-hang
-
-   #:current-mark
-   #:pop-buffer-mark
-   #:push-buffer-mark
-   #:change-to-buffer
-   #:previous-buffer
-   #:buffer-active-region-p
-
-   #:make-modeline-field
-   #:buffer-modeline-fields
-   #:buffer-modeline-field-p
-   #:update-modeline-fields
-   #:update-modeline-field
-
-   #:fetch-cut-string
-   #:store-cut-string
-   #:check-region-query-size
-
-   #:kill-region
-   #:kill-characters
-   #:activate-region
-   #:deactivate-region
-   #:region-active-p
-   #:check-region-active
-   #:current-region
-
-   #:current-variable-tables
-   #:defhvar
-   #:variable-value
-   #:variable-documentation
-   #:variable-hooks
-   #:variable-name
-   #:string-to-variable
-   #:hemlock-bound-p
-   #:delete-variable
-
-   #:make-command
-   #:bind-key
-   #:delete-key-binding
-   #:get-command
-   #:map-bindings
-   #:key-translation
-   #:interactive
-   #:last-command-type
-   #:prefix-argument
-   #:recursive-edit
-   #:in-recursive-edit
-   #:exit-recursive-edit
-   #:abort-recursive-edit
-
-   #:defmode
-   #:mode-documentation
-   #:buffer-major-mode
-   #:buffer-minor-mode
-   #:mode-variables
-   #:mode-major-p
-
-   ;; syntax.lisp — character attribute system
-   #:defattribute
-   #:character-attribute-name
-   #:character-attribute-documentation
-   #:character-attribute-p
-   #:shadow-attribute
-   #:unshadow-attribute
-   #:find-attribute
-   #:reverse-find-attribute
-   #:character-attribute-hooks
-
-   #:current-window
-   #:make-window
-   #:delete-window
-   #:window-display-start
-   #:window-display-end
-   #:window-display-recentering
-   #:center-window
-   #:scroll-window
-   #:displayed-p
-   #:next-window
-   #:previous-window
-   #:mark-to-cursorpos
-   #:cursorpos-to-mark
-   #:last-key-event-cursorpos
-   #:mark-column
-   #:move-to-column
-   #:show-mark
-   #:redisplay
-   #:redisplay-all
-   #:editor-finish-output
-
-   #:define-logical-key-event
-   #:logical-key-event-key-events
-   #:logical-key-event-p
-
-   #:clear-echo-area
-   #:message
-   #:loud-message
-   #:prompt-for-buffer
-   #:prompt-for-key-event
-   #:prompt-for-key
-   #:prompt-for-file
-   #:prompt-for-integer
-   #:prompt-for-keyword
-   #:prompt-for-expression
-   #:prompt-for-string
-   #:prompt-for-variable
-   #:prompt-for-y-or-n
-   #:prompt-for-yes-or-no
-
-   #:process-file-options
-   #:pathname-to-buffer-name
-   #:buffer-default-pathname
-   #:read-file
-   #:write-file
-   #:write-buffer-file
-   #:read-buffer-file
-   #:find-file-buffer
-
-   #:get-key-event
-   #:unget-key-event
-   #:clear-editor-input
-   #:listen-editor-input
-
-   #:make-hemlock-output-stream
-   #:hemlock-output-stream-p
-   #:make-hemlock-region-stream
-   #:hemlock-region-stream-p
-   #:make-kbdmac-stream
-   #:modify-kbdmac-stream
-
-   #:add-definition-dir-translation
-   #:delete-definition-dir-translation
-   #:schedule-event
-   #:remove-scheduled-event
-   #:in-lisp
-
-   #:indent-region
-   #:indent-region-for-commands
-   #:delete-horizontal-space
-   #:pre-command-parse-check
-   #:form-offset
-   #:top-level-offset
-   #:mark-top-level-form
-   #:defun-region
-   #:inside-defun-p
-   #:start-defun-p
-   #:forward-up-list
-   #:backward-up-list
-   #:valid-spot
-   #:defindent
-   #:word-offset
-   #:sentence-offset
-   #:paragraph-offset
-   #:mark-paragraph
-   #:goto-page
-   #:page-offset
-   #:page-directory
-   #:display-page-directory
-   #:fill-region
-   #:fill-region-by-paragraphs
-
-   #:save-for-undo
-   #:make-region-undo
-   #:supply-generic-pointer-up-function
-
-   ;; Macros from the CIM:
-   #:with-writable-buffer
-   #:value
-   #:setv
-   #:add-hook
-   #:remove-hook
-   #:invoke-hook
-   #:defcommand
-   #:use-buffer
-   #:command-case
-   #:define-file-option
-   #:define-file-type-hook
-   #:do-active-group
-   #:with-input-from-region
-   #:with-output-to-mark
-   #:with-pop-up-display
-   #:handle-lisp-errors
-   #:do-strings
-
-   ;; Later, possibly ill-advised additions
-   #:goto-buffer-start
-   #:goto-buffer-end
-
-   ;; device interface
-   #:device                             ;[class]
-   #:device-init
-   #:device-make-window
-   #:device-exit
-   #:device-smart-redisplay
-   #:device-dumb-redisplay
-   #:device-after-redisplay
-   #:device-clear
-   #:device-note-read-wait
-   #:device-force-output
-   #:device-finish-output
-   #:device-put-cursor
-   #:device-show-mark
-   #:device-next-window
-   #:device-previous-window
-   #:device-delete-window
-   #:device-random-typeout-full-more
-   #:device-random-typeout-line-more
-   #:device-random-typeout-setup
-   #:device-random-typeout-cleanup
-   #:device-beep
-   ;;
-   #:random-typeout-stream
-   #:with-mark
-
-   ;; variables
-   #:*current-buffer*
-   #:*current-window*
-   #:*echo-area-buffer*
-   #:*random-typeout-buffers*
-   #:*random-typeout-ml-fields*
-   #:*window-list*
-
-   ;; functions
-   #:hlet
-   #:random-typeout-stream-mark
-   #:default-font
-   #:window                             ;as a type
-
-   #:editor-input
-   #:*editor-input*
-   #:*real-editor-input*
-
-   #:list-all-connections
-   #:connection
-   #:connection-name
-   #:connection-buffer
-   #:connection-sentinel
-   #:connection-filter
-   #:connection-encoding
-   #:delete-connection
-   #:connection-listen
-   #:connection-write
-   #:tcp-connection
-   #:make-tcp-connection
-   #:process-connection
-   #:connection-command
-   #:make-process-connection
-   #:make-pipelike-connection
-   #:make-process-with-pty-connection
-   #:connection-exit-status
-   #:connection-exit-code
-   #:file-connection
-   #:connection-port
-   #:connection-host
-   #:make-file-connection
-   #:conection-filename
-   #:descriptor-connection
-   #:connection-descriptor
-   #:make-descriptor-connection
-   #:listening-connection
-   #:make-tcp-listener
-   #:make-connection-device
-
-   ;; additional public API
-   #:directoryp
-   #:reprompt
-   #:exit-hemlock
-   #:pause-hemlock
-   #:merge-relative-pathnames
-   #:*beep-function* #:beep
-   #:*last-key-event-typed* #:*key-event-history*
-   #:*global-variable-names* #:*character-attribute-names*
-   #:*mode-names* #:*buffer-names* #:*command-names* #:*buffer-list*
-   #:*default-modeline-fields*
-   #:maximum-modeline-pathname-length-hook
-   #:site-init
-   #:%init-syntax-table
-   #:%init-line-image
-   ;; rompsite.lisp — entry-point functions used from main.lisp (hemlock pkg)
-   ;; display constants (winimage.lisp) — re-exported through hemlock.display to hemlock.tty
-   #:unaltered-bits #:changed-bit #:moved-bit #:new-bit #:the-sentinel
-   #:site-wrapper-macro
-   #:init-raw-io
-   #:*illegal-read-stream*
-   #:*default-backend*
-   #:*available-backends*
-   #:*editor-has-been-entered*
-   #:validate-backend-type
-   #:choose-backend-type
-   ;; tty input helpers defined in rompsite.lisp, used by tty backend
-   #:get-terminal-name
-   #:make-tty-editor-input
-   #:process-editor-tty-input
-   #:tty-beep
-   #:translate-tty-event
-   #:register-tty-translation
-   #:tty-key-event
-   #:editor-tty-listen
-   #:*tty-translations*
-   ;; macros.lisp — used from main.lisp
-   #:*connection-backend*
-   #:with-existing-event-loop
-   #:with-new-event-loop
-   #:invoke-with-new-event-loop
-   #:invoke-with-existing-event-loop
-   #:make-event-loop
-   #:dispatch-events-with-backend
-   #:dispatch-events-no-hang-with-backend
-   #:invoke-later
-   #:later
-   #:lisp-error-error-handler
-   ;; key-dispatch.lisp — used from main.lisp
-   #:%command-loop
-   ;; window.lisp — used from main.lisp
-   #:%init-redisplay
-   ;; echo.lisp — referenced via hi:: from user-layer files
-   #:display-prompt-nicely
-   #:key-event-case
-   #:after-editor-initializations
-   #:*background-image*
-
-   ;; parse/echo variables
-   #:*echo-area-stream*
-   #:*echo-area-window*
-   #:*parse-starting-mark*
-   #:*parse-input-region*
-   #:*parse-verification-function*
-   #:*parse-string-tables*
-   #:*parse-value-must-exist*
-   #:*parse-default*
-   #:*parse-default-string*
-   #:*parse-prompt*
-   #:*parse-help*
-   #:*parse-type*
-
-   ;; editor-input internals (input.lisp) — used by tty backend
-   #:*real-editor-input*
-   #:*free-input-events*
-   #:*screen-image-trashed*
-   #:*editor-windowed-input*
-   #:%editor-input-method
-   #:q-event #:un-event #:dq-event
-   #:editor-input-head #:editor-input-tail
-   #:input-event-next #:input-event-key-event
-   #:input-event-x #:input-event-y #:input-event-hunk #:input-event-unread-p
-   #:new-event #:editor-abort-key-events #:abort-key-event-p
-   #:more-read-key-event
-   #:*in-hemlock-stream-input-method*
-
-   ;; window image internals
-   #:setup-modeline-image
-   #:canonical-case
-   #:setup-window-image
-   #:change-window-image-height
-   #:internal-redisplay
-
-   ;; display functions forward-declared
-   #:random-typeout-redisplay
-   #:update-window-image
-   #:maybe-recenter-window
-   #:wait-for-more
-
-   ;; misc
-   #:input-waiting
-   #:concat
-   #:setup-initial-buffer
-   ))
+  (:export #:dispatch-events #:dispatch-events-no-hang #:dispatch-events-timeout))
 
 
 (defpackage :hemlock-ext
@@ -1448,8 +1494,6 @@
         :trivial-gray-streams)
   (:nicknames :hi)
   (:shadow #:char-code-limit #:show-option-help)
-  (:import-from :hemlock-ext
-                #:delq #:memq #:assq)
   (:shadowing-import-from :hemlock-ext #:concat)
   ;;
   (:export
@@ -1646,7 +1690,19 @@
            #:*background-image*
            #:linedit
            #:formedit
-           #:repl)
+           #:repl
+           #:command-loop
+           ;; filesystem utilities (prepl.lisp) used by hemlock.tty
+           #:file-kind
+           #:read-link
+           #:user-info
+           #:relative-pathname-p
+           #:with-directory-iterator
+           #:get-init-file-string
+           ;; repl utilities
+           #:call-with-typeout-pop-up-in-master
+           #:with-typeout-pop-up-in-master
+           #:call-with-standard-synonym-streams)
   (:shadowing-import-from #:hemlock-ext
                           #:char-code-limit)
   ;;  #+cmu
@@ -1720,7 +1776,8 @@
 
 
 (defpackage :hemlock.x11
-  (:use :common-lisp :hemlock-interface)
+  (:use :common-lisp :hemlock.text :hemlock.command :hemlock :trivial-gray-streams)
+  (:shadowing-import-from :hemlock.text #:char-code-limit)
 
   (:import-from :hemlock-ext
    #:serve-button-press
@@ -1738,12 +1795,10 @@
    #:serve-map-notify
    #:serve-no-exposure
    #:serve-reparent-notify
-   #:serve-unmap-notify)
-
-  (:use :trivial-gray-streams))
+   #:serve-unmap-notify))
 
 (defpackage :hemlock-user
-    (:use :common-lisp :hemlock-interface))
+    (:use :common-lisp :hemlock))
 
 (defpackage :hemlock.terminfo
   (:use :common-lisp)

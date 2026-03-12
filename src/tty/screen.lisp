@@ -98,7 +98,7 @@ This distinguishes a bare Escape keypress from an Alt+key escape sequence."
            :buffer nil
            :filter (lambda (connection bytes)
                      (tty-key-event
-                      (esc-disambiguate fd (hi::default-filter connection bytes)))
+                      (esc-disambiguate fd (default-filter connection bytes)))
                      nil))))
   (let* ((width (tty-device-columns device))
          (height (tty-device-lines device))
@@ -168,8 +168,8 @@ This distinguishes a bare Escape keypress from an Alt+key escape sequence."
     ;; Get size and speed.
     (multiple-value-bind  (lines cols speed)
                           (get-terminal-attributes)
-      (setf (tty-device-lines device) (or lines (termcap :lines)))
-      (let ((cols (or cols (termcap :columns))))
+      (setf (tty-device-lines device) (or lines (termcap :lines) 24))
+      (let ((cols (max 1 (or cols (termcap :columns) 80))))
         (setf (tty-device-columns device)
               (if hemlock.terminfo:auto-right-margin (1- cols) cols)))
       (setf (tty-device-speed device) speed))
@@ -359,6 +359,7 @@ This distinguishes a bare Escape keypress from an Alt+key escape sequence."
 
 (defmethod enlarge-device
     ((device tty-device) offset)
+  (setf *currently-selected-hunk* nil)
   (set-up-screen-image device)
   (let ((first (device-hunks device)))
     (incf (device-hunk-position first) offset)
@@ -387,7 +388,7 @@ This distinguishes a bare Escape keypress from an Alt+key escape sequence."
     (setf (device-hunk-next prev) next)
     (setf (device-hunk-previous next) prev)
     (let ((buffer (window-buffer window)))
-      (setf (buffer-windows buffer) (delq window (buffer-windows buffer))))
+      (setf (buffer-windows buffer) (delete window (buffer-windows buffer) :test #'eq)))
     (let ((new-lines (device-hunk-height hunk)))
       (declare (fixnum new-lines))
       (cond ((eq hunk (device-hunks (device-hunk-device next)))
@@ -508,16 +509,7 @@ This distinguishes a bare Escape keypress from an Alt+key escape sequence."
            t)
         (t nil)))
 
-(defclass tty-hunk (device-hunk)
-  ((text-position :initarg :text-position
-                  :accessor tty-hunk-text-position)
-   (text-height :initarg :text-height
-                :accessor tty-hunk-text-height)))
-
-(defun make-tty-hunk (&rest args
-                      &key position height text-position text-height device)
-  (declare (ignore position height text-position text-height device))
-  (apply #'make-instance 'tty-hunk args))
+;;; tty-hunk and make-tty-hunk are defined in tty/device.lisp
 
 
 (defmethod %init-screen-manager ((backend-type (eql :tty)) (display t))

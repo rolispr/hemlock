@@ -167,21 +167,6 @@
                         (setf line (line-next line))))
              (nreverse result)))))
 
-(defmethod device-init ((device tty-device))
-  (setup-input)
-  ;; similar to ordinary tty initialization, but without init-cm-string:
-  (let* ((init-string (termcap :init-string))
-         (init-file (termcap :init-file))
-         (init-file-string (if init-file (get-init-file-string init-file))))
-    (tty-write-cmd
-     (hemlock.terminfo:tputs
-      (concatenate 'simple-string
-		   (or init-string "")
-		   (or init-file-string "")
-		   ;; Transmit-mode: this makes arrow-keys give sequences matching
-		   ;; the terminfo db.
-		   hemlock.terminfo:keypad-xmit))))
-  (redisplay-all))
 
 (defmethod device-exit ((device linedit-device))
   (ensure-not-in-cm-mode device)

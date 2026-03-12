@@ -12,7 +12,7 @@
 (declaim (special *echo-area-buffer* ; defined in echo.lisp --amb
                   *things-to-do-once*)) ; defined in display.lisp --amb
 
-(defparameter hunk-width-limit 200 "Maximum possible width for any hunk.")
+(defparameter hunk-width-limit 1024 "Maximum possible width for any hunk.")
 
 
 ;;;; CURRENT-WINDOW.
@@ -398,11 +398,11 @@
 (defun maximum-modeline-pathname-length-hook (name kind where new-value)
   (declare (ignore name new-value))
   (if (eq kind :buffer)
-      (hi::queue-buffer-change where)
+      (queue-buffer-change where)
       (dolist (buffer *buffer-list*)
         (when (and (buffer-modeline-field-p buffer :buffer-pathname)
                    (buffer-windows buffer))
-          (hi::queue-buffer-change buffer)))))
+          (queue-buffer-change buffer)))))
 
 (defun buffer-pathname-ml-field-fun (buffer window)
   "Returns the namestring of buffer's pathname if there is one.  When

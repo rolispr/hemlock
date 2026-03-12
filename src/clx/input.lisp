@@ -1,6 +1,6 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 
-(in-package :hemlock-internals)
+(in-package :hemlock.x11)
 
 (pushnew :clx *available-backends*)
 

@@ -2,6 +2,11 @@
 
 (in-package :hemlock)
 
+(defun symbol-external-p (symbol package)
+  (multiple-value-bind (sym status)
+      (find-symbol (symbol-name symbol) package)
+    (and sym (eq status :external))))
+
 (defvar *buffer-package*
   nil
   "Special variable, bound by certain wire requests, telling the slave

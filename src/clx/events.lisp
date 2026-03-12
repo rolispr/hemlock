@@ -1,6 +1,6 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 
-(in-package :hemlock-ext)
+(in-package :hemlock.x11)
 
 ;; these came from RE-INITIALIZE-KEY-EVENTS:
 (define-clx-modifier (xlib:make-state-mask :shift) "Shift")
@@ -260,9 +260,9 @@
   (let ((change-handler (assoc display *display-event-handlers*)))
     (if change-handler
         (setf (cdr change-handler) handler)
-        (let ((fd (hi::stream-fd (xlib::display-input-stream display))))
+        (let ((fd (stream-fd (xlib::display-input-stream display))))
           (iolib:set-io-handler
-           hi::*event-base* fd :read #'call-display-event-handler)
+           *event-base* fd :read #'call-display-event-handler)
           (setf (gethash fd *clx-fds-to-displays*) display)
           (push (cons display handler) *display-event-handlers*)))))
 
@@ -277,14 +277,14 @@
 ;;;
 (defun call-display-event-handler (file-descriptor event error)
   (if (eq error :error)
-      (iolib:remove-fd-handlers hi::*event-base* file-descriptor :read t)
+      (iolib:remove-fd-handlers *event-base* file-descriptor :read t)
       (let ((display (gethash file-descriptor *clx-fds-to-displays*)))
         (unless display
-          (iolib.multiplex:remove-fd-handlers hi::*event-base* file-descriptor)
+          (iolib.multiplex:remove-fd-handlers *event-base* file-descriptor)
           (setf *display-event-handlers*
                 (delete file-descriptor *display-event-handlers*
                         :key #'(lambda (d/h)
-                                 (hi::stream-fd
+                                 (stream-fd
                                   (xlib::display-input-stream
                                    (car d/h))))))
           (error "File descriptor ~S not associated with any CLX display.~%~
@@ -304,9 +304,9 @@
   "Undoes the effect of EXT:ENABLE-CLX-EVENT-HANDLING."
   (setf *display-event-handlers*
         (delete display *display-event-handlers* :key #'car))
-  (let ((fd (hi::stream-fd (xlib::display-input-stream display))))
+  (let ((fd (stream-fd (xlib::display-input-stream display))))
     (remhash fd *clx-fds-to-displays*)
-    (iolib:remove-fd-handlers hi::*event-base* fd :read t)))
+    (iolib:remove-fd-handlers *event-base* fd :read t)))
 
 ;;; (defun serve-event (&optional timeout)
 ;;;   (let ((dps))
@@ -316,3 +316,12 @@
 ;;;              *xwindow-hash*)
 ;;;     (when dps
 ;;;       (object-set-event-handler (car dps) timeout))))
+
+;;; Bind the hemlock-ext: symbols so that backward-compat references from
+;;; rompsite.lisp and hemlock-ext.lisp (which use hemlock-ext: qualified names)
+;;; resolve to our implementations.
+(setf (fdefinition 'hemlock-ext:object-set-event-handler)    #'object-set-event-handler)
+(setf (fdefinition 'hemlock-ext::call-with-clx-event-handling) #'call-with-clx-event-handling)
+(setf (fdefinition 'hemlock-ext:flush-display-events)         #'flush-display-events)
+(setf (fdefinition 'hemlock-ext:disable-clx-event-handling)   #'disable-clx-event-handling)
+(setf (fdefinition 'hemlock-ext:translate-key-event)          #'translate-key-event)

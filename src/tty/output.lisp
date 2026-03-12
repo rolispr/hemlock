@@ -144,27 +144,33 @@
 ;;; where I need it.  Currently, there really can only be one TTY anyway, since
 ;;; the buffer is in a global.
 ;;;
-(defun get-terminal-attributes (&optional (fd 1))
-  (let ((baud-rate #+(or CMU scl)
-                   (alien:with-alien ((termios (alien:struct unix:termios)))
-                     (declare (optimize (ext:inhibit-warnings 3)))
-                     (when (unix:unix-tcgetattr fd termios)
-                       (let ((baud (logand unix:tty-cbaud
-                                           (alien:slot termios 'unix:c-cflag))))
-                         (if (< baud unix::tty-cbaudex)
-                             (aref #(0 50 75 110 134 150 200 300 600 1200
-                                     1800 2400 4800 9600 19200 38400)
-                                   baud)
-                             (aref #(57600 115200 230400 460800 500000 576000
-                                     921600 1000000 1152000 1500000 2000000
-                                     2500000 3000000 3500000 4000000)
-                                   (logxor baud unix::tty-cbaudex))))))
-                   #-(or CMU scl) 4800))
+(defun get-terminal-attributes (&optional fd)
+  "Return (values lines cols baud-rate).
+Query the controlling terminal via /dev/tty if no FD is given.
+Falls back to stty(1) if the ioctl fails."
+  (let ((baud-rate 4800))
     (setf *terminal-baud-rate* baud-rate)
-    (cffi:with-foreign-object (ws '(:struct winsize))
-      (ioctl-syscall fd tiocgwinsz :pointer ws)
-      (cffi:with-foreign-slots ((row col) ws (:struct winsize))
-        (values row col baud-rate)))))
+    (handler-case
+        (let ((tty-fd (or fd (sb-posix:open "/dev/tty" sb-posix:o-rdwr))))
+          (unwind-protect
+               (cffi:with-foreign-object (ws '(:struct winsize))
+                 (ioctl-syscall tty-fd tiocgwinsz :pointer ws)
+                 (cffi:with-foreign-slots ((row col) ws (:struct winsize))
+                   (values row col baud-rate)))
+            (unless fd
+              (sb-posix:close tty-fd))))
+      (error ()
+        (handler-case
+            (let ((out (uiop:run-program '("stty" "size")
+                                        :output :string
+                                        :error-output nil
+                                        :input "/dev/tty")))
+              (let ((parts (uiop:split-string out)))
+                (when (= 2 (length parts))
+                  (values (parse-integer (first parts))
+                          (parse-integer (second parts))
+                          baud-rate))))
+          (error () (values nil nil baud-rate)))))))
 
 
 ;;;; Output routines and buffering.

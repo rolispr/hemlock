@@ -18,7 +18,7 @@
 ;; --GB 2003-05-22
 
 (defparameter hunk-height-limit 80 "Maximum possible height for any hunk.")
-(defparameter hunk-width-limit 200 "Maximum possible width for any hunk.")
+(defparameter hunk-width-limit 1024 "Maximum possible width for any hunk.")
 (defparameter hunk-top-border 2 "Clear area at beginning.")
 (defparameter hunk-left-border 10 "Clear area before first character.")
 (defparameter hunk-bottom-border 3 "Minimum Clear area at end.")

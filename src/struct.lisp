@@ -7,6 +7,18 @@
 
 (in-package :hemlock.text)
 
+;;;; Basic list utilities needed throughout all layers.
+
+(defun delq (item list) (delete item list))
+(defun memq (item list) (member item list))
+(defun assq (item alist) (assoc item alist))
+
+;;;; String copy primitive (portable replacement for CMUCL's %sp-byte-blt).
+
+(defun %sp-byte-blt (src src-start dst dst-start dst-end)
+  "Copy DST-END - DST-START characters from SRC starting at SRC-START into DST starting at DST-START."
+  (replace dst src :start1 dst-start :end1 dst-end :start2 src-start))
+
 ;;;; Marks.
 
 (defclass mark ()
@@ -468,6 +480,9 @@
 
 (defgeneric device-beep (device stream)
   (:documentation "beep or flash the screen."))
+
+(defgeneric device-enlarge-window (device window offset)
+  (:documentation "Resize window by offset lines (may be negative)."))
 
 (defmethod device-beep ((device t) stream)
   (declare (ignore stream)))

@@ -222,15 +222,13 @@
      (unless (internal-redisplay)
        (internal-redisplay)
        (device-note-read-wait device t)
-       (let ((wait (and (not
-                         ;; Let's be extra careful here and prepare
-                         ;; for the case where key events have been
-                         ;; seen in the mean time, in which case we
-                         ;; must not wait here:
-                         (listen-editor-input editor-input))
-                        (next-scheduled-event-wait))))
-         (when wait
-           (dispatch-events)))))
+       (unless (listen-editor-input editor-input)
+         ;; Block until an fd event arrives (tty byte, webui pipe, etc.)
+         ;; or the nearest scheduled event fires.
+         (let ((wait (next-scheduled-event-wait)))
+           (if wait
+               (dispatch-events-timeout wait)
+               (dispatch-events))))))
     (device-note-read-wait device nil)
     (when (and (abort-key-event-p key-event)
                ;; ignore-abort-attempts-p must exist outside the macro.
@@ -341,7 +339,7 @@
   (let ((key-event (loop
                      (let ((key-event (dq-event *editor-input*)))
                        (when key-event (return key-event))
-                       (hemlock-ext:serve-event)))))
+                       (dispatch-events)))))
     (when (abort-key-event-p key-event)
       (beep)
       (throw 'editor-top-level-catcher nil))

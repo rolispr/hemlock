@@ -48,6 +48,11 @@ GB
   ;;
   ;; Define some of the system variables.
   (define-some-variables)
+  ;; Wire up the cross-layer bridge: hemlock.text cannot use invoke-hook
+  ;; directly (wrong package layer), so it calls *buffer-modified-notifier*.
+  (setf hemlock.text:*buffer-modified-notifier*
+        (lambda (buffer sense)
+          (invoke-hook buffer-modified-hook buffer sense)))
   ;;
   ;; Site initializations such as window system variables.
   (site-init)
@@ -250,7 +255,6 @@ GB
 
 ;;;; ED.
 
-;;; *editor-has-been-entered* is defined in rompsite.lisp (hemlock.command).
 (defvar *in-the-editor* ()
   "True if we are inside the editor.  This is used to prevent ill-advised
    \"recursive\" edits.")

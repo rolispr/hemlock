@@ -15,6 +15,9 @@
 (defun dispatch-events-no-hang ()
   (dispatch-events-no-hang-with-backend *connection-backend*))
 
+(defun dispatch-events-timeout (seconds)
+  (dispatch-events-with-timeout-backend *connection-backend* seconds))
+
 
 ;;;;
 ;;;; CONNECTION
@@ -202,14 +205,6 @@
               :initarg :directory
               :accessor connection-directory)))
 
-(defmethod class-for
-    ((backend (eql :sb-sys)) (type (eql 'process-connection-mixin)))
-  'process-connection/sb-sys)
-
-(defmethod class-for
-    ((backend (eql :qt)) (type (eql 'process-connection-mixin)))
-  'process-connection/qt)
-
 (defun make-process-connection
        (command
         &rest args
@@ -238,14 +233,6 @@
             (connection-name instance)
             (connection-host instance)
             (connection-port instance))))
-
-(defmethod class-for
-    ((backend (eql :sb-sys)) (type (eql 'tcp-connection-mixin)))
-  'tcp-connection/sb-sys)
-
-(defmethod class-for
-    ((backend (eql :qt)) (type (eql 'tcp-connection-mixin)))
-  'tcp-connection/qt)
 
 (defun make-tcp-connection
     (name host port &rest args &key buffer stream filter sentinel)
@@ -380,21 +367,9 @@
     ((connection process-with-pty-connection-mixin))
   (delete-connection (connection-process-connection connection)))
 
-(defmethod class-for
-    ((backend (eql :sb-sys)) (type (eql 'process-with-pty-connection-mixin)))
-  'process-with-pty-connection/sb-sys)
-
-(defmethod class-for
-    ((backend (eql :qt)) (type (eql 'process-with-pty-connection-mixin)))
-  'process-with-pty-connection/qt)
-
-(defmethod class-for
-    ((backend (eql :sb-sys)) (type (eql 'pipelike-connection-mixin)))
-  'pipelike-connection/sb-sys)
-
-(defmethod class-for
-    ((backend (eql :qt)) (type (eql 'pipelike-connection-mixin)))
-  'pipelike-connection/qt)
+;;; Backend-specific class-for methods are defined in the backend files
+;;; (e.g. tty/ioconnections.lisp) so that the symbols are interned in the
+;;; correct package where the classes are actually defined.
 
 (defun make-pipelike-connection
     (read-fd
@@ -493,14 +468,6 @@
          :host host
          :port port
          args))
-
-(defmethod class-for
-    ((backend (eql :sb-sys)) (type (eql 'tcp-listener-mixin)))
-  'tcp-listener/sb-sys)
-
-(defmethod class-for
-    ((backend (eql :qt)) (type (eql 'tcp-listener-mixin)))
-  'tcp-listener/qt)
 
 
 ;;; wire interaction

@@ -136,6 +136,10 @@
 ;;;
 (defvar now-tick 0 "Current tick.")
 
+;;; Cross-layer bridge: hemlock.command wires this up to invoke-hook.
+(defvar *buffer-modified-notifier* nil
+  "If non-nil, a function (buffer sense) called when a buffer's modified state changes.")
+
 (defmacro tick ()
   "Increments the ``now'' tick."
   `(incf now-tick))
@@ -154,7 +158,8 @@
         (editor-error "Buffer ~S is read only." (buffer-name buffer)))
       (when (< (buffer-modified-tick buffer)
                (buffer-unmodified-tick buffer))
-        (invoke-hook hemlock::buffer-modified-hook buffer t))
+        (when *buffer-modified-notifier*
+          (funcall *buffer-modified-notifier* buffer t)))
       (setf (buffer-modified-tick buffer) (tick)))
     ;; FIXME: what is hemlock-ext:without-interrupts for?
     (hemlock-ext:without-interrupts (funcall fun))))

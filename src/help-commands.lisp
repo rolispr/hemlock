@@ -185,25 +185,25 @@
         (progn
           #+echo-area-is-separate-window
           (setf (current-window) hi::*echo-area-window*)
-          (hi::display-prompt-nicely "Describe key: " nil)
-          (setf (fill-pointer hi::*prompt-key*) 0)
+          (display-prompt-nicely "Describe key: " nil)
+          (setf (fill-pointer *prompt-key*) 0)
           (loop
-            (let ((key-event (get-key-event hi::*editor-input*)))
-              (vector-push-extend key-event hi::*prompt-key*)
-              (let ((res (get-command hi::*prompt-key* :current)))
+            (let ((key-event (get-key-event *editor-input*)))
+              (vector-push-extend key-event *prompt-key*)
+              (let ((res (get-command *prompt-key* :current)))
                 (hemlock-ext:print-pretty-key-event key-event *echo-area-stream*)
                 (write-char #\space *echo-area-stream*)
                 (finish-output *echo-area-stream*)
                 (cond ((commandp res)
                        (with-pop-up-display (s)
-                         (hemlock-ext:print-pretty-key (copy-seq hi::*prompt-key*) s)
+                         (hemlock-ext:print-pretty-key (copy-seq *prompt-key*) s)
                          (format s " is bound to ~S.~%" (command-name res))
                          (format s "Documentation for this command:~%   ~A"
                                  (command-documentation res)))
                        (return))
                       ((not (eq res :prefix))
                        (with-pop-up-display (s :height 1)
-                         (hemlock-ext:print-pretty-key (copy-seq hi::*prompt-key*) s)
+                         (hemlock-ext:print-pretty-key (copy-seq *prompt-key*) s)
                          (write-string " is not bound to anything." s))
                        (return)))))))
       #+echo-area-is-separate-window
