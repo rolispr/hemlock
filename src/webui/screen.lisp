@@ -326,11 +326,27 @@ window.addEventListener('resize', _measureGrid);
                 (device-hunk-previous (device-hunk-next victim))
                 new-hunk)
         (shiftf (device-hunk-next new-hunk) (device-hunk-next victim) new-hunk)
+        ;; Create DOM elements for the new window.  Insert right after
+        ;; the old window's modeline div so visual order matches hemlock.
+        (let ((win (webui-device-window-id device))
+              (old-dom-id (webui-hunk-dom-id victim)))
+          (when win
+            (sb-int:with-float-traps-masked (:invalid :overflow :inexact
+                                             :divide-by-zero :underflow)
+              (webui:webui-run win
+                (format nil "(function(){var c=document.getElementById('editor-container');var anchor=document.getElementById('~A-ml');var ref=anchor?anchor.nextSibling:document.getElementById('echo');var w=document.createElement('div');w.id='~A';w.className='hem-window';c.insertBefore(w,ref);~A})();"
+                        (json-escape old-dom-id)
+                        (json-escape dom-id)
+                        (if modelinep
+                            (format nil "var m=document.createElement('div');m.id='~A-ml';m.className='hem-ml';c.insertBefore(m,ref);"
+                                    (json-escape dom-id))
+                            ""))))))
         (setf *screen-image-trashed* t)
         new-window))))
 
 (defmethod device-delete-window ((device webui-device) window)
   (let* ((hunk (window-hunk window))
+         (dom-id (webui-hunk-dom-id hunk))
          (prev (device-hunk-previous hunk))
          (next (device-hunk-next hunk)))
     (setf (device-hunk-next prev) next)
@@ -352,7 +368,15 @@ window.addEventListener('resize', _measureGrid);
              (change-window-image-height (device-hunk-window prev)
                                          (+ new-lines (window-height (device-hunk-window prev)))))))
     (when (eq hunk (device-hunks device))
-      (setf (device-hunks device) next)))
+      (setf (device-hunks device) next))
+    ;; Remove DOM elements for the deleted window.
+    (let ((win (webui-device-window-id device)))
+      (when win
+        (sb-int:with-float-traps-masked (:invalid :overflow :inexact
+                                         :divide-by-zero :underflow)
+          (webui:webui-run win
+            (format nil "(function(){var w=document.getElementById('~A');if(w)w.remove();var m=document.getElementById('~A-ml');if(m)m.remove();})();"
+                    (json-escape dom-id) (json-escape dom-id)))))))
   (setf *screen-image-trashed* t))
 
 (defmethod device-next-window ((device webui-device) window)
