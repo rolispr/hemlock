@@ -762,6 +762,7 @@
    #:make-process-connection
    #:make-pipelike-connection
    #:make-process-with-pty-connection
+   #:find-a-pty
    #:connection-exit-status
    #:connection-exit-code
    #:file-connection
@@ -1409,6 +1410,7 @@
    #:make-process-connection
    #:make-pipelike-connection
    #:make-process-with-pty-connection
+   #:find-a-pty
    #:connection-exit-status
    #:connection-exit-code
    #:file-connection

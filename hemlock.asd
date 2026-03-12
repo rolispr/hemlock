@@ -3,4 +3,4 @@
 (asdf:defsystem :hemlock
   :description "Hemlock text editor"
   :licence "Public Domain"
-  :depends-on (:hemlock.tty))
+  :depends-on (:hemlock.tty :hemlock.term))

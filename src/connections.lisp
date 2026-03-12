@@ -255,13 +255,18 @@
              :accessor connection-slave-fd)
    (directory :initform nil
               :initarg :directory
-              :accessor connection-directory)))
+              :accessor connection-directory)
+   (environment :initform nil
+                :initarg :environment
+                :accessor connection-environment)))
 
 (defun make-process-connection
        (command
         &rest args
-        &key name buffer stream filter sentinel slave-pty-name slave-fd directory)
-  (declare (ignore buffer stream filter sentinel slave-pty-name slave-fd directory))
+        &key name buffer stream filter sentinel slave-pty-name slave-fd directory
+             environment)
+  (declare (ignore buffer stream filter sentinel slave-pty-name slave-fd directory
+                   environment))
   (apply #'make-instance
          (class-for *connection-backend* 'process-connection-mixin)
          :name (or name (princ-to-string command))

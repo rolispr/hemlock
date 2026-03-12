@@ -401,6 +401,35 @@ window.addEventListener('resize', _measureGrid);
         (t nil)))
 
 
+;;;; webui-resize-window-width — reallocate dis-line arrays for new column count
+
+(defun webui-resize-window-width (window new-width)
+  "Adjust WINDOW's dis-line arrays and width for a new column count.
+Nuke all active lines back to spare, reallocate if wider, and rebuild modeline."
+  (let ((old-width (window-width window)))
+    ;; Move all active dis-lines back to the spare list.
+    (unless (eq (cdr (window-first-line window)) the-sentinel)
+      (shiftf (cdr (window-last-line window))
+              (window-spare-lines window)
+              (cdr (window-first-line window))
+              the-sentinel))
+    ;; Reallocate dis-line char arrays when the window got wider.
+    (when (> new-width old-width)
+      (dolist (dl (window-spare-lines window))
+        (setf (dis-line-chars dl) (make-string new-width))))
+    (setf (window-width window) new-width)
+    ;; Rebuild modeline dis-line if present.
+    (when (window-modeline-buffer window)
+      (let* ((dl (window-modeline-dis-line window))
+             (chars (make-string new-width))
+             (len (min new-width (window-modeline-buffer-len window))))
+        (setf (dis-line-old-chars dl) nil
+              (dis-line-chars dl) chars)
+        (replace chars (window-modeline-buffer window) :end1 len :end2 len)
+        (setf (dis-line-length dl) len
+              (dis-line-flags dl) changed-bit)))))
+
+
 ;;;; webui-apply-resize — called on the main thread by webui-drain-events
 
 ;;; Apply a window resize that was signalled by the browser.  The new
@@ -408,41 +437,103 @@ window.addEventListener('resize', _measureGrid);
 ;;; This runs on the main editor thread (fd-handler context), so it is safe
 ;;; to touch hemlock display structures.
 ;;;
-;;; Strategy: adjust hunk geometry and resize each window's image with
-;;; change-window-image-height (which does not re-register the window in
-;;; *window-list* or buffer-windows, unlike setup-window-image).  Then
-;;; set *screen-image-trashed* so the next redisplay pass does a full repaint.
+;;; Mirrors resize-tty-layout: redistributes height proportionally among
+;;; all hunks, reallocates dis-line arrays on width change, and removes
+;;; extra split windows if the terminal shrinks too much.
 (defun webui-apply-resize (device)
-  (let* ((new-rows    (webui-device-lines   device))
+  (let* ((new-lines   (webui-device-lines   device))
          (new-cols    (webui-device-columns device))
-         (echo-height (value hemlock::echo-area-height))
-         ;; New main text rows: total rows - echo area - 1 modeline row.
-         (new-main-text (max 1 (- new-rows echo-height 1))))
-    ;; Update window widths if columns changed.
-    (dolist (w *window-list*)
-      (unless (= (window-width w) new-cols)
-        (setf (window-width w) new-cols)))
-    ;; Update the echo area hunk — stays at the bottom with fixed height.
-    (let ((echo-hunk (window-hunk *echo-area-window*)))
-      (setf (device-hunk-position      echo-hunk) (1- new-rows)
-            (device-hunk-height        echo-hunk) echo-height
-            (webui-hunk-text-position  echo-hunk) (- new-rows 2)
-            (webui-hunk-text-height    echo-hunk) echo-height)
-      ;; Echo area text height rarely changes; update image height in case.
-      (change-window-image-height *echo-area-window* echo-height))
-    ;; Update the main window hunk (only the first/primary hunk for now;
-    ;; for multi-window configurations we just trash and let redisplay fix it).
-    (let ((first-hunk (device-hunks device)))
-      (when first-hunk
-        (let ((main-win   (device-hunk-window first-hunk))
-              ;; Total hunk height includes 1 modeline row.
-              (new-height (+ new-main-text 1)))
-          (setf (device-hunk-position      first-hunk) new-main-text
-                (device-hunk-height        first-hunk) new-height
-                (webui-hunk-text-position  first-hunk) (1- new-main-text)
-                (webui-hunk-text-height    first-hunk) new-main-text)
-          (setf (device-bottom-window-base device) (1- new-main-text))
-          (change-window-image-height main-win new-main-text))))
+         (width-changed (/= new-cols (window-width
+                                      (device-hunk-window
+                                       (device-hunks device)))))
+         (echo-hunk (window-hunk *echo-area-window*))
+         (echo-text-height (webui-hunk-text-height echo-hunk))
+         ;; Available lines for non-echo hunks: total minus echo minus
+         ;; echo modeline.
+         (available (- new-lines echo-text-height 1)))
+    ;; If terminal is too small for even one window + echo, bail out.
+    (when (< available 2)
+      (return-from webui-apply-resize))
+    ;; Handle width changes for all windows (including echo).
+    (when width-changed
+      (dolist (w *window-list*)
+        (webui-resize-window-width w new-cols))
+      (webui-resize-window-width *echo-area-window* new-cols))
+    ;; Collect non-echo hunks in display order.
+    (let* ((first (device-hunks device))
+           (hunks (list first))
+           (old-total 0))
+      (do ((h (device-hunk-next first) (device-hunk-next h)))
+          ((eq h first))
+        (push h hunks))
+      (setf hunks (nreverse hunks))
+      (dolist (h hunks) (incf old-total (device-hunk-height h)))
+      ;; Delete extra windows if terminal shrinks too much.
+      ;; Each window needs at least 2 lines (1 text + 1 modeline).
+      (loop while (and (> (length hunks) 1)
+                       (< available (* 2 (length hunks))))
+            do (let* ((victim-hunk (car (last hunks)))
+                      (victim-window (device-hunk-window victim-hunk))
+                      (prev (device-hunk-previous victim-hunk))
+                      (next (device-hunk-next victim-hunk)))
+                 ;; Unlink from the hunk ring.
+                 (setf (device-hunk-next prev) next
+                       (device-hunk-previous next) prev)
+                 ;; Remove from window/buffer lists.
+                 (setf *window-list* (delete victim-window *window-list*))
+                 (let ((buf (window-buffer victim-window)))
+                   (when buf
+                     (setf (buffer-windows buf)
+                           (delete victim-window (buffer-windows buf)))))
+                 (when (eq victim-hunk (device-hunks device))
+                   (setf (device-hunks device) next))
+                 ;; If we just killed the current window, switch to first.
+                 (when (eq victim-window *current-window*)
+                   (setf *current-window*
+                         (device-hunk-window (car hunks))))
+                 (decf old-total (device-hunk-height victim-hunk))
+                 (setf hunks (butlast hunks))))
+      ;; Ensure old-total is positive for proportion calculation.
+      (when (zerop old-total) (setf old-total 1))
+      ;; Redistribute heights proportionally, building top-down.
+      (let ((remaining available)
+            (row 0))
+        (loop for (hunk . rest) on hunks
+              for has-modeline = (not (null (window-modeline-buffer
+                                            (device-hunk-window hunk))))
+              for min-h = (if has-modeline 2 1)
+              for new-h = (if rest
+                              (max min-h
+                                   (round (* available
+                                            (/ (device-hunk-height hunk)
+                                               old-total))))
+                              ;; Last hunk gets the remainder.
+                              (max min-h remaining))
+              for new-text-h = (if has-modeline (1- new-h) new-h)
+              do (setf (device-hunk-height hunk) new-h
+                       (webui-hunk-text-height hunk) new-text-h
+                       (webui-hunk-text-position hunk) (+ row new-text-h -1)
+                       (device-hunk-position hunk)
+                       (if has-modeline (+ row new-h -1)
+                           (+ row new-text-h -1)))
+                 (change-window-image-height (device-hunk-window hunk)
+                                             new-text-h)
+                 (decf remaining new-h)
+                 (incf row new-h))
+        ;; Update device-bottom-window-base.
+        (let ((last-hunk (car (last hunks))))
+          (setf (device-bottom-window-base device)
+                (webui-hunk-text-position last-hunk)))
+        ;; Echo area: fixed at the bottom.
+        (setf (device-hunk-position echo-hunk) (1- new-lines)
+              (device-hunk-height echo-hunk) echo-text-height
+              (webui-hunk-text-position echo-hunk) (- new-lines 2)
+              (webui-hunk-text-height echo-hunk) echo-text-height)
+        (change-window-image-height *echo-area-window* echo-text-height))
+      ;; Recompute modeline fields for all windows so they fill the new width.
+      (dolist (w *window-list*)
+        (when (window-modeline-buffer w)
+          (update-modeline-fields (window-buffer w) w))))
     (setf hemlock.command::*screen-image-trashed* t)))
 
 

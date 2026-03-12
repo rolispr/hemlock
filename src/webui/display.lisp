@@ -175,7 +175,7 @@
    these must be removed before embedding in JS (C strings truncate at null)."
   (let* ((buf (window-modeline-buffer     window))
          (len (window-modeline-buffer-len window))
-         (raw (if (and buf len (> len 0))
+         (raw (if (and (stringp buf) len (> len 0))
                   (subseq buf 0 (min len (length buf)))
                   (let ((dl (window-modeline-dis-line window)))
                     (if dl
@@ -189,20 +189,13 @@
 ;;;; Redisplay methods
 
 (defmethod device-dumb-redisplay ((device webui-device) window)
-  (let* ((hunk    (window-hunk window))
-         (dom-id  (webui-hunk-dom-id hunk))
-         (cw      (current-window))
-         (ch      (when (eq window cw) (window-hunk cw)))
-         (lines   (collect-window-lines window ch
-                                        (webui-device-cursor-x device)
-                                        (webui-device-cursor-y device)))
-         (ml      (modeline-text window)))
-    (when (window-modeline-dis-line window)
-      (setf (dis-line-flags (window-modeline-dis-line window)) unaltered-bits))
-    (push (list dom-id lines ml)
-          (webui-device-dirty-windows device))
-    (setf (window-first-changed window) the-sentinel
-          (window-last-changed  window) (window-first-line window))))
+  ;; Record the window for later rendering in device-force-output,
+  ;; where the cursor position has been finalized by device-put-cursor.
+  (when (window-modeline-dis-line window)
+    (setf (dis-line-flags (window-modeline-dis-line window)) unaltered-bits))
+  (pushnew window (webui-device-dirty-windows device) :test #'eq)
+  (setf (window-first-changed window) the-sentinel
+        (window-last-changed  window) (window-first-line window)))
 
 (defmethod device-smart-redisplay ((device webui-device) window)
   (device-dumb-redisplay device window))
@@ -217,14 +210,26 @@
     (when win
       (sb-int:with-float-traps-masked (:invalid :overflow :inexact :divide-by-zero
                                        :underflow)
-        (dolist (entry (nreverse (webui-device-dirty-windows device)))
-          (destructuring-bind (dom-id lines ml) entry
-            (let ((js (format nil "updateWindow(\"~A\",~A,\"~A\");"
-                              (json-escape dom-id)
-                              (lines-to-json lines)
-                              (json-escape ml))))
-              (webui:webui-run win js)))))
-      (setf (webui-device-dirty-windows device) nil))))
+        (let* ((cw  (current-window))
+               (ch  (when cw (window-hunk cw)))
+               (cx  (webui-device-cursor-x device))
+               (cy  (webui-device-cursor-y device))
+               (windows (shiftf (webui-device-dirty-windows device) nil)))
+          (dolist (window (nreverse windows))
+            (handler-case
+                (let* ((hunk   (window-hunk window))
+                       (dom-id (webui-hunk-dom-id hunk))
+                       (cursor-hunk (when (eq window cw) ch))
+                       (lines  (collect-window-lines window cursor-hunk cx cy))
+                       (ml     (modeline-text window)))
+                  (let ((js (format nil "updateWindow(\"~A\",~A,\"~A\");"
+                                    (json-escape dom-id)
+                                    (lines-to-json lines)
+                                    (json-escape ml))))
+                    (webui:webui-run win js)))
+              (error (c)
+                (declare (ignore c))
+                nil))))))))
 
 (defmethod device-finish-output ((device webui-device) window)
   (declare (ignore window))

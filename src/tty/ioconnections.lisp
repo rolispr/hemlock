@@ -185,19 +185,20 @@
           (let* ((slave-stream (sb-sys:make-fd-stream slave-fd :input t :output t
                                                       :external-format :utf-8
                                                       :name "PTY slave"))
-                 (env (remove-if (lambda (s)
-                                   (or (uiop:string-prefix-p "TERM=" s)
-                                       (uiop:string-prefix-p "COLORTERM=" s)))
-                                 (sb-ext:posix-environ)))
+                 (custom-env (hemlock.command::connection-environment instance))
+                 (env (or custom-env
+                          (list* "TERM=dumb"
+                                 (remove-if (lambda (s)
+                                              (or (uiop:string-prefix-p "TERM=" s)
+                                                  (uiop:string-prefix-p "COLORTERM=" s)))
+                                            (sb-ext:posix-environ)))))
                  (proc (sb-ext:run-program prog args
                                            :input  slave-stream
                                            :output slave-stream
                                            :error  slave-stream
                                            :wait   nil
                                            :pty    nil
-                                           :environment
-                                           (list* "TERM=dumb"
-                                                  env)
+                                           :environment env
                                            :directory (or directory
                                                          (uiop:getcwd)))))
             ;; Don't close slave-stream here — sb-ext:run-program dups the fd

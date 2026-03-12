@@ -40,7 +40,7 @@
    (dirty-windows
     :accessor webui-device-dirty-windows
     :initform nil
-    :documentation "List of (dom-id html-lines-vector modeline) pending JS updates.")
+    :documentation "List of window objects needing redisplay; rendered in device-force-output.")
    (cursor-x
     :accessor webui-device-cursor-x
     :initform 0)
