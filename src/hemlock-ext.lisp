@@ -9,7 +9,7 @@
   (peek-char t stream))
 
 (defun quit ()
-  )
+  (uiop:quit))
 
 (defvar hi::*command-line-switches* nil)
 

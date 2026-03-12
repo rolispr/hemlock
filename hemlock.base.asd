@@ -24,7 +24,8 @@
                   :cffi
                   :babel
                   :cl-ppcre
-                  :command-line-arguments)
+                  :command-line-arguments
+                  :with-user-abort)
     :components
     ((:module wire
               :pathname "src/"
