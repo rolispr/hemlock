@@ -229,42 +229,134 @@ Nuke all active lines back to spare, reallocate if wider, and rebuild modeline."
         (setf (dis-line-length dl) len
               (dis-line-flags dl) changed-bit)))))
 
+(defun resize-tty-layout (device new-lines new-cols)
+  "Rebuild the TTY window layout for new terminal dimensions.
+Recalculates all hunk positions and heights from scratch, distributing available
+height proportionally among existing windows.  If the terminal shrinks too much
+for all windows, extra splits are removed (keeping the first/top window)."
+  (let* ((new-device-cols (if hemlock.terminfo:auto-right-margin
+                              (max 1 (1- new-cols))
+                              (max 1 new-cols)))
+         (width-changed (/= new-device-cols (tty-device-columns device)))
+         (echo-hunk (window-hunk *echo-area-window*))
+         (echo-text-height (tty-hunk-text-height echo-hunk))
+         ;; Available lines for non-echo hunks: total minus echo text minus
+         ;; echo modeline.
+         (available (- new-lines echo-text-height 1)))
+    ;; If terminal is too small for even one window + echo, bail out.
+    ;; (Need at least 2 lines for main: 1 text + 1 modeline.)
+    (when (< available 2)
+      (return-from resize-tty-layout))
+    ;; Update device dimensions.
+    (setf (tty-device-lines device) new-lines)
+    (when width-changed
+      (setf (tty-device-columns device) new-device-cols))
+    ;; Rebuild screen image array for new dimensions.
+    (setf *currently-selected-hunk* nil)
+    (set-up-screen-image device)
+    ;; Handle width changes for all windows.
+    (when width-changed
+      (dolist (w *window-list*)
+        (resize-window-width w new-device-cols)))
+    ;; Collect non-echo hunks in display order (top hunk = device-hunks first).
+    (let* ((first (device-hunks device))
+           (hunks (list first))
+           (old-total 0))
+      (do ((h (device-hunk-next first) (device-hunk-next h)))
+          ((eq h first))
+        (push h hunks))
+      (setf hunks (nreverse hunks))
+      (dolist (h hunks) (incf old-total (device-hunk-height h)))
+      ;; Delete extra windows if terminal shrinks too much.
+      ;; Each window needs at least 2 lines (1 text + 1 modeline).
+      (loop while (and (> (length hunks) 1)
+                       (< available (* 2 (length hunks))))
+            do (let* ((victim-hunk (car (last hunks)))
+                      (victim-window (device-hunk-window victim-hunk))
+                      (prev (device-hunk-previous victim-hunk))
+                      (next (device-hunk-next victim-hunk)))
+                 ;; Unlink from the hunk ring.
+                 (setf (device-hunk-next prev) next
+                       (device-hunk-previous next) prev)
+                 ;; Remove from window/buffer lists.
+                 (setf *window-list* (delete victim-window *window-list*))
+                 (let ((buf (window-buffer victim-window)))
+                   (when buf
+                     (setf (buffer-windows buf)
+                           (delete victim-window (buffer-windows buf)))))
+                 (when (eq victim-hunk (device-hunks device))
+                   (setf (device-hunks device) next))
+                 ;; If we just killed the current window, switch to first.
+                 (when (eq victim-window *current-window*)
+                   (setf *current-window*
+                         (device-hunk-window (car hunks))))
+                 (decf old-total (device-hunk-height victim-hunk))
+                 (setf hunks (butlast hunks))))
+      ;; Ensure old-total is positive for proportion calculation.
+      (when (zerop old-total) (setf old-total 1))
+      ;; Redistribute heights proportionally, building top-down.
+      ;; Hunk geometry:
+      ;;   position = screen row of the modeline (bottom of hunk)
+      ;;   height = total lines (text + modeline)
+      ;;   text-position = screen row of the last text line
+      ;;   text-height = number of text lines
+      (let ((remaining available)
+            (row 0))
+        (loop for (hunk . rest) on hunks
+              for has-modeline = (not (null (window-modeline-buffer
+                                            (device-hunk-window hunk))))
+              for min-h = (if has-modeline 2 1)
+              for new-h = (if rest
+                              (max min-h
+                                   (round (* available
+                                            (/ (device-hunk-height hunk)
+                                               old-total))))
+                              ;; Last hunk gets the remainder.
+                              (max min-h remaining))
+              for new-text-h = (if has-modeline (1- new-h) new-h)
+              do (setf (device-hunk-height hunk) new-h
+                       (tty-hunk-text-height hunk) new-text-h
+                       (tty-hunk-text-position hunk) (+ row new-text-h -1)
+                       (device-hunk-position hunk)
+                       (if has-modeline (+ row new-h -1)
+                           (+ row new-text-h -1)))
+                 (change-window-image-height (device-hunk-window hunk)
+                                             new-text-h)
+                 (decf remaining new-h)
+                 (incf row new-h))
+        ;; Update device-bottom-window-base.
+        (let ((last-hunk (car (last hunks))))
+          (setf (device-bottom-window-base device)
+                (tty-hunk-text-position last-hunk)))
+        ;; Echo area: fixed at the bottom of the terminal.
+        (setf (device-hunk-position echo-hunk) (1- new-lines)
+              (device-hunk-height echo-hunk) echo-text-height
+              (tty-hunk-text-position echo-hunk) (- new-lines 2)
+              (tty-hunk-text-height echo-hunk) echo-text-height)
+        (change-window-image-height *echo-area-window* echo-text-height))
+      ;; Recompute modeline fields for all windows so they fill the new width.
+      (dolist (w *window-list*)
+        (when (window-modeline-buffer w)
+          (update-modeline-fields (window-buffer w) w))))
+    (setf *screen-image-trashed* t)))
+
 (defun maybe-resize-tty-device (device)
-  "Handle pending SIGWINCH resize: update device dimensions, rebuild screen
-image, adjust all window and hunk geometries.  Called at the top of redisplay."
+  "Handle pending SIGWINCH resize.  Called from device-clear so that all
+dimensions are correct before update-window-image runs."
   (when *pending-resize*
     (setf *pending-resize* nil)
     (multiple-value-bind (ioctl-lines ioctl-cols)
         (unless (and *pending-resize-lines* *pending-resize-cols*)
           (get-terminal-attributes))
-      (let* ((new-lines (or *pending-resize-lines* ioctl-lines))
-             (new-cols  (or *pending-resize-cols*  ioctl-cols))
-             (height-delta (- new-lines (tty-device-lines device)))
-             (new-device-cols (if hemlock.terminfo:auto-right-margin
-                                  (max 1 (1- new-cols))
-                                  (max 1 new-cols)))
-             (width-changed (not (= new-device-cols (tty-device-columns device)))))
+      (let ((new-lines (or *pending-resize-lines* ioctl-lines))
+            (new-cols  (or *pending-resize-cols*  ioctl-cols)))
         (setf *pending-resize-lines* nil
               *pending-resize-cols*  nil)
-        ;; Update device dimensions.
-        (when width-changed
-          (setf (tty-device-columns device) new-device-cols))
-        (unless (zerop height-delta)
-          (setf (tty-device-lines device) new-lines))
-        ;; Resize window widths if columns changed.
-        ;; *window-list* includes all windows (main + echo area).
-        (when width-changed
-          (dolist (w *window-list*)
-            (resize-window-width w new-device-cols)))
-        ;; Handle height change (adjusts hunk positions, rebuilds screen image).
-        (unless (zerop height-delta)
-          (enlarge-device device height-delta))
-        ;; If only width changed, still need to rebuild the screen image.
-        (when (and width-changed (zerop height-delta))
-          (set-up-screen-image device))))))
+        (when (and new-lines new-cols
+                   (> new-lines 0) (> new-cols 0))
+          (resize-tty-layout device new-lines new-cols))))))
 
 (defmethod device-dumb-redisplay ((device tty-device) window)
-  (maybe-resize-tty-device device)
   (let* ((first (window-first-line window))
          (hunk (window-hunk window))
          (device (device-hunk-device hunk))
@@ -564,7 +656,6 @@ image, adjust all window and hunk geometries.  Called at the top of redisplay."
 ;;; inserting lines.
 ;;;
 (defmethod device-smart-redisplay ((device tty-device) window)
-  (maybe-resize-tty-device device)
   (let* ((hunk (window-hunk window))
          (device (device-hunk-device hunk)))
     (let ((first-changed (window-first-changed window))
@@ -993,6 +1084,9 @@ image, adjust all window and hunk geometries.  Called at the top of redisplay."
 ;;; Clearing the device (DEVICE-CLEAR functions).
 
 (defmethod device-clear ((device tty-device))
+  ;; Handle pending resize BEFORE clearing, so that all hunk geometry and
+  ;; window dimensions are correct when update-window-image runs next.
+  (maybe-resize-tty-device device)
   (tty-write-cmd (tty-device-clear-string device))
   (cursor-motion device 0 0)
   (setf (tty-device-cursor-x device) 0)

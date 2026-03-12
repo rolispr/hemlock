@@ -222,9 +222,10 @@
                      (length entries) win *force-output-count*)
           (dolist (entry entries)
             (destructuring-bind (dom-id lines ml) entry
-              (let ((js (format nil "updateWindow(\"~A\",~A,\"~A\");"
+              (let ((js (format nil "try{var _e=document.getElementById(\"~A\");if(_e)_e.innerHTML=~A;var _m=document.getElementById(\"~A-ml\");if(_m)_m.textContent=\"~A\";}catch(e){document.body.innerHTML='<pre style=color:red>'+e.stack+'</pre>';}"
                                 (json-escape dom-id)
                                 (lines-to-json lines)
+                                (json-escape dom-id)
                                 (json-escape ml))))
                 (webui-log "[force-output] ~S len=~D" dom-id (length js))
                 (webui:webui-run win js))))))
