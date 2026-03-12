@@ -344,6 +344,8 @@
 ;;; in a keyword or file prompt.  Candidates update after every keystroke;
 ;;; arrow keys move the selection; Tab inserts the selected candidate.
 
+(defvar *completions-window* nil
+  "The window currently showing completion candidates, or nil.")
 (defvar *completion-candidates* nil
   "Current filtered list of candidate strings.")
 (defvar *completion-selection* 0
@@ -462,20 +464,24 @@
           (mod (1- *completion-selection*) (length *completion-candidates*)))
     (redraw-completions)))
 
-;;; --- wire hooks ---
-
-(setf *completion-display-start-fn* #'start-completion-display)
-(setf *completion-display-stop-fn*  #'stop-completion-display)
-
-;;; Wrap *invoke-hook* once at load time so that after every command
-;;; dispatched while the completion window is visible we refresh the list.
+;;; Wrap *invoke-hook* once at load time.
+;;; After every command:
+;;;  • If we're in a keyword/file echo-area prompt and no window is open yet,
+;;;    open one (handles the first keystroke after the prompt appears).
+;;;  • If the window is open, refresh the candidate list.
+;;;  • If we've left the echo-area buffer, close the window.
 (let ((prev *invoke-hook*))
   (setf *invoke-hook*
         (lambda (command p)
           (funcall prev command p)
-          (when (and *completions-window*
-                     (eq (current-buffer) *echo-area-buffer*))
-            (handler-case
-                (update-completion-display
-                 (region-to-string *parse-input-region*))
-              (error ()))))))
+          (handler-case
+              (cond
+                ((and (eq (current-buffer) *echo-area-buffer*)
+                      (member *parse-type* '(:keyword :file)))
+                 (unless *completions-window*
+                   (start-completion-display))
+                 (update-completion-display
+                  (region-to-string *parse-input-region*)))
+                (*completions-window*
+                 (stop-completion-display)))
+            (error ())))))
