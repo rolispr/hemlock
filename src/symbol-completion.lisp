@@ -286,6 +286,37 @@ For example:
                  (transpose-lists (mapcar #'cdr lists))))))
 
 
+;;;;; Missing completion helpers
+
+(defun longest-common-prefix (strings)
+  "Return the longest string that is a prefix of all strings in the list."
+  (if (null strings)
+      ""
+      (let ((prefix (first strings)))
+        (dolist (s (rest strings) prefix)
+          (let ((len (mismatch prefix s)))
+            (when len
+              (setf prefix (subseq prefix 0 len))))))))
+
+(defun format-completion-set (strings internal-p package-name)
+  "Format completion strings, optionally adding package prefix."
+  (if (null package-name)
+      strings
+      (if internal-p
+          (mapcar (lambda (s) (concatenate 'string package-name "::" s)) strings)
+          (mapcar (lambda (s) (concatenate 'string package-name ":" s)) strings))))
+
+(defun character-completion-set (prefix matcher)
+  "Return a list of character names that match PREFIX using MATCHER."
+  (let ((result '()))
+    (loop for i from 0 to 127
+          for c = (code-char i)
+          for name = (char-name c)
+          when (and name (funcall matcher prefix name))
+            do (push name result))
+    (nreverse result)))
+
+
 ;;;; Completion for character names
 
 (defun completions-for-character (prefix)

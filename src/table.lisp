@@ -74,6 +74,18 @@
       (setf (getstring (car x) table) (cdr x)))
     table))
 
+(defstruct (value-node
+            (:constructor make-value-node (proper folded value))
+            (:print-function print-value-node))
+  "This structure is a node containing a value in a Hemlock string-table."
+  folded                                   ; Downcased copy of string
+  proper                                   ; Proper copy of string entry
+  value)                                   ; Value of entry
+
+(defun print-value-node (node stream depth)
+  (declare (ignore depth))
+  (format stream "<Value Node \"~A\">" (value-node-proper node)))
+
 (defun map-string-table (result-type fun table)
   (let ((remove '#:remove))
     (remove remove
@@ -107,19 +119,6 @@
 (defun print-word-entry (entry stream depth)
   (declare (ignore depth))
   (format stream "#<Word Table Entry: \"~A\">" (word-entry-folded entry)))
-
-
-(defstruct (value-node
-            (:constructor make-value-node (proper folded value))
-            (:print-function print-value-node))
-  "This structure is a node containing a value in a Hemlock string-table."
-  folded                                   ; Downcased copy of string
-  proper                                   ; Proper copy of string entry
-  value)                                   ; Value of entry
-
-(defun print-value-node (node stream depth)
-  (declare (ignore depth))
-  (format stream "<Value Node \"~A\">" (value-node-proper node)))
 
 
 ;;;; Bi-SvPosition, String-Compare, String-Compare*

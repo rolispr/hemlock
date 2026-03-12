@@ -201,10 +201,11 @@
                               (lines-to-json lines)
                               ml)))
               (format *error-output*
-                      "~&[device-force-output] win=~S dom=~S lines=~D ml=~S~%"
-                      win dom-id (length lines) ml)
+                      "~&[device-force-output] win=~S dom=~S lines=~D ml=~S~%~&[JS] ~A~%"
+                      win dom-id (length lines) ml js)
               (finish-output *error-output*)
-              (webui:webui-run win js)))))
+              (webui:webui-run win js)
+              (webui:webui-run win "document.title='HEM:'+document.title;"))))
       (setf (webui-device-dirty-windows device) nil))))
 
 (defmethod device-finish-output ((device webui-device) window)

@@ -260,6 +260,17 @@ GB
   "True if we are inside the editor.  This is used to prevent ill-advised
    \"recursive\" edits.")
 
+(defvar *after-editor-initializations-funs* nil
+  "A list of functions to be called after the editor has been initialized upon
+   entering the first time.")
+
+(defmacro after-editor-initializations (&rest forms)
+  "Causes forms to be executed after the editor has been initialized.
+   Forms supplied with successive uses of this macro will be executed after
+   forms supplied with previous uses."
+  `(push #'(lambda () ,@forms)
+         *after-editor-initializations-funs*))
+
 ;;; Saved original stream values so device-exit can restore them.
 (defvar *original-standard-output* nil)
 (defvar *original-error-output* nil)
@@ -278,17 +289,6 @@ GB
    (setf *standard-output* stream
          *error-output*    stream
          *trace-output*    stream)))
-
-(defvar *after-editor-initializations-funs* nil
-  "A list of functions to be called after the editor has been initialized upon
-   entering the first time.")
-
-(defmacro after-editor-initializations (&rest forms)
-  "Causes forms to be executed after the editor has been initialized.
-   Forms supplied with successive uses of this macro will be executed after
-   forms supplied with previous uses."
-  `(push #'(lambda () ,@forms)
-         *after-editor-initializations-funs*))
 
 #-(or cmu scl)
 (defvar *command-line-options* nil)
