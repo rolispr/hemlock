@@ -24,12 +24,12 @@
   "Write HTML-escaped characters of STR[start..end) to stream OUT."
   (loop for i from start below end
         for ch = (char str i) do
-    (case ch
-      (#\& (write-string "&amp;"  out))
-      (#\< (write-string "&lt;"   out))
-      (#\> (write-string "&gt;"   out))
-      (#\" (write-string "&quot;" out))
-      (t   (write-char ch out)))))
+          (case ch
+            (#\& (write-string "&amp;"  out))
+            (#\< (write-string "&lt;"   out))
+            (#\> (write-string "&gt;"   out))
+            (#\" (write-string "&quot;" out))
+            (t   (write-char ch out)))))
 
 
 ;;;; Font → CSS class string
@@ -204,8 +204,17 @@
                       "~&[device-force-output] win=~S dom=~S lines=~D ml=~S~%~&[JS] ~A~%"
                       win dom-id (length lines) ml js)
               (finish-output *error-output*)
-              (webui:webui-run win js)
-              (webui:webui-run win "document.title='HEM:'+document.title;"))))
+              ;; DEBUG: skip updateWindow, write diagnostic directly to the div
+              (webui:webui-run win
+               (format nil "document.getElementById('~A').innerHTML='<div style=\"color:lime\">~A L=~D ML=~D first50=['+~S+']</div>';"
+                       dom-id dom-id (length lines) (length ml)
+                       (if (plusp (length lines))
+                           (subseq (aref lines 0) 0 (min 80 (length (aref lines 0))))
+                           "EMPTY")))
+              ;; Also show modeline in the ml bar
+              (webui:webui-run win
+               (format nil "document.getElementById('~A-ml').textContent=~S;"
+                       dom-id ml))))))
       (setf (webui-device-dirty-windows device) nil))))
 
 (defmethod device-finish-output ((device webui-device) window)

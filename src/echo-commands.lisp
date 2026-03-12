@@ -54,58 +54,58 @@
   (declare (ignore p))
   (let ((help (typecase *parse-help*
                 (list (unless *parse-help* (error "There is no parse help."))
-                      (apply #'format nil *parse-help*))
+                 (apply #'format nil *parse-help*))
                 (string *parse-help*)
                 (t (error "Parse help is not a string or list: ~S" *parse-help*))))
         (input (region-to-string *parse-input-region*)))
     (cond
-     ((eq *parse-type* :keyword)
-      (let ((strings (find-all-completions input *parse-string-tables*)))
-        (with-pop-up-display (s :height (+ (length strings) 2))
-          (write-line help s)
-          (finish-output s)
-          (cond (strings
-                 (write-line "Possible completions of what you have typed:" s)
-                 (dolist (string strings)
-                   (write-line string s)))
-                (t
-                 (write-line
- "There are no possible completions of what you have typed." s))))))
-     ((and (eq *parse-type* :file) (not (zerop (length input))))
-      (let ((pns (ambiguous-files (region-to-string *parse-input-region*)
-                                  *parse-default*)))
-        (declare (list pns))
-        (with-pop-up-display(s :height (+ (length pns) 2))
-          (write-line help s)
-          (cond (pns
-                 (write-line "Possible completions of what you have typed:" s)
-                 (let ((width (- (window-width (current-window)) 27)))
-                   (dolist (pn pns)
-                     (let* ((dir (directory-namestring pn))
-                            (len (length dir)))
-                       (unless (<= len width)
-                         (let ((slash (position #\/ dir
-                                                :start (+ (- len width) 3))))
-                           (setf dir
-                                 (if slash
-                                     (concatenate 'string "..."
-                                                  (subseq dir slash))
-                                     "..."))))
-                       (format s " ~A~25T ~A~%"
-                               (file-namestring pn) dir)))))
-                (t
-                 (write-line
- "There are no possible completions of what you have typed." s))))))
-     (t
-      (with-mark ((m (buffer-start-mark *echo-area-buffer*) :left-inserting))
-        (insert-string m help)
-        (insert-character m #\newline))))))
+      ((eq *parse-type* :keyword)
+       (let ((strings (find-all-completions input *parse-string-tables*)))
+         (with-pop-up-display (s :height (+ (length strings) 2))
+           (write-line help s)
+           (finish-output s)
+           (cond (strings
+                  (write-line "Possible completions of what you have typed:" s)
+                  (dolist (string strings)
+                    (write-line string s)))
+                 (t
+                  (write-line
+                   "There are no possible completions of what you have typed." s))))))
+      ((and (eq *parse-type* :file) (not (zerop (length input))))
+       (let ((pns (ambiguous-files (region-to-string *parse-input-region*)
+                                   *parse-default*)))
+         (declare (list pns))
+         (with-pop-up-display(s :height (+ (length pns) 2))
+           (write-line help s)
+           (cond (pns
+                  (write-line "Possible completions of what you have typed:" s)
+                  (let ((width (- (window-width (current-window)) 27)))
+                    (dolist (pn pns)
+                      (let* ((dir (directory-namestring pn))
+                             (len (length dir)))
+                        (unless (<= len width)
+                          (let ((slash (position #\/ dir
+                                                 :start (+ (- len width) 3))))
+                            (setf dir
+                                  (if slash
+                                      (concatenate 'string "..."
+                                                   (subseq dir slash))
+                                      "..."))))
+                        (format s " ~A~25T ~A~%"
+                                (file-namestring pn) dir)))))
+                 (t
+                  (write-line
+                   "There are no possible completions of what you have typed." s))))))
+      (t
+       (with-mark ((m (buffer-start-mark *echo-area-buffer*) :left-inserting))
+         (insert-string m help)
+         (insert-character m #\newline))))))
 
 (defun file-completion-action (typein)
   (declare (simple-string typein))
   (when (zerop (length typein)) (editor-error))
   (multiple-value-bind
-      (result win)
+        (result win)
       (hemlock-ext:complete-file typein
                                  :defaults (directory-namestring *parse-default*)
                                  :ignore-types (value ignore-file-types))
@@ -127,7 +127,7 @@
     (case *parse-type*
       (:keyword
        (multiple-value-bind
-           (prefix key value field ambig)
+             (prefix key value field ambig)
            (complete-string typein *parse-string-tables*)
          (declare (ignore value field))
          (when prefix
@@ -163,36 +163,30 @@
       (:string
        (self-insert-command p))
       (:file
-       ;; With live completion: insert the selected candidate.
-       (if (and *candidates-start-mark* *completion-candidates*)
-           (insert-completion-candidate)
-           (file-completion-action typein)))
+       (file-completion-action typein))
       (:keyword
-       ;; With live completion: insert the selected candidate.
-       (if (and *candidates-start-mark* *completion-candidates*)
-           (insert-completion-candidate)
-           (let ((spacep
-                  ;; due to the use of spaces in command names, let's special
-                  ;; case on spaces here: The space key both completes and
-                  ;; self inserts, where other keys (like tab) only complete.
-                  (eql (hemlock-ext:key-event-char *last-key-event-typed*)
-                       #\space)))
-             (when spacep
-               (let ((point (current-point)))
-                 (unless (blank-after-p point)
-                   (insert-character point #\space))))
-             (multiple-value-bind
-                   (prefix key value field ambig)
-                 (complete-string typein *parse-string-tables*)
-               (declare (ignore value ambig))
-               (when (eq key :none) (editor-error "No possible completion."))
-               (delete-region *parse-input-region*)
-               (let ((new-typein (if (and spacep (or field (not (eq key :unique))))
-                                     (concatenate 'string
-                                                  (subseq prefix 0 field)
-                                                  " ")
-                                     (subseq prefix 0 field))))
-                 (insert-string (region-start *parse-input-region*) new-typein))))))
+       (let ((spacep
+               ;; due to the use of spaces in command names, let's special
+               ;; case on spaces here: The space key both completes and
+               ;; self inserts, where other keys (like tab) only complete.
+               (eql (hemlock-ext:key-event-char *last-key-event-typed*)
+                    #\space)))
+         (when spacep
+           (let ((point (current-point)))
+             (unless (blank-after-p point)
+               (insert-character point #\space))))
+         (multiple-value-bind
+               (prefix key value field ambig)
+             (complete-string typein *parse-string-tables*)
+           (declare (ignore value ambig))
+           (when (eq key :none) (editor-error "No possible completion."))
+           (delete-region *parse-input-region*)
+           (let ((new-typein (if (and spacep (or field (not (eq key :unique))))
+                                 (concatenate 'string
+                                              (subseq prefix 0 field)
+                                              " ")
+                                 (subseq prefix 0 field))))
+             (insert-string (region-start *parse-input-region*) new-typein)))))
       (t
        (editor-error "Cannot complete input for this prompt.")))))
 
@@ -210,7 +204,6 @@
   "If no input has been given, exits the recursive edit with the default,
   otherwise calls the verification function."
   (declare (ignore p))
-  (stop-completion-display)
   (let* ((string (region-to-string *parse-input-region*))
          (empty (zerop (length string))))
     (declare (simple-string string))
@@ -220,7 +213,7 @@
                   (string/= string (ring-ref *echo-area-history* 0)))
           (ring-push string *echo-area-history*)))
     (multiple-value-bind (res flag)
-                         (funcall *parse-verification-function* string)
+        (funcall *parse-verification-function* string)
       (unless (or res flag) (editor-error))
       (exit-recursive-edit res))))
 
@@ -233,23 +226,23 @@
         (p (or p 1)))
     (when (zerop length) (editor-error))
     (cond
-     ((eq (last-command-type) :echo-history)
-      (let ((base (mod (+ *echo-history-pointer* p) length)))
-        (delete-region *parse-input-region*)
-        (insert-string (region-end *parse-input-region*)
-                       (ring-ref *echo-area-history* base))
-        (setq *echo-history-pointer* base)))
-     (t
-      (let ((current (region-to-string *parse-input-region*))
-            (base (mod (if (minusp p) p (1- p)) length)))
-        (delete-region *parse-input-region*)
-        (insert-string (region-end *parse-input-region*)
-                       (ring-ref *echo-area-history* base))
-        (when (and (plusp (length current))
-                   (string/= (ring-ref *echo-area-history* 0) current))
-          (ring-push current *echo-area-history*)
-          (incf base))
-        (setq *echo-history-pointer* base))))
+      ((eq (last-command-type) :echo-history)
+       (let ((base (mod (+ *echo-history-pointer* p) length)))
+         (delete-region *parse-input-region*)
+         (insert-string (region-end *parse-input-region*)
+                        (ring-ref *echo-area-history* base))
+         (setq *echo-history-pointer* base)))
+      (t
+       (let ((current (region-to-string *parse-input-region*))
+             (base (mod (if (minusp p) p (1- p)) length)))
+         (delete-region *parse-input-region*)
+         (insert-string (region-end *parse-input-region*)
+                        (ring-ref *echo-area-history* base))
+         (when (and (plusp (length current))
+                    (string/= (ring-ref *echo-area-history* 0) current))
+           (ring-push current *echo-area-history*)
+           (incf base))
+         (setq *echo-history-pointer* base))))
     (setf (last-command-type) :echo-history)))
 
 (defcommand "Next Parse" (p)
@@ -337,157 +330,3 @@
   (when (mark< (buffer-point *echo-area-buffer*) *parse-starting-mark*)
     (beginning-of-parse-command ())
     (editor-error)))
-
-
-;;;; Live completion display
-;;;
-;;; Candidates are written directly into the echo area buffer, below
-;;; the prompt/input line, so they appear in the same large space the
-;;; user already sees.  A left-inserting mark (*candidates-start-mark*)
-;;; is placed right after the last user-typed character; the
-;;; parse-input-region's end is redirected to that mark so that
-;;; region-to-string never returns the candidate lines as part of the
-;;; typed input.
-
-(defvar *candidates-start-mark* nil
-  "Left-inserting mark in the echo area buffer separating user input
-from the displayed candidate lines.  Nil when no completion display is active.")
-(defvar *completions-saved-region-end* nil
-  "The original end mark of *parse-input-region*, restored on stop.")
-(defvar *completion-candidates* nil
-  "Current filtered list of candidate strings.")
-(defvar *completion-selection* 0
-  "Index into *completion-candidates* of the highlighted candidate.")
-
-;;; --- candidate collection ---
-
-(defun collect-raw-candidates ()
-  "Return the full unfiltered candidate list for the current parse type."
-  (case *parse-type*
-    (:keyword
-     (find-all-completions "" *parse-string-tables*))
-    (:file
-     (mapcar #'namestring
-             (ambiguous-files (or *parse-default* "") *parse-default*)))
-    (t nil)))
-
-(defun get-filtered-candidates (pattern)
-  "Return candidates matching PATTERN using the active completion styles."
-  (let ((all (collect-raw-candidates)))
-    (if (and all (plusp (length pattern)))
-        (filter-completions pattern all)
-        all)))
-
-;;; --- echo area rendering ---
-
-(defun redraw-completions ()
-  "Delete old candidate lines from the echo area and write new ones."
-  (when *candidates-start-mark*
-    ;; Delete from the separator mark to the buffer end.
-    (let ((end (buffer-end-mark *echo-area-buffer*)))
-      (unless (mark= *candidates-start-mark* end)
-        (delete-region (region *candidates-start-mark* end))))
-    ;; Write new candidate lines after the separator mark.
-    (let ((cands *completion-candidates*)
-          (sel   *completion-selection*)
-          (pt    (buffer-end-mark *echo-area-buffer*)))
-      (when cands
-        (insert-character pt #\newline)
-        (let ((shown (min 10 (length cands))))
-          (loop for i from 0 below shown
-                for c in cands
-                do (insert-string pt (if (= i sel)
-                                         (format nil "▶ ~A~%" c)
-                                         (format nil "  ~A~%" c)))))))))
-
-;;; --- update (called after every echo-area keystroke) ---
-
-(defun update-completion-display (pattern)
-  "Recompute candidates from PATTERN and redraw them in the echo area."
-  (let ((cands (get-filtered-candidates pattern)))
-    (setf *completion-candidates* cands
-          *completion-selection*  (if cands
-                                      (min *completion-selection*
-                                           (1- (length cands)))
-                                      0)))
-  (redraw-completions))
-
-;;; --- insert selected candidate ---
-
-(defun insert-completion-candidate ()
-  "Replace the typed input with the currently selected candidate."
-  (when *completion-candidates*
-    (let ((chosen (nth *completion-selection* *completion-candidates*)))
-      (delete-region *parse-input-region*)
-      (insert-string (region-start *parse-input-region*) chosen))))
-
-;;; --- start / stop ---
-
-(defun start-completion-display ()
-  "Place the candidate separator mark and show initial candidates."
-  (unless *candidates-start-mark*
-    ;; Left-inserting: stays before candidates when we insert them after it.
-    (setf *candidates-start-mark*
-          (copy-mark (buffer-end-mark *echo-area-buffer*) :left-inserting))
-    ;; Redirect parse-input-region's end so candidates aren't parsed.
-    (setf *completions-saved-region-end* (region-end *parse-input-region*))
-    (setf (region-end *parse-input-region*) *candidates-start-mark*)
-    (setf *completion-selection* 0)
-    (update-completion-display (region-to-string *parse-input-region*))))
-
-(defun stop-completion-display ()
-  "Remove candidate lines from the echo area and restore parse state."
-  (when *candidates-start-mark*
-    ;; Delete candidate lines.
-    (let ((end (buffer-end-mark *echo-area-buffer*)))
-      (unless (mark= *candidates-start-mark* end)
-        (delete-region (region *candidates-start-mark* end))))
-    ;; Restore parse-input-region's end.
-    (when *completions-saved-region-end*
-      (setf (region-end *parse-input-region*) *completions-saved-region-end*)
-      (setf *completions-saved-region-end* nil))
-    (delete-mark *candidates-start-mark*)
-    (setf *candidates-start-mark*  nil
-          *completion-candidates*  nil
-          *completion-selection*   0)))
-
-;;; --- navigation commands ---
-
-(defcommand "Next Completion" (p)
-  "Move selection down one candidate in the echo area list."
-  "Advance *completion-selection* by one, wrapping around."
-  (declare (ignore p))
-  (when *completion-candidates*
-    (setf *completion-selection*
-          (mod (1+ *completion-selection*) (length *completion-candidates*)))
-    (redraw-completions)))
-
-(defcommand "Previous Completion" (p)
-  "Move selection up one candidate in the echo area list."
-  "Retreat *completion-selection* by one, wrapping around."
-  (declare (ignore p))
-  (when *completion-candidates*
-    (setf *completion-selection*
-          (mod (1- *completion-selection*) (length *completion-candidates*)))
-    (redraw-completions)))
-
-;;; Ensure candidates are cleaned up when the parse is confirmed or aborted.
-(add-hook abort-hook 'stop-completion-display)
-
-;;; Wrap *invoke-hook* once at load time.
-;;; After each echo-area command: open or refresh the candidate list.
-;;; After leaving the echo area: close it.
-(let ((prev *invoke-hook*))
-  (setf *invoke-hook*
-        (lambda (command p)
-          (funcall prev command p)
-          (handler-case
-              (cond
-                ((and (eq (current-buffer) *echo-area-buffer*)
-                      (member *parse-type* '(:keyword :file)))
-                 (start-completion-display)  ; no-op if already open
-                 (update-completion-display
-                  (region-to-string *parse-input-region*)))
-                (*candidates-start-mark*
-                 (stop-completion-display)))
-            (error ())))))

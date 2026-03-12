@@ -659,9 +659,15 @@
       (ignore-errors (message "~A" condition))
       (throw 'command-loop-catcher nil))
      (t
-      (format *error-output* "~&[hemlock error] ~A~%" condition)
-      (ignore-errors (message "Error: ~A" condition))
-      (throw 'command-loop-catcher nil)))))
+      (let ((restarts (compute-restarts condition)))
+        (if restarts
+            (hemlock::enter-master-debugger condition)
+            (progn
+              (format *error-output* "~&[hemlock error] ~A~%" condition)
+              (ignore-errors (message "Error: ~A" condition))
+              (throw 'command-loop-catcher nil))))))))
+
+(declaim (ftype (function (condition) nil) hemlock::enter-master-debugger))
 
 (defmacro handle-lisp-errors (&body body)
   "Handle-Lisp-Errors {Form}*

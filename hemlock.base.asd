@@ -114,7 +114,7 @@
               :depends-on (root-2 core-1 wire)
               :components
               ((:file "completion-source")
-               (:file "echo-commands" :depends-on ("completion-source"))
+               (:file "echo-commands")
                (:file "command")
                (:file "kbd-macro")
                (:file "undo")
