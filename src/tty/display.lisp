@@ -182,6 +182,18 @@
                 results))))))
 
 
+(defun modeline-fill-to-edge (hunk dl dl-len y)
+  "Fill from column DL-LEN to the right terminal edge with the modeline
+background color.  Extracts the bg from DL's font-changes so we don't need
+to reference *modeline-font* across packages."
+  (let* ((fc (dis-line-font-changes dl))
+         (font (and fc (font-change-font fc)))
+         (bg (and (listp font) (getf font :bg))))
+    (when bg (setab bg))
+    (funcall (tty-device-clear-to-eol (device-hunk-device hunk)) hunk dl-len y)
+    (when bg (exit-attribute-mode))))
+
+
 ;;;; Dumb window redisplay.
 
 (defmacro tty-dumb-line-redisplay (device hunk dis-line &optional y)
@@ -382,6 +394,7 @@ dimensions are correct before update-window-image runs."
             (y (tty-hunk-modeline-pos hunk)))
         (funcall (tty-device-clear-to-eol device) hunk 0 y)
         (tty-dumb-line-redisplay device hunk dl y)
+        (modeline-fill-to-edge hunk dl (dis-line-length dl) y)
         (setf (dis-line-flags dl) unaltered-bits)))))
 
 
@@ -432,8 +445,9 @@ dimensions are correct before update-window-image runs."
     (when (window-modeline-buffer window)
       (let ((dl (window-modeline-dis-line window)))
         (when (/= (dis-line-flags dl) unaltered-bits)
-          (tty-smart-line-redisplay device hunk dl
-                                    (tty-hunk-modeline-pos hunk)))))))
+          (let ((y (tty-hunk-modeline-pos hunk)))
+            (tty-smart-line-redisplay device hunk dl y)
+            (modeline-fill-to-edge hunk dl (dis-line-length dl) y)))))))
 
 ;;; NEXT-DIS-LINE is used in DO-SEMI-DUMB-LINE-WRITES and
 ;;; COMPUTE-TTY-CHANGES.
@@ -698,8 +712,9 @@ dimensions are correct before update-window-image runs."
     (when (window-modeline-buffer window)
       (let ((dl (window-modeline-dis-line window)))
         (when (/= (dis-line-flags dl) unaltered-bits)
-          (tty-smart-line-redisplay device hunk dl
-                                    (tty-hunk-modeline-pos hunk)))))))
+          (let ((y (tty-hunk-modeline-pos hunk)))
+            (tty-smart-line-redisplay device hunk dl y)
+            (modeline-fill-to-edge hunk dl (dis-line-length dl) y)))))))
 
 
 ;;;; Smart window redisplay -- computing changes to the display.

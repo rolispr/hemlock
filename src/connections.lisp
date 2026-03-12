@@ -201,6 +201,9 @@
    (slave-pty-name :initform nil
                    :initarg :slave-pty-name
                    :accessor connection-slave-pty-name)
+   (slave-fd :initform nil
+             :initarg :slave-fd
+             :accessor connection-slave-fd)
    (directory :initform nil
               :initarg :directory
               :accessor connection-directory)))
@@ -208,8 +211,8 @@
 (defun make-process-connection
        (command
         &rest args
-        &key name buffer stream filter sentinel slave-pty-name directory)
-  (declare (ignore buffer stream filter sentinel slave-pty-name directory))
+        &key name buffer stream filter sentinel slave-pty-name slave-fd directory)
+  (declare (ignore buffer stream filter sentinel slave-pty-name slave-fd directory))
   (apply #'make-instance
          (class-for *connection-backend* 'process-connection-mixin)
          :name (or name (princ-to-string command))
@@ -282,62 +285,39 @@
 ;;;; PIPELIKE-CONNECTION
 ;;;;
 
-#-(and scl linux)
-(defun find-a-pty ()
-  (block t
-    (dolist (char '(#\p #\q) (error "no pty found"))
-      (dotimes (digit 16)
-        (handler-case
-            (sb-posix:open (format nil "/dev/pty~C~X" char digit)
-                                      sb-posix:o-rdwr)
-          (sb-posix:syscall-error
-           ())
-          (:no-error (master-fd)
-            (let ((slave-name (format nil "/dev/tty~C~X" char digit)))
-              (handler-case
-                  (sb-posix:open slave-name sb-posix:o-rdwr)
-                (sb-posix:syscall-error
-                 ()
-                 (sb-posix:close master-fd))
-                (:no-error (slave-fd)
-                  (return-from t
-                    (values master-fd
-                            slave-fd
-                            slave-name)))))))))))
+;;; POSIX PTY allocation via posix_openpt/grantpt/unlockpt/ptsname.
+;;; Works on modern macOS and Linux (replaces legacy /dev/ptyXX scanning).
 
-#+(and scl linux)
+(cffi:defcfun ("posix_openpt" %posix-openpt) :int (flags :int))
+(cffi:defcfun ("grantpt"      %grantpt)      :int (fd :int))
+(cffi:defcfun ("unlockpt"     %unlockpt)     :int (fd :int))
+(cffi:defcfun ("ptsname"      %ptsname)      :string (fd :int))
+
 (defun find-a-pty ()
-  (multiple-value-bind (master errno)
-      (unix:unix-getpt)
-    (unless master
-      (error "~@<Getpt failed: ~A~@:>" (unix:get-unix-error-msg errno)))
-    (multiple-value-bind (winp errno)
-        (unix:unix-grantpt master)
-      (unless winp
-        (unix:unix-close master)
-        (error "~@<Grantpt failed: ~A~@:>" (unix:get-unix-error-msg errno))))
-    (multiple-value-bind (winp errno)
-        (unix:unix-unlockpt master)
-      (unless winp
-        (unix:unix-close master)
-        (error "~@<unlockpt failed: ~A~@:>" (unix:get-unix-error-msg errno))))
-    (multiple-value-bind (name errno)
-        (unix:unix-ptsname master)
-      (unless name
-        (unix:unix-close master)
-        (error "~@<ptsname failed: ~A~@:>" (unix:get-unix-error-msg errno)))
-      (multiple-value-bind (slave errno)
-          (unix:unix-open name unix:o_rdwr 0)
-        (unless slave
-          (unix:unix-close master)
-          (error "~@<Error opening slave pty: ~A~@:>" (unix:get-unix-error-msg errno)))
-        (values master slave name)))))
+  "Allocate a PTY pair.  Returns (values master-fd slave-fd slave-name)."
+  (let ((master (%posix-openpt sb-posix:o-rdwr)))
+    (when (minusp master)
+      (error "posix_openpt failed"))
+    (when (minusp (%grantpt master))
+      (sb-posix:close master)
+      (error "grantpt failed"))
+    (when (minusp (%unlockpt master))
+      (sb-posix:close master)
+      (error "unlockpt failed"))
+    (let ((slave-name (%ptsname master)))
+      (unless slave-name
+        (sb-posix:close master)
+        (error "ptsname failed"))
+      (let ((slave (sb-posix:open slave-name sb-posix:o-rdwr)))
+        (values master slave slave-name)))))
 
 (defun make-process-with-pty-connection
     (command &key name (buffer nil bufferp) stream)
   (multiple-value-bind (master slave slave-name)
       (find-a-pty)
-    (let ((pc (make-process-connection command :slave-pty-name slave-name)))
+    (let ((pc (make-process-connection command
+                                       :slave-pty-name slave-name
+                                       :slave-fd slave)))
       (sb-posix:close slave)
       (make-pipelike-connection master
                                 master

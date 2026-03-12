@@ -20,14 +20,12 @@ GB
 
 (defparameter *hemlock-version*
   (let* ((system (asdf:find-system :hemlock.base))
-         (dir (asdf:component-pathname system))
-         (.git (merge-pathnames ".git/" dir))
-         (ref (with-open-file (s (merge-pathnames "HEAD" .git)
-                                 :if-does-not-exist nil)
-                (and s (subseq (read-line s) 5)))))
-    (if ref
-        (with-open-file (s (merge-pathnames ref .git))
-          (subseq (read-line s) 0 8))
+         (dir (asdf:component-pathname system)))
+    (or (ignore-errors
+          (uiop:with-current-directory (dir)
+            (string-trim '(#\Newline #\Return #\Space)
+                         (uiop:run-program '("git" "rev-parse" "--short" "HEAD")
+                                           :output :string))))
         "4.unknown")))
 
 

@@ -169,23 +169,41 @@
 
 (defmethod initialize-instance :after
     ((instance process-connection/sb-sys) &key)
-  (with-slots (read-fd write-fd process command directory) instance
+  (with-slots (read-fd write-fd process command directory slave-fd) instance
     (connection-note-event instance :initialized)
     (when (stringp command)
       (setf command (cl-ppcre:split " " command)))
     (assert (every #'stringp command))
     (assert command)
     (let* ((prog (car command))
-           (args (cdr command))
-           (proc (sb-ext:run-program prog args
-                                     :input  :stream
-                                     :output :stream
-                                     :wait   nil
-                                     :directory (or directory "/"))))
-      (setf process proc
-            write-fd (sb-sys:fd-stream-fd (sb-ext:process-input proc))
-            read-fd  (sb-sys:fd-stream-fd (sb-ext:process-output proc))))
-    (install-read-handler instance)
+           (args (cdr command)))
+      (if slave-fd
+          ;; PTY mode: child's stdin/stdout/stderr go through the slave PTY fd.
+          ;; The pipelike-connection reads/writes the master side, so we do NOT
+          ;; set read-fd/write-fd or install a read handler here.
+          (let* ((slave-stream (sb-sys:make-fd-stream slave-fd :input t :output t
+                                                      :name "PTY slave"))
+                 (proc (sb-ext:run-program prog args
+                                           :input  slave-stream
+                                           :output slave-stream
+                                           :error  slave-stream
+                                           :wait   nil
+                                           :pty    nil
+                                           :directory (or directory
+                                                         (uiop:getcwd)))))
+            ;; Don't close slave-stream here — sb-ext:run-program dups the fd
+            ;; and the caller closes the slave fd after we return.
+            (setf process proc))
+          ;; Pipe mode: use sb-ext:run-program's built-in pipes.
+          (let ((proc (sb-ext:run-program prog args
+                                          :input  :stream
+                                          :output :stream
+                                          :wait   nil
+                                          :directory (or directory "/"))))
+            (setf process proc
+                  write-fd (sb-sys:fd-stream-fd (sb-ext:process-input proc))
+                  read-fd  (sb-sys:fd-stream-fd (sb-ext:process-output proc)))
+            (install-read-handler instance))))
     (note-connected instance)))
 
 (defmethod delete-connection :before ((connection process-connection/sb-sys))

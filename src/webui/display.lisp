@@ -9,22 +9,28 @@
 ;;;; JSON / HTML escaping helpers
 
 (defun json-escape (str)
-  "Escape STR for embedding as a JSON string value (no surrounding quotes)."
+  "Escape STR for embedding as a JSON string value (no surrounding quotes).
+   Null bytes are stripped to avoid truncating C strings."
   (with-output-to-string (out)
     (loop for ch across str do
       (case ch
+        (#\Nul)                                   ; strip null bytes
         (#\\        (write-string "\\\\" out))
         (#\"        (write-string "\\\"" out))
         (#\Newline  (write-string "\\n"  out))
         (#\Return   (write-string "\\r"  out))
         (#\Tab      (write-string "\\t"  out))
-        (t          (write-char ch out))))))
+        (t          (if (< (char-code ch) 32)
+                        (format out "\\u~4,'0X" (char-code ch))
+                        (write-char ch out)))))))
 
 (defun html-escape-range (str start end out)
-  "Write HTML-escaped characters of STR[start..end) to stream OUT."
+  "Write HTML-escaped characters of STR[start..end) to stream OUT.
+   Null bytes and control characters are skipped."
   (loop for i from start below end
         for ch = (char str i) do
           (case ch
+            (#\Nul)                                ; skip null bytes
             (#\& (write-string "&amp;"  out))
             (#\< (write-string "&lt;"   out))
             (#\> (write-string "&gt;"   out))
@@ -158,28 +164,23 @@
 ;;;; Modeline text
 
 (defun modeline-text (window)
-  (let ((buf (window-modeline-buffer     window))
-        (len (window-modeline-buffer-len window)))
-    (if (and buf len (> len 0))
-        (subseq buf 0 (min len (length buf)))
-        (let ((dl (window-modeline-dis-line window)))
-          (if dl
-              (subseq (dis-line-chars dl) 0 (dis-line-length dl))
-              "")))))
+  "Return the modeline string for WINDOW, with any null characters stripped.
+   The modeline buffer is often padded with null bytes beyond the visible text;
+   these must be removed before embedding in JS (C strings truncate at null)."
+  (let* ((buf (window-modeline-buffer     window))
+         (len (window-modeline-buffer-len window))
+         (raw (if (and buf len (> len 0))
+                  (subseq buf 0 (min len (length buf)))
+                  (let ((dl (window-modeline-dis-line window)))
+                    (if dl
+                        (subseq (dis-line-chars dl) 0 (dis-line-length dl))
+                        "")))))
+    ;; Strip trailing null bytes (the modeline buffer is often padded with #\Nul).
+    (let ((end (position #\Nul raw)))
+      (if end (subseq raw 0 end) raw))))
 
 
 ;;;; Redisplay methods
-
-(defun webui-log (fmt &rest args)
-  "Write a debug line to /tmp/hemlock-webui.log."
-  (ignore-errors
-    (with-open-file (f "/tmp/hemlock-webui.log"
-                       :direction :output
-                       :if-exists :append
-                       :if-does-not-exist :create)
-      (apply #'format f fmt args)
-      (terpri f)
-      (finish-output f))))
 
 (defmethod device-dumb-redisplay ((device webui-device) window)
   (let* ((hunk    (window-hunk window))
@@ -190,7 +191,6 @@
                                         (webui-device-cursor-x device)
                                         (webui-device-cursor-y device)))
          (ml      (modeline-text window)))
-    (webui-log "[dumb-redisplay] dom=~S lines=~D ml-len=~D" dom-id (length lines) (length ml))
     (when (window-modeline-dis-line window)
       (setf (dis-line-flags (window-modeline-dis-line window)) unaltered-bits))
     (push (list dom-id lines ml)
@@ -206,29 +206,18 @@
   (setf (webui-device-cursor-x device) x
         (webui-device-cursor-y device) y))
 
-(defvar *force-output-count* 0)
-
 (defmethod device-force-output ((device webui-device))
   (let ((win (webui-device-window-id device)))
     (when win
       (sb-int:with-float-traps-masked (:invalid :overflow :inexact :divide-by-zero
                                        :underflow)
-        ;; One-time canary: prove webui-run works post-init
-        (when (zerop *force-output-count*)
-          (webui:webui-run win "document.body.style.border='5px solid lime';_dbg('CANARY from Lisp');"))
-        (incf *force-output-count*)
-        (let ((entries (nreverse (webui-device-dirty-windows device))))
-          (webui-log "[force-output] ~D entries win-id=~S count=~D"
-                     (length entries) win *force-output-count*)
-          (dolist (entry entries)
-            (destructuring-bind (dom-id lines ml) entry
-              (let ((js (format nil "try{var _e=document.getElementById(\"~A\");if(_e)_e.innerHTML=~A;var _m=document.getElementById(\"~A-ml\");if(_m)_m.textContent=\"~A\";}catch(e){document.body.innerHTML='<pre style=color:red>'+e.stack+'</pre>';}"
-                                (json-escape dom-id)
-                                (lines-to-json lines)
-                                (json-escape dom-id)
-                                (json-escape ml))))
-                (webui-log "[force-output] ~S len=~D" dom-id (length js))
-                (webui:webui-run win js))))))
+        (dolist (entry (nreverse (webui-device-dirty-windows device)))
+          (destructuring-bind (dom-id lines ml) entry
+            (let ((js (format nil "updateWindow(\"~A\",~A,\"~A\");"
+                              (json-escape dom-id)
+                              (lines-to-json lines)
+                              (json-escape ml))))
+              (webui:webui-run win js)))))
       (setf (webui-device-dirty-windows device) nil))))
 
 (defmethod device-finish-output ((device webui-device) window)

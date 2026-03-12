@@ -22,11 +22,11 @@
          font-family:'Courier New',Courier,monospace;
          font-size:14px; line-height:1.2; overflow:hidden; margin:0; padding:0; }
   #editor-container { display:flex; flex-direction:column; height:100vh; }
-  .hem-window  { flex:1; white-space:pre; overflow:hidden; font-family:inherit; }
-  .hem-echo    { height:2em; flex:none; white-space:pre; overflow:hidden; font-family:inherit; }
-  .hem-ml      { background:#3a3a3a; color:#aaa; white-space:pre; overflow:hidden;
-                 font-family:inherit; font-size:12px; padding:0 2px; }
-  .cursor      { background:#528bff; color:#1e1e1e; }
+  .hem-window  { flex:1; white-space:pre; overflow:hidden; font-family:inherit; background:#252526; }
+  .hem-echo    { height:2em; flex:none; white-space:pre; overflow:hidden; font-family:inherit; background:#252526; }
+  .hem-ml      { background:#3a3a3a; color:#ccc; white-space:pre; overflow:hidden;
+                 font-family:inherit; font-size:12px; padding:2px 4px; flex:none; }
+  .cursor      { background:#528bff; color:#fff; }
   .fg-0{color:#000} .fg-1{color:#cc0000} .fg-2{color:#00aa00} .fg-3{color:#888800}
   .fg-4{color:#3366aa} .fg-5{color:#880088} .fg-6{color:#008888} .fg-7{color:#cccccc}
   .fg-8{color:#555555} .fg-9{color:#ff5555} .fg-10{color:#55ff55} .fg-11{color:#ffff55}
@@ -35,27 +35,14 @@
   .reverse{filter:invert(100%)} .italic{font-style:italic}
 </style></head>
 <body><div id=\"editor-container\">
-  <div id=\"win0\"  class=\"hem-window\"><div style=\"color:yellow\">Waiting for Hemlock...</div></div>
-  <div id=\"win0-ml\" class=\"hem-ml\">-- loading --</div>
-  <div id=\"echo\"  class=\"hem-echo\"><div style=\"color:yellow\">Echo area loading...</div></div>
-  <div id=\"echo-ml\" class=\"hem-ml\">-- loading --</div>
-</div>
-<div id=\"dbg\" style=\"position:fixed;bottom:0;right:0;width:400px;max-height:200px;overflow:auto;background:black;color:lime;font-size:10px;z-index:9999;padding:4px;border:2px solid lime\">dbg ready<br></div>
-<script>
-window.onerror = function(msg, src, line, col, err) {
-  document.body.innerHTML = '<pre style=\"color:red;white-space:pre-wrap;padding:1em\">' +
-    msg + '\\n' + src + ':' + line + ':' + col + '\\n' + (err && err.stack || '') + '</pre>';
-};
-var _dbgN = 0;
-function _dbg(msg) {
-  var d = document.getElementById('dbg');
-  if (d && _dbgN < 30) { _dbgN++; d.innerHTML += msg + '<br>'; }
-}
+  <div id=\"win0\"  class=\"hem-window\"></div>
+  <div id=\"win0-ml\" class=\"hem-ml\"></div>
+  <div id=\"echo\"  class=\"hem-echo\"></div>
+  <div id=\"echo-ml\" class=\"hem-ml\"></div>
+</div><script>
 function updateWindow(id, lines, ml) {
-  _dbg('uW(' + id + ',' + lines.length + ')');
   var el = document.getElementById(id);
-  if (el) { el.innerHTML = lines.join(''); _dbg('set ' + id + ' innerHTML=' + el.innerHTML.length + ' chars'); }
-  else _dbg('NOT FOUND: ' + id);
+  if (el) el.innerHTML = lines.join('');
   var m = document.getElementById(id + '-ml');
   if (m) m.textContent = ml;
 }
@@ -72,9 +59,21 @@ function updateLines(id, changesJson) {
 document.addEventListener('keydown', function(e) {
   var m = '';
   if (e.ctrlKey)  m += 'Control-';
-  if (e.altKey)   m += 'Meta-';
+  // On macOS: Command key sets metaKey, Option sets altKey.
+  // Option often mangles e.key (e.g. Option-x -> a special char),
+  // so treat both as Meta and recover the base key from e.code.
+  var isMeta = e.altKey || e.metaKey;
+  if (isMeta) m += 'Meta-';
   if (e.shiftKey && e.key.length > 1) m += 'Shift-';
-  var k = (e.key === ' ') ? 'Space' : e.key;
+  var k;
+  if (isMeta && e.code && e.code.startsWith('Key')) {
+    // e.code is 'KeyX' etc. — extract the letter in the right case.
+    k = e.shiftKey ? e.code.charAt(3).toUpperCase() : e.code.charAt(3).toLowerCase();
+  } else if (isMeta && e.code && e.code.startsWith('Digit')) {
+    k = e.code.charAt(5);
+  } else {
+    k = (e.key === ' ') ? 'Space' : e.key;
+  }
   webui.call('hemlock_key', m + k).catch(function(){});
   e.preventDefault();
 });
@@ -193,36 +192,24 @@ window.addEventListener('resize', _measureGrid);
 ;;;; device-init / device-exit
 
 (defmethod device-init ((device webui-device))
-  (format *error-output* "~&[device-init] called~%") (finish-output *error-output*)
   (sb-int:with-float-traps-masked (:invalid :overflow :inexact :divide-by-zero
                                    :underflow)
     (let ((win (webui:webui-new-window)))
-      (format *error-output* "~&[device-init] new-window id=~S~%" win)
-      (finish-output *error-output*)
       (setf (webui-device-window-id device) win)
       ;; Bind callbacks BEFORE webui-show so no events are lost if the
       ;; browser connects and fires hemlock_resize before we get here.
-      (let ((key-id (webui:webui-bind win "hemlock_key"
-                      (lambda (event)
-                        (ignore-errors
-                          (format *error-output* "~&[hemlock_key callback fired]~%")
-                          (finish-output *error-output*))
-                        (sb-int:with-float-traps-masked (:invalid :overflow :inexact
-                                                         :divide-by-zero :underflow)
-                          (when *webui-device*
-                            (webui-key-callback *webui-device* event))))))
-            (resize-id (webui:webui-bind win "hemlock_resize"
-                         (lambda (event)
-                           (ignore-errors
-                             (format *error-output* "~&[hemlock_resize callback fired]~%")
-                             (finish-output *error-output*))
-                           (sb-int:with-float-traps-masked (:invalid :overflow :inexact
-                                                            :divide-by-zero :underflow)
-                             (when *webui-device*
-                               (webui-resize-callback *webui-device* event)))))))
-        (format *error-output* "~&[device-init] key-bind-id=~S resize-bind-id=~S~%"
-                key-id resize-id)
-        (finish-output *error-output*))
+      (webui:webui-bind win "hemlock_key"
+        (lambda (event)
+          (sb-int:with-float-traps-masked (:invalid :overflow :inexact
+                                                     :divide-by-zero :underflow)
+            (when *webui-device*
+              (webui-key-callback *webui-device* event)))))
+      (webui:webui-bind win "hemlock_resize"
+        (lambda (event)
+          (sb-int:with-float-traps-masked (:invalid :overflow :inexact
+                                                    :divide-by-zero :underflow)
+            (when *webui-device*
+              (webui-resize-callback *webui-device* event)))))
       ;; NOTE: do NOT call sb-sys:add-fd-handler here.
       ;; *descriptor-handlers* is thread-local in SBCL.  device-init runs on
       ;; the main OS thread, but dispatch-events/serve-event run on the
@@ -232,9 +219,7 @@ window.addEventListener('resize', _measureGrid);
       ;;
       ;; Show the window. webui-wait is called on the main OS thread by
       ;; run-with-webui-event-loop (required by Cocoa/WebKit on macOS).
-      (let ((ok (webui:webui-show win *webui-initial-html*)))
-        (format *error-output* "~&[device-init] webui-show returned ~S~%" ok)
-        (finish-output *error-output*)))))
+      (webui:webui-show win *webui-initial-html*))))
 
 (defmethod device-exit ((device webui-device))
   nil)
@@ -268,20 +253,17 @@ window.addEventListener('resize', _measureGrid);
                 (let ((dev *webui-device*))
                   (sb-sys:add-fd-handler
                    (webui-device-pipe-read-fd dev)
-                   :input (lambda (fd) (webui-drain-events dev fd))))
+                   :input (lambda (fd)
+                            (webui-drain-events dev fd))))
                 (catch 'hemlock-exit (funcall fun)))
               ;; Command loop exited — signal webui to shut down so
               ;; webui-wait returns on the main thread.
               (webui:webui-exit))
             :name "hemlock-command-loop")))
       ;; Main thread: run the webui event loop (required on macOS).
-      (format *error-output* "~&[run-with-webui-event-loop] calling webui-wait~%")
-      (finish-output *error-output*)
       (sb-int:with-float-traps-masked (:invalid :overflow :inexact
                                        :divide-by-zero :underflow)
         (webui:webui-wait))
-      (format *error-output* "~&[run-with-webui-event-loop] webui-wait returned~%")
-      (finish-output *error-output*)
       ;; webui-wait returned (all windows closed or webui-exit called).
       ;; Stop the command loop if it is still running.
       (when (sb-thread:thread-alive-p cmd-thread)
@@ -407,15 +389,15 @@ window.addEventListener('resize', _measureGrid);
 ;;; *window-list* or buffer-windows, unlike setup-window-image).  Then
 ;;; set *screen-image-trashed* so the next redisplay pass does a full repaint.
 (defun webui-apply-resize (device)
-  (ignore-errors
-    (hemlock.webui::webui-log "[webui-apply-resize] rows=~S cols=~S"
-                              (webui-device-lines device) (webui-device-columns device)))
   (let* ((new-rows    (webui-device-lines   device))
          (new-cols    (webui-device-columns device))
          (echo-height (value hemlock::echo-area-height))
          ;; New main text rows: total rows - echo area - 1 modeline row.
          (new-main-text (max 1 (- new-rows echo-height 1))))
-    (declare (ignore new-cols))
+    ;; Update window widths if columns changed.
+    (dolist (w *window-list*)
+      (unless (= (window-width w) new-cols)
+        (setf (window-width w) new-cols)))
     ;; Update the echo area hunk — stays at the bottom with fixed height.
     (let ((echo-hunk (window-hunk *echo-area-window*)))
       (setf (device-hunk-position      echo-hunk) (1- new-rows)
@@ -447,8 +429,7 @@ window.addEventListener('resize', _measureGrid);
          (sp (when (stringp s) (position #\Space s)))
          (cols (when sp (parse-integer s :end sp)))
          (rows (when sp (parse-integer s :start (1+ sp)))))
-    (ignore-errors
-      (hemlock.webui::webui-log "[webui-resize-callback] s=~S cols=~S rows=~S" s cols rows))
+    (declare (ignorable s))
     (when (and cols rows (> cols 0) (> rows 0))
       (setf (webui-device-columns device) cols
             (webui-device-lines   device) rows)
