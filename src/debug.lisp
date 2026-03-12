@@ -140,12 +140,26 @@ Non-nil means we are inside master-agent-debugger.")
   (declare (ignore p))
   (cond
     (*debugger-restarts*
-     (let ((abort (find-restart 'abort)))
+     (let ((abort (find 'abort *debugger-restarts* :key #'restart-name)))
        (if abort
            (invoke-restart abort)
            (throw 'command-loop-catcher nil))))
     (*debugger-restart-count*
      (invoke-restart 'debugger-chose nil))))
+
+;;; Bind keys here (not in bindings.lisp) so they're always set up
+;;; together with the mode and commands when debug.lisp is loaded.
+(bind-key "Debugger Invoke Restart" #k"0" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"1" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"2" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"3" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"4" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"5" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"6" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"7" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"8" :mode "Debugger")
+(bind-key "Debugger Invoke Restart" #k"9" :mode "Debugger")
+(bind-key "Debugger Abort"          #k"q" :mode "Debugger")
 
 
 (defun render-debugger-buffer (buf condition-type condition-msg restart-strings frame-strings)
@@ -168,16 +182,21 @@ Non-nil means we are inside master-agent-debugger.")
 (defun master-agent-debugger (condition-type condition-msg restart-strings frame-strings)
   "Called via wire from agent-debugger on the slave side.
 Returns the chosen restart index (integer) or NIL for abort."
-  (let ((buf (or (getstring "*Agent Debugger*" *buffer-names*)
-                 (make-buffer "*Agent Debugger*" :modes '("Debugger"))))
-        (*debugger-restart-count* (length restart-strings)))
+  (let* ((buf (or (getstring "*Agent Debugger*" *buffer-names*)
+                  (make-buffer "*Agent Debugger*" :modes '("Debugger"))))
+         (*debugger-restart-count* (length restart-strings))
+         (prev-buffer (current-buffer)))
     (render-debugger-buffer buf condition-type condition-msg restart-strings frame-strings)
-    (change-to-buffer buf)
-    (restart-case
-        (hemlock.command::%command-loop)
-      (debugger-chose (n)
-        :report "Debugger restart chosen"
-        n))))
+    (unwind-protect
+        (progn
+          (change-to-buffer buf)
+          (restart-case
+              (hemlock.command::%command-loop)
+            (debugger-chose (n)
+              :report "Debugger restart chosen"
+              n)))
+      (when (member prev-buffer *buffer-list*)
+        (change-to-buffer prev-buffer)))))
 
 
 (defun enter-master-debugger (condition)
@@ -188,7 +207,8 @@ Must be called from within a handler-bind that caught CONDITION so restarts rema
                      (hemlock.introspect:compute-backtrace 0 20)))
          (buf (or (getstring "*Debugger*" *buffer-names*)
                   (make-buffer "*Debugger*" :modes '("Debugger"))))
-         (*debugger-restarts* restarts))
+         (*debugger-restarts* restarts)
+         (prev-buffer (current-buffer)))
     (render-debugger-buffer
      buf
      (type-of condition)
@@ -199,5 +219,9 @@ Must be called from within a handler-bind that caught CONDITION so restarts rema
                  (with-output-to-string (s)
                    (hemlock.introspect:print-frame f s)))
                frames)))
-    (change-to-buffer buf)
-    (hemlock.command::%command-loop)))
+    (unwind-protect
+        (progn
+          (change-to-buffer buf)
+          (hemlock.command::%command-loop))
+      (when (member prev-buffer *buffer-list*)
+        (change-to-buffer prev-buffer)))))

@@ -203,19 +203,65 @@
          (setf (si-line-length ,screen-image-line) ,dl-len)
          (setf (si-line-fonts ,screen-image-line) ,dl-fonts)))))
 
+(defun resize-window-width (window new-width)
+  "Adjust WINDOW's dis-line arrays and width for a new terminal column count.
+Nuke all active lines back to spare, reallocate if wider, and rebuild modeline."
+  (let ((old-width (window-width window)))
+    ;; Move all active dis-lines back to the spare list.
+    (unless (eq (cdr (window-first-line window)) the-sentinel)
+      (shiftf (cdr (window-last-line window))
+              (window-spare-lines window)
+              (cdr (window-first-line window))
+              the-sentinel))
+    ;; Reallocate dis-line char arrays when the terminal got wider.
+    (when (> new-width old-width)
+      (dolist (dl (window-spare-lines window))
+        (setf (dis-line-chars dl) (make-string new-width))))
+    (setf (window-width window) new-width)
+    ;; Rebuild modeline dis-line if present.
+    (when (window-modeline-buffer window)
+      (let* ((dl (window-modeline-dis-line window))
+             (chars (make-string new-width))
+             (len (min new-width (window-modeline-buffer-len window))))
+        (setf (dis-line-old-chars dl) nil
+              (dis-line-chars dl) chars)
+        (replace chars (window-modeline-buffer window) :end1 len :end2 len)
+        (setf (dis-line-length dl) len
+              (dis-line-flags dl) changed-bit)))))
+
 (defun maybe-resize-tty-device (device)
-  ;; Only query terminal size when the SIGWINCH handler has signalled a resize.
-  ;; This avoids an ioctl syscall on every redisplay cycle.
+  "Handle pending SIGWINCH resize: update device dimensions, rebuild screen
+image, adjust all window and hunk geometries.  Called at the top of redisplay."
   (when *pending-resize*
     (setf *pending-resize* nil)
-    (let* ((lines (or *pending-resize-lines*
-                      (nth-value 0 (get-terminal-attributes))))
-           (delta (- lines (tty-device-lines device))))
-      (setf *pending-resize-lines* nil
-            *pending-resize-cols*  nil)
-      (unless (zerop delta)
-        (setf (tty-device-lines device) lines)
-        (enlarge-device device delta)))))
+    (multiple-value-bind (ioctl-lines ioctl-cols)
+        (unless (and *pending-resize-lines* *pending-resize-cols*)
+          (get-terminal-attributes))
+      (let* ((new-lines (or *pending-resize-lines* ioctl-lines))
+             (new-cols  (or *pending-resize-cols*  ioctl-cols))
+             (height-delta (- new-lines (tty-device-lines device)))
+             (new-device-cols (if hemlock.terminfo:auto-right-margin
+                                  (max 1 (1- new-cols))
+                                  (max 1 new-cols)))
+             (width-changed (not (= new-device-cols (tty-device-columns device)))))
+        (setf *pending-resize-lines* nil
+              *pending-resize-cols*  nil)
+        ;; Update device dimensions.
+        (when width-changed
+          (setf (tty-device-columns device) new-device-cols))
+        (unless (zerop height-delta)
+          (setf (tty-device-lines device) new-lines))
+        ;; Resize window widths if columns changed.
+        ;; *window-list* includes all windows (main + echo area).
+        (when width-changed
+          (dolist (w *window-list*)
+            (resize-window-width w new-device-cols)))
+        ;; Handle height change (adjusts hunk positions, rebuilds screen image).
+        (unless (zerop height-delta)
+          (enlarge-device device height-delta))
+        ;; If only width changed, still need to rebuild the screen image.
+        (when (and width-changed (zerop height-delta))
+          (set-up-screen-image device))))))
 
 (defmethod device-dumb-redisplay ((device tty-device) window)
   (maybe-resize-tty-device device)
@@ -518,6 +564,7 @@
 ;;; inserting lines.
 ;;;
 (defmethod device-smart-redisplay ((device tty-device) window)
+  (maybe-resize-tty-device device)
   (let* ((hunk (window-hunk window))
          (device (device-hunk-device hunk)))
     (let ((first-changed (window-first-changed window))

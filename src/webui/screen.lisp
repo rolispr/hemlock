@@ -35,14 +35,27 @@
   .reverse{filter:invert(100%)} .italic{font-style:italic}
 </style></head>
 <body><div id=\"editor-container\">
-  <div id=\"win0\"  class=\"hem-window\"></div>
-  <div id=\"win0-ml\" class=\"hem-ml\"></div>
-  <div id=\"echo\"  class=\"hem-echo\"></div>
-  <div id=\"echo-ml\" class=\"hem-ml\"></div>
-</div><script>
+  <div id=\"win0\"  class=\"hem-window\"><div style=\"color:yellow\">Waiting for Hemlock...</div></div>
+  <div id=\"win0-ml\" class=\"hem-ml\">-- loading --</div>
+  <div id=\"echo\"  class=\"hem-echo\"><div style=\"color:yellow\">Echo area loading...</div></div>
+  <div id=\"echo-ml\" class=\"hem-ml\">-- loading --</div>
+</div>
+<div id=\"dbg\" style=\"position:fixed;bottom:0;right:0;width:400px;max-height:200px;overflow:auto;background:black;color:lime;font-size:10px;z-index:9999;padding:4px;border:2px solid lime\">dbg ready<br></div>
+<script>
+window.onerror = function(msg, src, line, col, err) {
+  document.body.innerHTML = '<pre style=\"color:red;white-space:pre-wrap;padding:1em\">' +
+    msg + '\\n' + src + ':' + line + ':' + col + '\\n' + (err && err.stack || '') + '</pre>';
+};
+var _dbgN = 0;
+function _dbg(msg) {
+  var d = document.getElementById('dbg');
+  if (d && _dbgN < 30) { _dbgN++; d.innerHTML += msg + '<br>'; }
+}
 function updateWindow(id, lines, ml) {
+  _dbg('uW(' + id + ',' + lines.length + ')');
   var el = document.getElementById(id);
-  if (el) el.innerHTML = lines.join('\\n');
+  if (el) { el.innerHTML = lines.join(''); _dbg('set ' + id + ' innerHTML=' + el.innerHTML.length + ' chars'); }
+  else _dbg('NOT FOUND: ' + id);
   var m = document.getElementById(id + '-ml');
   if (m) m.textContent = ml;
 }
@@ -191,16 +204,18 @@ window.addEventListener('resize', _measureGrid);
       ;; browser connects and fires hemlock_resize before we get here.
       (let ((key-id (webui:webui-bind win "hemlock_key"
                       (lambda (event)
-                        (format *error-output* "~&[hemlock_key callback fired]~%")
-                        (finish-output *error-output*)
+                        (ignore-errors
+                          (format *error-output* "~&[hemlock_key callback fired]~%")
+                          (finish-output *error-output*))
                         (sb-int:with-float-traps-masked (:invalid :overflow :inexact
                                                          :divide-by-zero :underflow)
                           (when *webui-device*
                             (webui-key-callback *webui-device* event))))))
             (resize-id (webui:webui-bind win "hemlock_resize"
                          (lambda (event)
-                           (format *error-output* "~&[hemlock_resize callback fired]~%")
-                           (finish-output *error-output*)
+                           (ignore-errors
+                             (format *error-output* "~&[hemlock_resize callback fired]~%")
+                             (finish-output *error-output*))
                            (sb-int:with-float-traps-masked (:invalid :overflow :inexact
                                                             :divide-by-zero :underflow)
                              (when *webui-device*
@@ -392,9 +407,9 @@ window.addEventListener('resize', _measureGrid);
 ;;; *window-list* or buffer-windows, unlike setup-window-image).  Then
 ;;; set *screen-image-trashed* so the next redisplay pass does a full repaint.
 (defun webui-apply-resize (device)
-  (format *error-output* "~&[webui-apply-resize] called rows=~S cols=~S~%"
-          (webui-device-lines device) (webui-device-columns device))
-  (finish-output *error-output*)
+  (ignore-errors
+    (hemlock.webui::webui-log "[webui-apply-resize] rows=~S cols=~S"
+                              (webui-device-lines device) (webui-device-columns device)))
   (let* ((new-rows    (webui-device-lines   device))
          (new-cols    (webui-device-columns device))
          (echo-height (value hemlock::echo-area-height))
@@ -429,12 +444,11 @@ window.addEventListener('resize', _measureGrid);
 
 (defun webui-resize-callback (device event)
   (let* ((s  (webui:webui-get-string event))
-         (sp (position #\Space s))
+         (sp (when (stringp s) (position #\Space s)))
          (cols (when sp (parse-integer s :end sp)))
          (rows (when sp (parse-integer s :start (1+ sp)))))
-    (format *error-output* "~&[webui-resize-callback] s=~S cols=~S rows=~S~%"
-            s cols rows)
-    (finish-output *error-output*)
+    (ignore-errors
+      (hemlock.webui::webui-log "[webui-resize-callback] s=~S cols=~S rows=~S" s cols rows))
     (when (and cols rows (> cols 0) (> rows 0))
       (setf (webui-device-columns device) cols
             (webui-device-lines   device) rows)
