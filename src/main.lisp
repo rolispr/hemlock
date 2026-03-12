@@ -417,6 +417,7 @@ GB
          (catch 'editor-top-level-catcher
            (handler-bind
                ((error #'(lambda (condition)
+                           (format *error-output* "~&[hemlock error] ~A~%" condition)
                            (lisp-error-error-handler condition :internal))))
              (invoke-hook hemlock::abort-hook)
              (%command-loop)))))))

@@ -14,12 +14,10 @@
                :defaults *hemlock-base-directory*)
   :components
   ((:module webui-1
-    :pathname #.(merge-pathnames
-                 (make-pathname :directory '(:relative "src"))
-                 *hemlock-base-directory*)
+    :pathname "src/webui/"
     :serial t
     :components
-    ((:file "webui-device")
-     (:file "webui-screen")
-     (:file "webui-input")
-     (:file "webui-display")))))
+    ((:file "device")
+     (:file "screen")
+     (:file "input")
+     (:file "display")))))

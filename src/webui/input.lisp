@@ -5,6 +5,9 @@
 
 (in-package :hemlock.webui)
 
+;;; Forward-declare webui-apply-resize defined in webui-screen.lisp.
+(declaim (ftype (function (t) t) webui-apply-resize))
+
 
 ;;;; webui-editor-input
 
@@ -31,8 +34,12 @@
        (setf (editor-input-tail stream) head)))))
 
 (defmethod listen-editor-input ((stream webui-editor-input))
-  ;; Events arrive via sb-sys:serve-event (the self-pipe fd-handler).
-  nil)
+  ;; Return T if at least one key-event has already been drained from the
+  ;; self-pipe and enqueued into the editor-input queue.  This lets
+  ;; redisplay-loop abort early when there is pending input, and prevents
+  ;; %editor-input-method from spinning without ever calling dispatch-events
+  ;; when input arrives between redisplay passes.
+  (not (null (input-event-next (editor-input-head stream)))))
 
 
 ;;;; Self-pipe drain — called on the main thread by the fd-handler
@@ -45,7 +52,15 @@
   ;; Push queued key-events into hemlock's editor-input.
   (loop for ke = (sb-concurrency:dequeue (webui-device-input-queue device))
         while ke
-        do (q-event *real-editor-input* ke)))
+        do (q-event *real-editor-input* ke))
+  ;; If the browser reported a new window size, update hemlock's windows
+  ;; on the main thread (hemlock display structures are not thread-safe).
+  ;; We set *screen-image-trashed* so the next redisplay pass does a full
+  ;; refresh, and we update each window's image to match the new dimensions.
+  (when (webui-device-resize-pending device)
+    (hemlock-ext:without-interrupts
+      (setf (webui-device-resize-pending device) nil)
+      (webui-apply-resize device))))
 
 
 ;;;; webui callback — runs in the libwebui thread
@@ -119,7 +134,9 @@
                       (char-key-event (char str 0))))))
         (when ke
           (if (or ctrl meta shift)
-              (let ((bits (make-key-event-bits
-                           :control ctrl :meta meta :shift shift)))
+              (let ((bits (apply #'make-key-event-bits
+                                 (append (when ctrl  '("Control"))
+                                         (when meta   '("Meta"))
+                                         (when shift  '("Shift"))))))
                 (make-key-event ke bits))
               ke))))))

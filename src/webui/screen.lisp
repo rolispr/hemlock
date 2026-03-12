@@ -169,9 +169,8 @@ window.addEventListener('resize', _measureGrid);
                                    :underflow)
     (let ((win (webui:webui-new-window)))
       (setf (webui-device-window-id device) win)
-      (webui:webui-show win *webui-initial-html*)
-      ;; webui-wait blocks until all windows are closed; run it off the main thread.
-      (sb-thread:make-thread (lambda () (webui:webui-wait)) :name "webui-wait")
+      ;; Bind callbacks BEFORE webui-show so no events are lost if the
+      ;; browser connects and fires hemlock_resize before we get here.
       (webui:webui-bind win "hemlock_key"
         (lambda (event)
           (sb-int:with-float-traps-masked (:invalid :overflow :inexact
@@ -187,7 +186,15 @@ window.addEventListener('resize', _measureGrid);
       (sb-sys:add-fd-handler
        (webui-device-pipe-read-fd device)
        :input (let ((dev device))
-                (lambda (fd) (webui-drain-events dev fd)))))))
+                (lambda (fd) (webui-drain-events dev fd))))
+      ;; Disable show_wait_connection so webui_show returns immediately instead
+      ;; of blocking until the WebSocket handshake completes.  The command loop
+      ;; will block in serve-event until hemlock_resize fires (browser load),
+      ;; which is the correct place to wait.
+      (webui:webui-set-config webui:+show-wait-connection+ nil)
+      (webui:webui-show win *webui-initial-html*)
+      ;; webui-wait blocks until all windows are closed; run it off the main thread.
+      (sb-thread:make-thread (lambda () (webui:webui-wait)) :name "webui-wait"))))
 
 (defmethod device-exit ((device webui-device))
   nil)
@@ -296,6 +303,48 @@ window.addEventListener('resize', _measureGrid);
         (t nil)))
 
 
+;;;; webui-apply-resize — called on the main thread by webui-drain-events
+
+;;; Apply a window resize that was signalled by the browser.  The new
+;;; dimensions have already been written into the device by the callback.
+;;; This runs on the main editor thread (fd-handler context), so it is safe
+;;; to touch hemlock display structures.
+;;;
+;;; Strategy: adjust hunk geometry and resize each window's image with
+;;; change-window-image-height (which does not re-register the window in
+;;; *window-list* or buffer-windows, unlike setup-window-image).  Then
+;;; set *screen-image-trashed* so the next redisplay pass does a full repaint.
+(defun webui-apply-resize (device)
+  (let* ((new-rows    (webui-device-lines   device))
+         (new-cols    (webui-device-columns device))
+         (echo-height (value hemlock::echo-area-height))
+         ;; New main text rows: total rows - echo area - 1 modeline row.
+         (new-main-text (max 1 (- new-rows echo-height 1))))
+    (declare (ignore new-cols))
+    ;; Update the echo area hunk — stays at the bottom with fixed height.
+    (let ((echo-hunk (window-hunk *echo-area-window*)))
+      (setf (device-hunk-position      echo-hunk) (1- new-rows)
+            (device-hunk-height        echo-hunk) echo-height
+            (webui-hunk-text-position  echo-hunk) (- new-rows 2)
+            (webui-hunk-text-height    echo-hunk) echo-height)
+      ;; Echo area text height rarely changes; update image height in case.
+      (change-window-image-height *echo-area-window* echo-height))
+    ;; Update the main window hunk (only the first/primary hunk for now;
+    ;; for multi-window configurations we just trash and let redisplay fix it).
+    (let ((first-hunk (device-hunks device)))
+      (when first-hunk
+        (let ((main-win   (device-hunk-window first-hunk))
+              ;; Total hunk height includes 1 modeline row.
+              (new-height (+ new-main-text 1)))
+          (setf (device-hunk-position      first-hunk) new-main-text
+                (device-hunk-height        first-hunk) new-height
+                (webui-hunk-text-position  first-hunk) (1- new-main-text)
+                (webui-hunk-text-height    first-hunk) new-main-text)
+          (setf (device-bottom-window-base device) (1- new-main-text))
+          (change-window-image-height main-win new-main-text))))
+    (setf hemlock.command::*screen-image-trashed* t)))
+
+
 ;;;; Resize callback (called from webui thread)
 
 (defun webui-resize-callback (device event)
@@ -305,8 +354,14 @@ window.addEventListener('resize', _measureGrid);
          (rows (when sp (parse-integer s :start (1+ sp)))))
     (when (and cols rows (> cols 0) (> rows 0))
       (setf (webui-device-columns device) cols
-            (webui-device-lines   device) rows))
-    ;; Wake the main thread via the self-pipe.
+            (webui-device-lines   device) rows)
+      ;; Mark that the main thread needs to adjust the window layout.
+      ;; webui-drain-events reads this flag on the main thread and calls
+      ;; webui-apply-resize safely (hemlock data structures are not
+      ;; thread-safe, so we cannot do it here).
+      (setf (webui-device-resize-pending device) t))
+    ;; Wake the main thread via the self-pipe regardless of whether the
+    ;; size actually changed (also wakes it for the initial page-load resize).
     (cffi:with-foreign-object (b :uint8)
       (setf (cffi:mem-ref b :uint8) 1)
       (cffi:foreign-funcall "write"

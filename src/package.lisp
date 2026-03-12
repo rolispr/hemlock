@@ -727,6 +727,7 @@
    #:with-mark
 
    ;; variables
+   #:*in-the-editor*
    #:*current-buffer*
    #:*current-window*
    #:*echo-area-buffer*
@@ -910,6 +911,8 @@
    #:input-waiting
    #:concat
    #:setup-initial-buffer
+   ;; eval-server.lisp — used by lispeval.lisp
+   #:eval-server-ready-p
    ))
 
 

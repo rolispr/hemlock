@@ -5,7 +5,8 @@
 
 (in-package :hemlock.command)
 
-(declaim (special *in-the-editor*)) ; defined in main.lisp --amb
+(defvar *in-the-editor* nil
+  "True if we are inside the editor.")
 
 ;;;; Main redisplay entry points.
 

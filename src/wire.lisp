@@ -28,7 +28,7 @@
    #:device-wire #:device-append-to-input-buffer
    #:device-read #:device-listen #:device-write #:device-close
    #:device-serve-requests
-   #:dispatch-events #:dispatch-events-no-hang))
+   #:dispatch-events #:dispatch-events-no-hang #:dispatch-events-timeout))
 
 (in-package :hemlock.wire)
 
@@ -706,11 +706,16 @@ then output the bytes."
                      `(wire-output-object ,staging ,arg))
                  args)
        ;; Flush the staging wire to its vector, then write framed to real wire.
+       ;; Order matters: length MUST reach the device before the body.
+       ;; wire-output-number puts the length in the wire's obuf; device-write
+       ;; writes the body directly to the device (bypassing obuf), so we must
+       ;; flush the obuf first to guarantee [length][body] ordering.
        (wire-force-output ,staging)
        (let* ((,bytes (vector-device-bytes (wire-device ,staging)))
               (,nbytes (fill-pointer ,bytes)))
-         (wire-output-number ,wire ,nbytes)
-         (device-write (wire-device ,wire) ,bytes ,nbytes))
+         (wire-output-number ,wire ,nbytes)  ; length → obuf
+         (wire-force-output ,wire)           ; flush length to device first
+         (device-write (wire-device ,wire) ,bytes ,nbytes))  ; body after
        (values))))
 
 ;;; WIRE-OUTPUT-OBJECT -- public

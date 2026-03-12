@@ -5,9 +5,8 @@
 
 (in-package :hemlock.webui)
 
-;;; Register the backend and make it the default.
+;;; Register the backend.
 (pushnew :webui hemlock.command::*available-backends*)
-(setf hemlock.command::*default-backend* :webui)
 
 ;;;; Device class
 
@@ -47,7 +46,11 @@
     :initform 0)
    (cursor-y
     :accessor webui-device-cursor-y
-    :initform 0)))
+    :initform 0)
+   (resize-pending
+    :accessor webui-device-resize-pending
+    :initform nil
+    :documentation "Set to T by the resize callback; cleared by webui-drain-events after rebuilding windows.")))
 
 ;;;; Hunk class
 

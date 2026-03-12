@@ -396,7 +396,6 @@
        :name slave)
       server-info)))
 
-#+(or)                    ;disabled for now --dfl
 ;;; MAYBE-CREATE-SERVER -- Internal interface.
 ;;;
 (defun maybe-create-server ()
@@ -418,9 +417,9 @@
                                     "Enter the name of an existing eval server."
                                     :must-exist t)
               (declare (ignore name))
-              (or info (create-slave)))
-            (create-slave)))
-      (create-slave)))
+              (or info (create-slave (slave-command-with-arguments))))
+            (create-slave (slave-command-with-arguments))))
+      (create-slave (slave-command-with-arguments))))
 
 
 (defvar *next-slave-index* 0
@@ -1196,3 +1195,21 @@
          (ts-data (variable-value 'typescript-data :buffer buffer)))
     (change-to-buffer buffer)
     (hemlock.wire:make-remote-object ts-data)))
+
+
+;;;; Wire-readiness predicate.
+
+(defun eval-server-ready-p (info)
+  "Return true only when INFO is a server-info with an established wire."
+  (and info (hemlock.wire:wire-p (server-info-wire info))))
+
+;; Alias for prepl.lisp which calls this from background threads
+(setf (fdefinition 'make-extra-repl-buffer-impl)
+      #'%make-extra-typescript-buffer)
+
+
+;;;; Auto-start slave on editor entry.
+
+(add-hook entry-hook
+  (lambda ()
+    (ignore-errors (create-slave-in-thread))))

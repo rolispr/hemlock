@@ -735,7 +735,7 @@
   "Evaluates the current or next top-level form."
   (declare (ignore p))
   (let ((info (value current-eval-server)))
-    (cond ((not info)
+    (cond ((not (eval-server-ready-p info))
            (message "Evaluate Defun in the editor Lisp ...")
            (editor-evaluate-defun-command nil))
           ((region-active-p)
@@ -750,7 +750,7 @@
    form as if the variable is not bound."
   (declare (ignore p))
   (let ((info (value current-eval-server)))
-    (cond ((not info)
+    (cond ((not (eval-server-ready-p info))
            (message "Re-evaluate Defvar in the editor Lisp ...")
            (editor-re-evaluate-defvar-command nil))
           (t
@@ -781,7 +781,7 @@
   "Show the macroexpansion of the current expression in the null environment.
    With an argument, use MACROEXPAND instead of MACROEXPAND-1."
   (let ((info (value current-eval-server)))
-    (cond ((not info)
+    (cond ((not (eval-server-ready-p info))
            (message "Macroexpand Expression in the editor Lisp ...")
            (editor-macroexpand-expression-command nil))
           (t
@@ -806,7 +806,7 @@
   "Prompt for an expression to evaluate."
   (declare (ignore p))
   (let ((info (value current-eval-server)))
-    (cond ((not info)
+    (cond ((not (eval-server-ready-p info))
            (message "Evaluate Expression in the editor Lisp ...")
            (editor-evaluate-expression-command nil))
           (t
@@ -824,7 +824,7 @@
   "Evaluates the current or next top-level form."
   (declare (ignore p))
   (let ((info (value current-eval-server)))
-    (cond ((not info)
+    (cond ((not (eval-server-ready-p info))
            (message "Compiling in the editor Lisp ...")
            (editor-compile-defun-command nil))
           ((region-active-p)
@@ -837,7 +837,7 @@
   "Compiles lisp forms between the point and the mark."
   (declare (ignore p))
   (let ((info (value current-eval-server)))
-    (cond ((not info)
+    (cond ((not (eval-server-ready-p info))
            (message "Compiling in the editor Lisp ...")
            (editor-compile-region-command nil))
           (t
@@ -848,7 +848,7 @@
   "Evaluates lisp forms between the point and the mark."
   (declare (ignore p))
   (let ((info (value current-eval-server)))
-    (cond ((not info)
+    (cond ((not (eval-server-ready-p info))
            (message "Evaluating region in the editor Lisp ...")
            (editor-evaluate-region-command nil))
           (t
@@ -860,7 +860,7 @@
   the echo area.  The prefix argument is ignored."
   (declare (ignore p))
   (let ((info (value current-eval-server)))
-    (cond ((not info)
+    (cond ((not (eval-server-ready-p info))
            (message "Evaluating buffer in the editor Lisp ...")
            (editor-evaluate-buffer-command nil))
           (t
@@ -874,7 +874,7 @@
   "Prompt for a file to load into the current eval server."
   (declare (ignore p))
   (let ((info (value current-eval-server)))
-    (cond ((not info)
+    (cond ((not (eval-server-ready-p info))
            (message "Load File in the editor Lisp ...")
            (editor-load-file-command nil))
           (t
@@ -898,7 +898,7 @@
   "Prompts for file to compile."
   (declare (ignore p))
   (let ((info (value current-eval-server)))
-    (cond ((not info)
+    (cond ((not (eval-server-ready-p info))
            (message "Compile File in the editor Lisp ...")
            (editor-compile-file-command nil))
           (t
@@ -922,7 +922,7 @@
   "Compile the file in the current buffer if the fasl file isn't up to date.
    When p, always do it."
   (let ((info (value current-eval-server)))
-    (cond ((not info)
+    (cond ((not (eval-server-ready-p info))
            (message "Compile Buffer File in the editor Lisp ...")
            (editor-compile-buffer-file-command nil))
           (t
@@ -959,7 +959,7 @@
   All modified files are saved beforehand."
   "Do a Compile-File in each file in the current group that seems to need it."
   (let ((info (value current-eval-server)))
-    (cond ((not info)
+    (cond ((not (eval-server-ready-p info))
            (message "Compile Group in the editor Lisp ...")
            (editor-compile-group-command nil))
           (t
@@ -1107,7 +1107,7 @@
   "Describe the current function call."
   (let ((info (value current-eval-server)))
     (cond
-     ((not info)
+     ((not (eval-server-ready-p info))
       (message "Describing from the editor Lisp ...")
       (editor-describe-function-call-command p))
      (t
@@ -1161,7 +1161,7 @@
   (declare (ignore p))
   (let ((info (value current-eval-server)))
     (cond
-     ((not info)
+     ((not (eval-server-ready-p info))
       (message "Describing from the editor Lisp ...")
       (editor-describe-symbol-command nil))
      (t

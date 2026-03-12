@@ -654,9 +654,11 @@
         (error ()))
       (throw 'command-loop-catcher nil))
      (message-only-p
+      (format *error-output* "~&[hemlock editor-error] ~A~%" condition)
       (ignore-errors (message "~A" condition))
       (throw 'command-loop-catcher nil))
      (t
+      (format *error-output* "~&[hemlock error] ~A~%" condition)
       (ignore-errors (message "Error: ~A" condition))
       (throw 'command-loop-catcher nil)))))
 

@@ -33,6 +33,7 @@
               :components
               ((:file "wire-package")
                (:file "port")
+               (:file "introspect")
                (:file "wire")
                (:file "remote")))
      (:module core-1

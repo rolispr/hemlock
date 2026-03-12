@@ -318,7 +318,7 @@
 (defmacro site-wrapper-macro (&body body)
   `(unwind-protect
      (progn
-       (when *editor-has-been-entered*
+       (when (and *editor-has-been-entered* *current-window*)
          (let ((device (device-hunk-device (window-hunk (current-window)))))
             (device-init device)))
        (let ((*beep-function* #'hemlock-beep)
@@ -330,8 +330,9 @@
                 (hemlock-ext:with-clx-event-handling
                     (*editor-windowed-input* #'hemlock-ext:object-set-event-handler)
                   ,@body)))))
-     (let ((device (device-hunk-device (window-hunk (current-window)))))
-       (device-exit device))))
+     (when *current-window*
+       (let ((device (device-hunk-device (window-hunk (current-window)))))
+         (device-exit device)))))
 
 (declaim (special *echo-area-window*))
 
