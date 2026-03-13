@@ -61,13 +61,22 @@
             (face-conceal cur) (face-conceal saved)
             (face-crossed cur) (face-crossed saved)))))
 
+(defun term-current-bg-face (term)
+  "Return a face-attrs for the current background, reusing cached copy when possible."
+  (when (face-bg (term-attrs term))
+    (let ((cur (term-attrs term))
+          (cached (term-last-write-face term)))
+      (if (and cached (face-attrs-equal cached cur))
+          cached
+          (setf (term-last-write-face term)
+                (copy-face-attrs cur))))))
+
 (defun term-erase-in-line (term &optional (mode 0))
   (let* ((y (term-cursor-y term))
          (x (term-cursor-x term))
          (w (term-width term))
          (row (aref (term-grid term) y))
-         (bg-face (when (face-bg (term-attrs term))
-                    (copy-face-attrs (term-attrs term)))))
+         (bg-face (term-current-bg-face term)))
     (case mode
       (0
        (loop for i from x below w do
@@ -87,8 +96,7 @@
          (h (term-height term))
          (w (term-width term))
          (grid (term-grid term))
-         (bg-face (when (face-bg (term-attrs term))
-                    (copy-face-attrs (term-attrs term)))))
+         (bg-face (term-current-bg-face term)))
     (case mode
       (0
        (term-erase-in-line term 0)
@@ -111,8 +119,7 @@
          (w (term-width term))
          (row (aref (term-grid term) y))
          (count (min n (- w x)))
-         (bg-face (when (face-bg (term-attrs term))
-                    (copy-face-attrs (term-attrs term)))))
+         (bg-face (term-current-bg-face term)))
     (loop for i from x below (+ x count) do
       (setf (cell-char (aref row i)) #\Space
             (cell-face (aref row i)) bg-face))))
@@ -124,8 +131,7 @@
          (w (term-width term))
          (row (aref (term-grid term) y))
          (count (min n (- w x)))
-         (bg-face (when (face-bg (term-attrs term))
-                    (copy-face-attrs (term-attrs term)))))
+         (bg-face (term-current-bg-face term)))
     (loop for i from (1- w) downto (+ x count) do
       (let ((src (aref row (- i count))))
         (setf (cell-char (aref row i)) (cell-char src)
@@ -141,8 +147,7 @@
          (w (term-width term))
          (row (aref (term-grid term) y))
          (count (min n (- w x)))
-         (bg-face (when (face-bg (term-attrs term))
-                    (copy-face-attrs (term-attrs term)))))
+         (bg-face (term-current-bg-face term)))
     (loop for i from x below (- w count) do
       (let ((src (aref row (+ i count))))
         (setf (cell-char (aref row i)) (cell-char src)

@@ -51,10 +51,10 @@
      color)
     (t nil)))
 
-(defun term-render-line (term y)
+(defun term-render-line (term y &optional (chars (make-string (term-width term)
+                                                              :initial-element #\Space)))
   (let* ((w (term-width term))
          (row (aref (term-grid term) y))
-         (chars (make-string w :initial-element #\Space))
          (font-changes nil)
          (prev-face nil))
     (dotimes (x w)

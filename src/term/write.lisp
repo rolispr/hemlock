@@ -58,7 +58,12 @@
 (defun term-write (term str &optional (start 0) (end (length str)))
   (let* ((w (term-width term))
          (charset (current-charset-mapping term))
-         (face (copy-face-attrs (term-attrs term))))
+         (face (let ((cur (term-attrs term))
+                     (cached (term-last-write-face term)))
+                 (if (and cached (face-attrs-equal cached cur))
+                     cached
+                     (setf (term-last-write-face term)
+                           (copy-face-attrs cur))))))
     (do ((idx start (1+ idx)))
         ((>= idx end))
       (let* ((raw-ch (char str idx))

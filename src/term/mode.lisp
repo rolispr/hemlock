@@ -12,7 +12,8 @@
   (connection nil)
   (pty-fd nil :type (or null fixnum))
   (dirty nil :type boolean)
-  (font-info-cache nil))
+  (font-info-cache nil)
+  (render-buf nil :type (or null simple-string)))
 
 (defun terminal-state-for-buffer (buffer)
   (gethash buffer *terminal-buffers*))
@@ -56,10 +57,16 @@
   (let ((state (terminal-state-for-buffer buffer)))
     (when (and state (terminal-state-dirty state))
       (let* ((term (terminal-state-term state))
+             (w (hemlock.term:term-width term))
              (h (hemlock.term:term-height term))
              (cache (or (terminal-state-font-info-cache state)
                         (setf (terminal-state-font-info-cache state)
-                              (make-array h :initial-element nil)))))
+                              (make-array h :initial-element nil))))
+             (render-buf (let ((buf (terminal-state-render-buf state)))
+                           (if (and buf (= (length buf) w))
+                               buf
+                               (setf (terminal-state-render-buf state)
+                                     (make-string w :initial-element #\Space))))))
         (with-writable-buffer (buffer)
           (let ((line (mark-line (buffer-start-mark buffer)))
                 (cy (hemlock.term:term-cursor-y term))
@@ -67,10 +74,11 @@
                 (cursor-line nil))
             (dotimes (y h)
               (when line
+                (fill render-buf #\Space)
                 (multiple-value-bind (row-str font-changes)
-                    (hemlock.term:term-render-line term y)
+                    (hemlock.term:term-render-line term y render-buf)
                   (unless (string= (line-string line) row-str)
-                    (setf (line-string line) row-str))
+                    (setf (line-string line) (copy-seq row-str)))
                   (setf (aref cache y)
                         (terminal-font-changes-to-font-info
                          font-changes (length row-str))))
@@ -148,15 +156,19 @@
           (setf (terminal-state-dirty state) t))))))
 
 (defun terminal-redisplay-hook (window)
+  ;; Handle resize for the specific window being redisplayed
   (let* ((buffer (window-buffer window))
          (state (terminal-state-for-buffer buffer)))
     (when state
       (let ((term (terminal-state-term state)))
         (when (or (/= (window-height window) (hemlock.term:term-height term))
                   (/= (window-width window) (hemlock.term:term-width term)))
-          (terminal-resize-to-window buffer window)))
-      (when (terminal-state-dirty state)
-        (terminal-sync-buffer buffer)))))
+          (terminal-resize-to-window buffer window)))))
+  ;; Sync ALL dirty terminal buffers so non-focused windows update too
+  (maphash (lambda (buf state)
+             (when (terminal-state-dirty state)
+               (terminal-sync-buffer buf)))
+           *terminal-buffers*))
 
 (add-hook hemlock::redisplay-hook #'terminal-redisplay-hook)
 
@@ -251,6 +263,27 @@
         (when (<= 1 code 31)
           (terminal-send (string (code-char code))))))))
 
+(defcommand "Terminal Send Hyper As Control" (p)
+  "Translate Hyper-<letter> (from C-c <letter>) into the corresponding control character and send it to the terminal."
+  "Translate Hyper-<letter> (from C-c <letter>) into the corresponding control character and send it to the terminal."
+  (declare (ignore p))
+  (let* ((keysym (key-event-keysym *last-key-event-typed*))
+         (name (keysym-preferred-name keysym)))
+    (when (and name (= (length name) 1))
+      (let* ((ch (char-upcase (char name 0)))
+             (code (- (char-code ch) 64)))
+        (when (<= 1 code 31)
+          (terminal-send (string (code-char code))))))))
+
+(defcommand "Terminal Quoted Send" (p)
+  "Read the next key and send it literally to the terminal."
+  "Read the next key and send it literally to the terminal."
+  (declare (ignore p))
+  (let* ((ev (get-key-event *editor-input* t))
+         (char (hemlock-ext:key-event-char ev)))
+    (when char
+      (terminal-send (string char)))))
+
 (defcommand "Terminal Send Arrow Up" (p)
   "Send up arrow to the terminal process."
   "Send up arrow to the terminal process."
@@ -315,13 +348,30 @@
 (bind-key "Terminal Send Tab" #k"tab" :mode "Terminal")
 (bind-key "Terminal Send Backspace" #k"backspace" :mode "Terminal")
 (bind-key "Terminal Send Backspace" #k"delete" :mode "Terminal")
-(let ((ctrl-bits (make-key-event-bits "Control")))
+(let ((ctrl-bits (make-key-event-bits "Control"))
+      (c-lower (name-keysym "c"))
+      (c-upper (name-keysym "C"))
+      (x-lower (name-keysym "x"))
+      (x-upper (name-keysym "X")))
   (do-alpha-key-events (key-event :both)
-    (bind-key "Terminal Send Control"
-              (make-key-event key-event ctrl-bits)
-              :mode "Terminal")))
+    (let ((ks (key-event-keysym key-event)))
+      (unless (or (= ks c-lower) (= ks c-upper)
+                  (= ks x-lower) (= ks x-upper))
+        (bind-key "Terminal Send Control"
+                  (make-key-event key-event ctrl-bits)
+                  :mode "Terminal")))))
+(let ((hyper-bits (make-key-event-bits "Hyper"))
+      (q-lower (name-keysym "q"))
+      (q-upper (name-keysym "Q")))
+  (do-alpha-key-events (key-event :both)
+    (let ((ks (key-event-keysym key-event)))
+      (unless (or (= ks q-lower) (= ks q-upper))
+        (bind-key "Terminal Send Hyper As Control"
+                  (make-key-event key-event hyper-bits)
+                  :mode "Terminal")))))
+(bind-key "Terminal Quoted Send" #k"hyper-q" :mode "Terminal")
+(bind-key "Terminal Send Escape" #k"hyper-escape" :mode "Terminal")
 (bind-key "Terminal Send Arrow Up" #k"uparrow" :mode "Terminal")
 (bind-key "Terminal Send Arrow Down" #k"downarrow" :mode "Terminal")
 (bind-key "Terminal Send Arrow Right" #k"rightarrow" :mode "Terminal")
 (bind-key "Terminal Send Arrow Left" #k"leftarrow" :mode "Terminal")
-(bind-key "Terminal Quit" #k"hyper-q" :mode "Terminal")

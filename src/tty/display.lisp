@@ -251,9 +251,7 @@ Nuke all active lines back to spare, reallocate if wider, and rebuild modeline."
 Recalculates all hunk positions and heights from scratch, distributing available
 height proportionally among existing windows.  If the terminal shrinks too much
 for all windows, extra splits are removed (keeping the first/top window)."
-  (let* ((new-device-cols (if hemlock.terminfo:auto-right-margin
-                              (max 1 (1- new-cols))
-                              (max 1 new-cols)))
+  (let* ((new-device-cols (max 1 new-cols))
          (width-changed (/= new-device-cols (tty-device-columns device)))
          (echo-hunk (window-hunk *echo-area-window*))
          (echo-text-height (tty-hunk-text-height echo-hunk))

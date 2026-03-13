@@ -81,7 +81,8 @@
   (title "" :type string)
   (cwd "" :type string)
   (last-char #\Space :type character)
-  (in-alt-screen nil :type boolean))
+  (in-alt-screen nil :type boolean)
+  (last-write-face nil :type (or null face-attrs)))
 
 (defun make-term (&key (width 80) (height 24)
                        input-fn bell-fn title-fn cwd-fn

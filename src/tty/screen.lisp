@@ -169,9 +169,8 @@ This distinguishes a bare Escape keypress from an Alt+key escape sequence."
     (multiple-value-bind  (lines cols speed)
                           (get-terminal-attributes)
       (setf (tty-device-lines device) (or lines (termcap :lines) 24))
-      (let ((cols (max 1 (or cols (termcap :columns) 80))))
-        (setf (tty-device-columns device)
-              (if hemlock.terminfo:auto-right-margin (1- cols) cols)))
+      (setf (tty-device-columns device)
+            (max 1 (or cols (termcap :columns) 80)))
       (setf (tty-device-speed device) speed))
     ;;
     ;; Some function slots.
