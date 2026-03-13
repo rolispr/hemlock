@@ -176,26 +176,71 @@
 
 ;;;; Collect window HTML lines
 
-(defun collect-window-lines (window cursor-hunk cursor-x cursor-y)
-  "Return a vector of HTML <div> strings for each display line of WINDOW.
-   Pads with empty <div> rows up to the window height so the screen is full."
+(defun make-top-border (window border-class)
+  (let* ((width (+ (window-width window) 2))
+         (buf (window-buffer window))
+         (name (if buf (buffer-name buf) "")))
+    (with-output-to-string (out)
+      (write-string "<div><span class=\"" out)
+      (write-string border-class out)
+      (write-string "\">" out)
+      (write-string "┌─" out)
+      (let* ((avail (- width 4))
+             (label (if (> (length name) 0)
+                        (let ((s (concatenate 'string " " name " ")))
+                          (if (> (length s) avail) (subseq s 0 avail) s))
+                        ""))
+             (fill-count (max 0 (- avail (length label)))))
+        (html-escape-range label 0 (length label) out)
+        (dotimes (x fill-count) (declare (ignore x)) (write-string "─" out)))
+      (write-string "─┐" out)
+      (write-string "</span></div>" out))))
+
+(defun make-bottom-border (window border-class)
+  (let ((width (+ (window-width window) 2)))
+    (with-output-to-string (out)
+      (write-string "<div><span class=\"" out)
+      (write-string border-class out)
+      (write-string "\">" out)
+      (write-string "└" out)
+      (dotimes (x (- width 2)) (declare (ignore x)) (write-string "─" out))
+      (write-string "┘" out)
+      (write-string "</span></div>" out))))
+
+(defun collect-window-lines (window cursor-hunk cursor-x cursor-y &optional focusedp)
   (let ((fn (and (fboundp 'hemlock::terminal-inject-font-changes-for-window)
                  (symbol-function 'hemlock::terminal-inject-font-changes-for-window))))
     (when fn (funcall fn window)))
   (let* ((hunk   (window-hunk window))
          (height (window-height window))
-         (result (make-array height :fill-pointer 0))
+         (echo-p (eq window *echo-area-window*))
+         (border-class (if focusedp "border-focused" "border-unfocused"))
+         (result (make-array (if echo-p height (+ height 2)) :fill-pointer 0))
          (i      0))
+    (unless echo-p
+      (vector-push-extend (make-top-border window border-class) result))
     (do ((dl (cdr (window-first-line window)) (cdr dl)))
         ((eq dl the-sentinel))
       (let* ((cursor-col (when (and (eq hunk cursor-hunk) (= i cursor-y))
                            cursor-x))
              (inner (dis-line->html (car dl) cursor-col)))
-        (vector-push-extend (format nil "<div>~A</div>" inner) result))
+        (vector-push-extend
+         (if echo-p
+             (format nil "<div>~A</div>" inner)
+             (format nil "<div class=\"hem-bline\"><span class=\"~A\">│</span><span class=\"hem-bcontent\">~A</span><span class=\"~A\">│</span></div>"
+                     border-class inner border-class))
+         result))
       (incf i))
-    ;; Pad remaining rows with empty divs (like ~ lines in a terminal).
-    (loop while (< (fill-pointer result) height)
-          do (vector-push-extend "<div> </div>" result))
+    (let ((target (if echo-p height (1+ height))))
+      (loop while (< (fill-pointer result) target)
+            do (vector-push-extend
+                (if echo-p
+                    "<div> </div>"
+                    (format nil "<div class=\"hem-bline\"><span class=\"~A\">│</span><span class=\"hem-bcontent\"> </span><span class=\"~A\">│</span></div>"
+                            border-class border-class))
+                result)))
+    (unless echo-p
+      (vector-push-extend (make-bottom-border window border-class) result))
     result))
 
 (defun lines-to-json (vec)
@@ -263,7 +308,8 @@
                 (let* ((hunk   (window-hunk window))
                        (dom-id (webui-hunk-dom-id hunk))
                        (cursor-hunk (when (eq window cw) ch))
-                       (lines  (collect-window-lines window cursor-hunk cx cy))
+                       (lines  (collect-window-lines window cursor-hunk cx cy
+                                                        (eq window cw)))
                        (ml     (modeline-text window)))
                   (let ((js (format nil "updateWindow(\"~A\",~A,\"~A\");"
                                     (json-escape dom-id)
