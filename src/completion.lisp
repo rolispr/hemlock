@@ -598,19 +598,22 @@
 
 
 (defun find-symbol-completion (show-matches-p prefix)
-  (multiple-value-bind (package-prefix symname)
-                       (let ((p (position #\: prefix)))
-                         (if p
-                             (values (subseq prefix 0 p)
-                                     (string-downcase (subseq prefix (1+ p))))
-                             (values nil
-                                     (string-downcase prefix))))
-    (hemlock::eval-in-slave
-     `(%find-symbol-completion/request
-       ',(and show-matches-p t)
-       ',package-prefix
-       ',(or package-prefix (package-at-point))
-       ',symname))))
+  (let ((info (value current-eval-server)))
+    (if (eval-server-ready-p info)
+        (multiple-value-bind (package-prefix symname)
+            (let ((p (position #\: prefix)))
+              (if p
+                  (values (subseq prefix 0 p)
+                          (string-downcase (subseq prefix (1+ p))))
+                  (values nil
+                          (string-downcase prefix))))
+          (hemlock::eval-in-slave
+           `(%find-symbol-completion/request
+             ',(and show-matches-p t)
+             ',package-prefix
+             ',(or package-prefix (package-at-point))
+             ',symname)))
+        (editor-find-symbol-completion show-matches-p prefix))))
 
 (defun complete-symbol (&optional show-matches-p)
   (find-symbol-completion show-matches-p (symbol-string-at-point)))
@@ -633,7 +636,7 @@
   (editor-find-symbol-completion show-matches-p (symbol-string-at-point)))
 
 (defhvar "Completion Function" ""
-  :value 'completion-complete-word)
+  :value 'completion-complete-word-command)
 
 (defhvar "Completion Function" ""
   :mode "Lisp" :value 'complete-symbol)

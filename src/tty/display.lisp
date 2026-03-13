@@ -182,6 +182,11 @@
                 results))))))
 
 
+(defun effective-font-usages (dis-line)
+  (or (and (fboundp 'hemlock::terminal-font-info-for-dis-line)
+           (funcall 'hemlock::terminal-font-info-for-dis-line dis-line))
+      (compute-font-usages dis-line)))
+
 (defun modeline-fill-to-edge (hunk dl dl-len y)
   "Fill from column DL-LEN to the right terminal edge with the modeline
 background color.  Extracts the bg from DL's font-changes so we don't need
@@ -201,7 +206,7 @@ to reference *modeline-font* across packages."
         (dl-pos (gensym)) (screen-image-line (gensym)))
     `(let* ((,dl ,dis-line)
             (,dl-chars (dis-line-chars ,dl))
-            (,dl-fonts (compute-font-usages ,dis-line))
+            (,dl-fonts (effective-font-usages ,dis-line))
             (,dl-len (dis-line-length ,dl))
             (,dl-pos ,(or y `(dis-line-position ,dl))))
        (display-string ,hunk 0 ,dl-pos ,dl-chars ,dl-fonts 0 ,dl-len)
@@ -349,7 +354,10 @@ for all windows, extra splits are removed (keeping the first/top window)."
       ;; Recompute modeline fields for all windows so they fill the new width.
       (dolist (w *window-list*)
         (when (window-modeline-buffer w)
-          (update-modeline-fields (window-buffer w) w))))
+          (update-modeline-fields (window-buffer w) w)))
+      (dolist (w *window-list*)
+        (when (fboundp 'hemlock::terminal-resize-to-window)
+          (funcall 'hemlock::terminal-resize-to-window (window-buffer w) w))))
     (setf *screen-image-trashed* t)))
 
 (defun maybe-resize-tty-device (device)
@@ -496,7 +504,7 @@ dimensions are correct before update-window-image runs."
   (declare (fixnum dl-pos))
   (let* ((dl-chars (dis-line-chars dl))
          (dl-len (dis-line-length dl))
-         (dl-fonts (compute-font-usages dl)))
+         (dl-fonts (effective-font-usages dl)))
     (declare (fixnum dl-len) (simple-string dl-chars))
     (when (listen-editor-input *editor-input*)
       (throw 'redisplay-catcher :editor-input))
@@ -1001,7 +1009,7 @@ dimensions are correct before update-window-image runs."
   (declare (fixnum dl-pos))
   (let* ((dl-chars (dis-line-chars dl))
          (dl-len (dis-line-length dl))
-         (dl-fonts (compute-font-usages dl)))
+         (dl-fonts (effective-font-usages dl)))
     (declare (fixnum dl-len) (simple-string dl-chars))
     (when (listen-editor-input *editor-input*)
       (throw 'redisplay-catcher :editor-input))
@@ -1247,15 +1255,21 @@ dimensions are correct before update-window-image runs."
           (cond (*terminal-has-colors*
                  (unwind-protect
                      (progn
-                       (let ((foreground (cond ((integerp font)
-                                                font)
-                                               ((listp font)
-                                                (getf font :fg)))))
-                         (when (and foreground (<= 0 foreground 9))
-                           (setaf foreground)))
+                       (let ((foreground (cond ((integerp font) font)
+                                               ((listp font) (getf font :fg)))))
+                         (when foreground
+                           (if (listp foreground)
+                               (tty-write-cmd
+                                (format nil "~C[38;2;~D;~D;~Dm" #\Escape
+                                        (first foreground) (second foreground) (third foreground)))
+                               (setaf foreground))))
                        (let ((background (and (listp font) (getf font :bg))))
-                         (when (and background (<= 0 background 9))
-                           (setab background)))
+                         (when background
+                           (if (listp background)
+                               (tty-write-cmd
+                                (format nil "~C[48;2;~D;~D;~Dm" #\Escape
+                                        (first background) (second background) (third background)))
+                               (setab background))))
                        (let ((boldp (and (listp font) (getf font :bold))))
                          (when boldp
                            (enter-bold-mode)))
@@ -1265,6 +1279,12 @@ dimensions are correct before update-window-image runs."
                        (let ((underlinep (and (listp font) (getf font :underline))))
                          (when underlinep
                            (enter-underline-mode)))
+                       (when (and (listp font) (getf font :faint))
+                         (tty-write-cmd (format nil "~C[2m" #\Escape)))
+                       (when (and (listp font) (getf font :inverse))
+                         (tty-write-cmd (format nil "~C[7m" #\Escape)))
+                       (when (and (listp font) (getf font :strike-through))
+                         (tty-write-cmd (format nil "~C[9m" #\Escape)))
                        (device-write-string string posn new-posn))
                    (exit-attribute-mode)))
                 (t

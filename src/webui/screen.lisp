@@ -533,7 +533,10 @@ Nuke all active lines back to spare, reallocate if wider, and rebuild modeline."
       ;; Recompute modeline fields for all windows so they fill the new width.
       (dolist (w *window-list*)
         (when (window-modeline-buffer w)
-          (update-modeline-fields (window-buffer w) w))))
+          (update-modeline-fields (window-buffer w) w)))
+      (dolist (w *window-list*)
+        (when (fboundp 'hemlock::terminal-resize-to-window)
+          (funcall 'hemlock::terminal-resize-to-window (window-buffer w) w))))
     (setf hemlock.command::*screen-image-trashed* t)))
 
 

@@ -46,12 +46,18 @@
      (if (zerop font) "" (format nil "fg-~D" font)))
     (list
      (with-output-to-string (out)
-       (let ((color (getf font :color)))
-         (when color (format out "fg-~D " color)))
-       (when (getf font :bold)      (write-string "bold "      out))
-       (when (getf font :underline) (write-string "underline " out))
-       (when (getf font :italic)    (write-string "italic "    out))
-       (when (getf font :reverse)   (write-string "reverse "   out))))
+       (let ((fg (or (getf font :color) (getf font :fg))))
+         (when (and fg (integerp fg) (<= fg 15))
+           (format out "fg-~D " fg)))
+       (let ((bg (getf font :bg)))
+         (when (and bg (integerp bg) (<= bg 15))
+           (format out "bg-~D " bg)))
+       (when (getf font :bold)           (write-string "bold " out))
+       (when (getf font :underline)      (write-string "underline " out))
+       (when (getf font :italic)         (write-string "italic " out))
+       (when (getf font :inverse)        (write-string "reverse " out))
+       (when (getf font :faint)          (write-string "faint " out))
+       (when (getf font :strike-through) (write-string "line-through " out))))
     (t "")))
 
 
@@ -105,27 +111,61 @@
             (push (list font (font-change-x prev) (font-change-x change)) spans)))))
     (nreverse spans)))
 
+(defun color->css-style (font)
+  (when (listp font)
+    (let ((result nil))
+      (let ((fg (getf font :fg)))
+        (when fg
+          (cond
+            ((listp fg)
+             (push (format nil "color:rgb(~D,~D,~D);" (first fg) (second fg) (third fg))
+                   result))
+            ((and (integerp fg) (> fg 15))
+             (let ((rgb (hemlock.term:color-index-to-rgb fg)))
+               (when rgb
+                 (push (format nil "color:rgb(~D,~D,~D);" (aref rgb 0) (aref rgb 1) (aref rgb 2))
+                       result)))))))
+      (let ((bg (getf font :bg)))
+        (when bg
+          (cond
+            ((listp bg)
+             (push (format nil "background:rgb(~D,~D,~D);" (first bg) (second bg) (third bg))
+                   result))
+            ((and (integerp bg) (> bg 15))
+             (let ((rgb (hemlock.term:color-index-to-rgb bg)))
+               (when rgb
+                 (push (format nil "background:rgb(~D,~D,~D);" (aref rgb 0) (aref rgb 1) (aref rgb 2))
+                       result)))))))
+      (when result
+        (format nil "~{~A~}" (nreverse result))))))
+
 ;;; Emit characters [start..end) with FONT, injecting cursor span at CURSOR-COL.
 (defun emit-range (chars start end font cursor-col out)
   (when (>= start end) (return-from emit-range))
-  (let ((css (font->css font)))
+  (let ((css (font->css font))
+        (style (color->css-style font)))
     (flet ((emit-chars (s e cursp)
              (when (>= s e) (return-from emit-chars))
-             (cond
-               (cursp
-                (write-string "<span class=\"cursor" out)
-                (unless (string= css "") (write-char #\Space out) (write-string css out))
-                (write-string "\">" out)
-                (html-escape-range chars s e out)
-                (write-string "</span>" out))
-               ((string= css "")
-                (html-escape-range chars s e out))
-               (t
-                (write-string "<span class=\"" out)
-                (write-string css out)
-                (write-string "\">" out)
-                (html-escape-range chars s e out)
-                (write-string "</span>" out)))))
+             (let ((has-class (or cursp (not (string= css ""))))
+                   (has-style (and style (plusp (length style)))))
+               (cond
+                 ((or has-class has-style)
+                  (write-string "<span" out)
+                  (when has-class
+                    (write-string " class=\"" out)
+                    (when cursp (write-string "cursor" out))
+                    (when (and cursp (not (string= css ""))) (write-char #\Space out))
+                    (unless (string= css "") (write-string css out))
+                    (write-string "\"" out))
+                  (when has-style
+                    (write-string " style=\"" out)
+                    (write-string style out)
+                    (write-string "\"" out))
+                  (write-string ">" out)
+                  (html-escape-range chars s e out)
+                  (write-string "</span>" out))
+                 (t
+                  (html-escape-range chars s e out))))))
       (if (and cursor-col (>= cursor-col start) (< cursor-col end))
           (progn
             (emit-chars start       cursor-col       nil)
@@ -139,6 +179,9 @@
 (defun collect-window-lines (window cursor-hunk cursor-x cursor-y)
   "Return a vector of HTML <div> strings for each display line of WINDOW.
    Pads with empty <div> rows up to the window height so the screen is full."
+  (let ((fn (and (fboundp 'hemlock::terminal-inject-font-changes-for-window)
+                 (symbol-function 'hemlock::terminal-inject-font-changes-for-window))))
+    (when fn (funcall fn window)))
   (let* ((hunk   (window-hunk window))
          (height (window-height window))
          (result (make-array height :fill-pointer 0))

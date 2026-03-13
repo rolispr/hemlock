@@ -964,8 +964,9 @@
                (when (zerop (mod i 100))
                  (message "Dired: reading files (~D/~D)" i n))
                (let* ((namestring (namestring file))
-                      (tail (subseq namestring
-                                    (1+ (or (position #\/ namestring
+                      (trimmed (string-right-trim "/" namestring))
+                      (tail (subseq trimmed
+                                    (1+ (or (position #\/ trimmed
                                                       :from-end t
                                                       :test #'char=)
                                             -1)))))
