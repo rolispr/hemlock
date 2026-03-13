@@ -33,8 +33,6 @@
   .fg-12{color:#5555ff} .fg-13{color:#ff55ff} .fg-14{color:#55ffff} .fg-15{color:#ffffff}
   .bold{font-weight:bold} .underline{text-decoration:underline}
   .reverse{filter:invert(100%)} .italic{font-style:italic}
-  .border-focused{color:#528bff} .border-unfocused{color:#3a3a3a}
-  .hem-bline{display:flex} .hem-bcontent{flex:1;white-space:pre;overflow:hidden}
 </style></head>
 <body><div id=\"editor-container\">
   <div id=\"win0\"  class=\"hem-window\"></div>
@@ -183,7 +181,7 @@ window.addEventListener('resize', _measureGrid);
       (setf (device-hunk-window main-hunk) main)
       (setf *current-window* main)
       (setup-window-image (buffer-point *current-buffer*)
-                          main (- main-text-lines 2) (- width 2))
+                          main main-text-lines width)
       (setup-modeline-image *current-buffer* main)
       (prepare-window-for-redisplay main)
       (setf (device-hunk-previous main-hunk) main-hunk
@@ -297,7 +295,7 @@ window.addEventListener('resize', _measureGrid);
          (victim       (window-hunk old-window))
          (text-height  (webui-hunk-text-height victim))
          (availability (if modelinep (1- text-height) text-height)))
-    (when (> availability 5)
+    (when (> availability 1)
       (let* ((new-lines    (truncate (* availability proportion)))
              (old-lines    (- availability new-lines))
              (pos          (device-hunk-position victim))
@@ -319,11 +317,11 @@ window.addEventListener('resize', _measureGrid);
           (setf (webui-hunk-text-height  victim) old-lines)
           (setf (device-hunk-position victim) old-new-pos)
           (setf (webui-hunk-text-position victim) (- old-new-pos pos-diff)))
-        (setup-window-image start new-window (- new-lines 2) (window-width old-window))
+        (setup-window-image start new-window new-lines (window-width old-window))
         (prepare-window-for-redisplay new-window)
         (when modelinep
           (setup-modeline-image (line-buffer (mark-line start)) new-window))
-        (change-window-image-height old-window (- old-lines 2))
+        (change-window-image-height old-window old-lines)
         (shiftf (device-hunk-previous new-hunk)
                 (device-hunk-previous (device-hunk-next victim))
                 new-hunk)
@@ -445,9 +443,9 @@ Nuke all active lines back to spare, reallocate if wider, and rebuild modeline."
 (defun webui-apply-resize (device)
   (let* ((new-lines   (webui-device-lines   device))
          (new-cols    (webui-device-columns device))
-         (width-changed (/= (- new-cols 2) (window-width
-                                           (device-hunk-window
-                                            (device-hunks device)))))
+         (width-changed (/= new-cols (window-width
+                                      (device-hunk-window
+                                       (device-hunks device)))))
          (echo-hunk (window-hunk *echo-area-window*))
          (echo-text-height (webui-hunk-text-height echo-hunk))
          ;; Available lines for non-echo hunks: total minus echo minus
@@ -459,7 +457,7 @@ Nuke all active lines back to spare, reallocate if wider, and rebuild modeline."
     ;; Handle width changes for all windows (including echo).
     (when width-changed
       (dolist (w *window-list*)
-        (webui-resize-window-width w (- new-cols 2)))
+        (webui-resize-window-width w new-cols))
       (webui-resize-window-width *echo-area-window* new-cols))
     ;; Collect non-echo hunks in display order.
     (let* ((first (device-hunks device))
@@ -519,7 +517,7 @@ Nuke all active lines back to spare, reallocate if wider, and rebuild modeline."
                        (if has-modeline (+ row new-h -1)
                            (+ row new-text-h -1)))
                  (change-window-image-height (device-hunk-window hunk)
-                                             (- new-text-h 2))
+                                             new-text-h)
                  (decf remaining new-h)
                  (incf row new-h))
         ;; Update device-bottom-window-base.
