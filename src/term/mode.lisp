@@ -245,8 +245,7 @@
 (add-hook hemlock::redisplay-hook #'terminal-redisplay-hook)
 
 (defun make-terminal-buffer (&key (command "/bin/bash --norc --noprofile")
-                                  (rows (if *current-window* (window-height *current-window*) 24))
-                                  (cols (if *current-window* (window-width *current-window*) 80)))
+                                  (rows 24) (cols 80))
   (let* ((term (hemlock.term:make-term
                 :width cols :height rows
                 :input-fn (lambda (term str)
@@ -392,7 +391,9 @@
   "Open a terminal emulator buffer."
   "Open a terminal emulator buffer."
   (declare (ignore p))
-  (let ((buffer (make-terminal-buffer)))
+  (let ((buffer (make-terminal-buffer
+                 :rows (window-height *current-window*)
+                 :cols (window-width *current-window*))))
     (change-to-buffer buffer)))
 
 (defcommand "Terminal With Command" (p)
@@ -403,7 +404,10 @@
                    :default "/bin/bash" :trim t
                    :prompt "Command: "
                    :help "Command to run in terminal."))
-         (buffer (make-terminal-buffer :command command)))
+         (buffer (make-terminal-buffer
+                  :command command
+                  :rows (window-height *current-window*)
+                  :cols (window-width *current-window*))))
     (change-to-buffer buffer)))
 
 ;;; Key bindings — MUST come after defcommand forms

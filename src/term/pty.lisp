@@ -2,18 +2,24 @@
 
 (in-package :hemlock.term)
 
+(cffi:defcstruct (pty-winsize :size 8)
+  (row    :uint16 :offset 0)
+  (col    :uint16 :offset 2)
+  (xpixel :uint16 :offset 4)
+  (ypixel :uint16 :offset 6))
+
 (defconstant +tiocswinsz+
   #+darwin #x80087467
   #+linux  #x00005414)
 
+(cffi:defcfun ("ioctl" pty-ioctl) :int
+  (fd :int) (request :unsigned-long) &rest)
+
 (defun set-pty-size (fd rows cols)
-  (cffi:with-foreign-object (ws '(:unsigned-char) 8)
-    (setf (cffi:mem-ref ws :uint16 0) rows
-          (cffi:mem-ref ws :uint16 2) cols
-          (cffi:mem-ref ws :uint16 4) 0
-          (cffi:mem-ref ws :uint16 6) 0)
-    (cffi:foreign-funcall "ioctl" :int fd :unsigned-long +tiocswinsz+
-                                  :pointer ws :int)))
+  (cffi:with-foreign-object (ws '(:struct pty-winsize))
+    (cffi:with-foreign-slots ((row col xpixel ypixel) ws (:struct pty-winsize))
+      (setf row rows col cols xpixel 0 ypixel 0))
+    (pty-ioctl fd +tiocswinsz+ :pointer ws)))
 
 (defun make-terminal-env (&optional (term-type "xterm-256color"))
   (let ((env (sb-ext:posix-environ)))
