@@ -1,10 +1,10 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
 ;;;
-;;; This file implements typescript streams.
+;;; This file implements session streams.
 ;;;
-;;; A typescript stream is a bidirectional stream which uses remote
-;;; function calls to interact with a Hemlock typescript buffer. That
+;;; A session stream is a bidirectional stream which uses remote
+;;; function calls to interact with a Hemlock session buffer. That
 ;;; is: the code in this file is executed on the agent side.
 ;;;
 ;;;
@@ -14,50 +14,50 @@
 
 ;;;; Ts-streams.
 
-(defconstant ts-stream-output-buffer-size 512)
+(defconstant session-stream-output-buffer-size 512)
 
-(defclass ts-stream (hi::trivial-gray-stream-mixin
+(defclass session-stream (hi::trivial-gray-stream-mixin
                      hi::fundamental-character-output-stream
                      hi::fundamental-character-input-stream)
   ((wire
     :initarg  :wire
     :initform nil
-    :accessor ts-stream-wire)
+    :accessor session-stream-wire)
 
-   (typescript
-    :initarg  :typescript
+   (session
+    :initarg  :session
     :initform nil
-    :accessor ts-stream-typescript)
+    :accessor session-stream-session)
 
    (output-buffer
     :initarg  :output-buffer
-    :initform (make-string ts-stream-output-buffer-size)
-    :accessor ts-stream-output-buffer
+    :initform (make-string session-stream-output-buffer-size)
+    :accessor session-stream-output-buffer
     :type     simple-string)
 
    (output-buffer-index
     :initarg  :output-buffer-index
     :initform 0
-    :accessor ts-stream-output-buffer-index
+    :accessor session-stream-output-buffer-index
     :type     fixnum)
 
    (char-pos
     :initarg  :char-pos
     :initform 0
-    :accessor ts-stream-char-pos
+    :accessor session-stream-char-pos
     :type     fixnum
     :documentation "The current output character position on the line, returned by the :CHARPOS method.")
 
    (line-length
     :initarg :line-length
     :initform 80
-    :accessor ts-stream-line-length
+    :accessor session-stream-line-length
     :documentation "The current length of a line of output.  Returned by STREAM-LINE-LENGTH method.")
 
    (current-input
     :initarg :current-input
     :initform nil
-    :accessor ts-stream-current-input
+    :accessor session-stream-current-input
     :type list
     :documentation "This is a list of strings and stream-commands whose order manifests the
                     input provided by remote procedure calls into the agent of
@@ -66,13 +66,13 @@
    (input-read-index
     :initarg :input-read-index
     :initform 0
-    :accessor ts-stream-input-read-index
+    :accessor session-stream-input-read-index
     :type fixnum)))
 
-(defun make-ts-stream (wire typescript)
-  (make-instance 'ts-stream
+(defun make-session-stream (wire session)
+  (make-instance 'session-stream
                  :wire wire
-                 :typescript typescript))
+                 :session session))
 
 
 ;;;; Conditions.
@@ -94,15 +94,15 @@
 ;;; provided input.  Input is a string, symbol, or list.  If it is a list, the
 ;;; the CAR names the command, and the CDR is the arguments.
 ;;;
-(defun ts-stream-accept-input (remote input)
+(defun session-stream-accept-input (remote input)
   (let ((stream (hemlock.wire:remote-object-value remote)))
-    (setf (ts-stream-current-input stream)
-          (nconc (ts-stream-current-input stream)
+    (setf (session-stream-current-input stream)
+          (nconc (session-stream-current-input stream)
                  (list (etypecase input
                          (string
                           (let ((newline
                                  (position #\newline input :from-end t)))
-                            (setf (ts-stream-char-pos stream)
+                            (setf (session-stream-char-pos stream)
                                   (if newline
                                       (- (length input) newline 1)
                                       (length input)))
@@ -121,9 +121,9 @@
 ;;; This function is called by the editor to indicate that the line-length for
 ;;; a TS stream should now be Length.
 ;;;
-(defun ts-stream-set-line-length (remote length)
+(defun session-stream-set-line-length (remote length)
   (let ((stream (hemlock.wire:remote-object-value remote)))
-    (setf (ts-stream-line-length stream) length)))
+    (setf (session-stream-line-length stream) length)))
 
 
 
@@ -134,20 +134,20 @@
 ;;; Determine if there is any input available.  If we don't think so, process
 ;;; all pending events, and look again.
 ;;;
-(defun %ts-stream-listen (stream)
+(defun %session-stream-listen (stream)
   (flet ((check ()
            (loop
-              (let* ((current (ts-stream-current-input stream))
+              (let* ((current (session-stream-current-input stream))
                      (first (first current)))
                 (cond ((null current)
                        (return nil))
                       #+NILGB
                       ((ext:stream-command-p first)
                        (return t))
-                      ((>= (ts-stream-input-read-index stream)
+                      ((>= (session-stream-input-read-index stream)
                            (length (the simple-string first)))
-                       (pop (ts-stream-current-input stream))
-                       (setf (ts-stream-input-read-index stream) 0))
+                       (pop (session-stream-current-input stream))
+                       (setf (session-stream-input-read-index stream) 0))
                       (t
                        (return t)))))))
     (or (check)
@@ -156,35 +156,35 @@
           (dispatch-events-no-hang)
           (check)))))
 
-(defmethod hi::stream-listen ((stream ts-stream))
-  (%ts-stream-listen stream))
+(defmethod hi::stream-listen ((stream session-stream))
+  (%session-stream-listen stream))
 
 ;;; %TS-STREAM-IN -- Internal.
 ;;;
 ;;; The READ-CHAR stream method.
 ;;;
-(defmethod hi::stream-read-char ((stream ts-stream))
+(defmethod hi::stream-read-char ((stream session-stream))
   (hi::stream-force-output stream)
-  (wait-for-typescript-input stream)
-  (let ((first (first (ts-stream-current-input stream))))
+  (wait-for-session-input stream)
+  (let ((first (first (session-stream-current-input stream))))
     (etypecase first
       (string
-       (prog1 (schar first (ts-stream-input-read-index stream))
-         (incf (ts-stream-input-read-index stream))))
+       (prog1 (schar first (session-stream-input-read-index stream))
+         (incf (session-stream-input-read-index stream))))
       #+NILGB
       (ext:stream-command
        (error 'unexpected-stream-command
               :context "in the READ-CHAR method")))))
 
-(defmethod hi::stream-read-char-no-hang ((stream ts-stream))
+(defmethod hi::stream-read-char-no-hang ((stream session-stream))
   (cond
-    ((%ts-stream-listen stream)
+    ((%session-stream-listen stream)
      (hi::stream-force-output stream)
-     (let ((first (first (ts-stream-current-input stream))))
+     (let ((first (first (session-stream-current-input stream))))
        (etypecase first
          (string
-          (prog1 (schar first (ts-stream-input-read-index stream))
-            (incf (ts-stream-input-read-index stream))))
+          (prog1 (schar first (session-stream-input-read-index stream))
+            (incf (session-stream-input-read-index stream))))
          #+NILGB
          (ext:stream-command
           (error 'unexpected-stream-command
@@ -204,15 +204,15 @@
   (macrolet
       ((next-str ()
          '(progn
-           (wait-for-typescript-input stream)
-           (let ((first (first (ts-stream-current-input stream))))
+           (wait-for-session-input stream)
+           (let ((first (first (session-stream-current-input stream))))
              (etypecase first
                (string
-                (prog1 (if (zerop (ts-stream-input-read-index stream))
-                           (pop (ts-stream-current-input stream))
-                           (subseq (pop (ts-stream-current-input stream))
-                                   (ts-stream-input-read-index stream)))
-                  (setf (ts-stream-input-read-index stream) 0)))
+                (prog1 (if (zerop (session-stream-input-read-index stream))
+                           (pop (session-stream-current-input stream))
+                           (subseq (pop (session-stream-current-input stream))
+                                   (session-stream-input-read-index stream)))
+                  (setf (session-stream-input-read-index stream) 0)))
                #+NILGB
                (ext:stream-command
                 (error 'unexpected-stream-command
@@ -227,15 +227,15 @@
 ;;;
 ;;; Keep calling server until some input shows up.
 ;;;
-(defun wait-for-typescript-input (stream)
-  (unless (%ts-stream-listen stream)
-    (let ((wire (ts-stream-wire stream))
-          (ts (ts-stream-typescript stream)))
+(defun wait-for-session-input (stream)
+  (unless (%session-stream-listen stream)
+    (let ((wire (session-stream-wire stream))
+          (ts (session-stream-session stream)))
       #+(or)
       (progn
-        (hemlock.wire:remote wire (ts-buffer-ask-for-input ts))
+        (hemlock.wire:remote wire (session-buffer-ask-for-input ts))
         (hemlock.wire:wire-force-output wire))
-      (loop until (%ts-stream-listen stream)
+      (loop until (%session-stream-listen stream)
             do (dispatch-events)))))
 
 ;;; %TS-STREAM-FLSBUF --- internal.
@@ -243,37 +243,37 @@
 ;;; Flush the output buffer associated with stream.  This should only be used
 ;;; inside a without-interrupts and without-gcing.
 ;;;
-(defun %ts-stream-flsbuf (stream)
-  (when (and (ts-stream-wire stream)
-             (ts-stream-output-buffer stream)
-             (not (zerop (ts-stream-output-buffer-index stream))))
-    (hemlock.wire:remote (ts-stream-wire stream)
-      (ts-buffer-output-string
-       (ts-stream-typescript stream)
-       (subseq (the simple-string (ts-stream-output-buffer stream))
+(defun %session-stream-flsbuf (stream)
+  (when (and (session-stream-wire stream)
+             (session-stream-output-buffer stream)
+             (not (zerop (session-stream-output-buffer-index stream))))
+    (hemlock.wire:remote (session-stream-wire stream)
+      (session-buffer-output-string
+       (session-stream-session stream)
+       (subseq (the simple-string (session-stream-output-buffer stream))
                0
-               (ts-stream-output-buffer-index stream))))
-    (setf (ts-stream-output-buffer-index stream) 0)))
+               (session-stream-output-buffer-index stream))))
+    (setf (session-stream-output-buffer-index stream) 0)))
 
 ;;; %TS-STREAM-OUT --- internal.
 ;;;
 ;;; Output a single character to stream.
 ;;;
-(defmethod hi::stream-write-char ((stream ts-stream) char)
+(defmethod hi::stream-write-char ((stream session-stream) char)
   (declare (base-char char))
-  (when (= (ts-stream-output-buffer-index stream)
-           ts-stream-output-buffer-size)
-    (%ts-stream-flsbuf stream))
-  (setf (schar (ts-stream-output-buffer stream)
-               (ts-stream-output-buffer-index stream))
+  (when (= (session-stream-output-buffer-index stream)
+           session-stream-output-buffer-size)
+    (%session-stream-flsbuf stream))
+  (setf (schar (session-stream-output-buffer stream)
+               (session-stream-output-buffer-index stream))
         char)
-  (incf (ts-stream-output-buffer-index stream))
-  (incf (ts-stream-char-pos stream))
+  (incf (session-stream-output-buffer-index stream))
+  (incf (session-stream-char-pos stream))
   (when (= (char-code char)
            (char-code #\Newline))
-    (%ts-stream-flsbuf stream)
-    (setf (ts-stream-char-pos stream) 0)
-    (hemlock.wire:wire-force-output (ts-stream-wire stream)))
+    (%session-stream-flsbuf stream)
+    (setf (session-stream-char-pos stream) 0)
+    (hemlock.wire:wire-force-output (session-stream-wire stream)))
   char)
 
 ;;; %TS-STREAM-SOUT --- internal.
@@ -281,60 +281,60 @@
 ;;; Output a string to stream.
 ;;;
 #+(or)
-(defmethod hi::stream-write-string ((stream ts-stream) string &optional (start 0) (end (length string)))
+(defmethod hi::stream-write-string ((stream session-stream) string &optional (start 0) (end (length string)))
   ;; This can't be true generally: --GB
   #+NIL (declare (simple-string string))
   (declare (fixnum start end))
-  (let ((wire (ts-stream-wire stream))
+  (let ((wire (session-stream-wire stream))
         (newline (position #\Newline string :start start :end end :from-end t))
         (length (- end start)))
     (when wire
-      (let ((index (ts-stream-output-buffer-index stream)))
+      (let ((index (session-stream-output-buffer-index stream)))
         (cond ((> (+ index length)
-                  ts-stream-output-buffer-size)
-               (%ts-stream-flsbuf stream)
+                  session-stream-output-buffer-size)
+               (%session-stream-flsbuf stream)
                (hemlock.wire:remote wire
-                                    (ts-buffer-output-string (ts-stream-typescript stream)
+                                    (session-buffer-output-string (session-stream-session stream)
                                                              (subseq string start end)))
                (when newline
                  (hemlock.wire:wire-force-output wire)))
               (t
-               (replace (the simple-string (ts-stream-output-buffer stream))
+               (replace (the simple-string (session-stream-output-buffer stream))
                         string
                         :start1 index
                         :end1 (+ index length)
                         :start2 start
                         :end2 end)
-               (incf (ts-stream-output-buffer-index stream)
+               (incf (session-stream-output-buffer-index stream)
                      length)
                (when newline
-                 (%ts-stream-flsbuf stream)
+                 (%session-stream-flsbuf stream)
                  (hemlock.wire:wire-force-output wire)))))
-      (setf (ts-stream-char-pos stream)
+      (setf (session-stream-char-pos stream)
             (if newline
                 (- end newline 1)
-                (+ (ts-stream-char-pos stream)
+                (+ (session-stream-char-pos stream)
                    length))))))
 
 ;;; %TS-STREAM-UNREAD -- Internal.
 ;;;
 ;;; Unread a single character.
 ;;;
-(defmethod hi::stream-unread-char ((stream ts-stream) char)
-  (let ((first (first (ts-stream-current-input stream))))
+(defmethod hi::stream-unread-char ((stream session-stream) char)
+  (let ((first (first (session-stream-current-input stream))))
     (cond ((and (stringp first)
-                (> (ts-stream-input-read-index stream) 0))
-           (setf (schar first (decf (ts-stream-input-read-index stream)))
+                (> (session-stream-input-read-index stream) 0))
+           (setf (schar first (decf (session-stream-input-read-index stream)))
                  char))
           (t
-           (push (string char) (ts-stream-current-input stream))
-           (setf (ts-stream-input-read-index stream) 0)))))
+           (push (string char) (session-stream-current-input stream))
+           (setf (session-stream-input-read-index stream) 0)))))
 
 ;;; %TS-STREAM-CLOSE --- internal.
 ;;;
 ;;; Can't do much, 'cause the wire is shared.
 ;;;
-(defmethod close ((stream ts-stream) &key abort)
+(defmethod close ((stream session-stream) &key abort)
   (unless abort
     (force-output stream))
   #+NILGB (lisp::set-closed-flame stream)       ;Hugh!? what is that? --GB
@@ -344,66 +344,66 @@
 ;;;
 ;;; Pass the request to the editor and clear any buffered input.
 ;;;
-(defmethod hi::stream-clear-input ((stream ts-stream))
-  (when (ts-stream-wire stream)
-    (hemlock.wire:remote-value (ts-stream-wire stream)
-                               (ts-buffer-clear-input (ts-stream-typescript stream))))
-  (setf (ts-stream-current-input stream) nil
-        (ts-stream-input-read-index stream) 0))
+(defmethod hi::stream-clear-input ((stream session-stream))
+  (when (session-stream-wire stream)
+    (hemlock.wire:remote-value (session-stream-wire stream)
+                               (session-buffer-clear-input (session-stream-session stream))))
+  (setf (session-stream-current-input stream) nil
+        (session-stream-input-read-index stream) 0))
 
-(defmethod hi::stream-finish-output ((stream ts-stream))
-  (when (ts-stream-wire stream)
-    (%ts-stream-flsbuf stream)
+(defmethod hi::stream-finish-output ((stream session-stream))
+  (when (session-stream-wire stream)
+    (%session-stream-flsbuf stream)
     ;; Note: for the return value to come back,
     ;; all pending RPCs must have completed.
     ;; Therefore, we know it has synced.
-    (hemlock.wire:remote-value (ts-stream-wire stream)
-                               (ts-buffer-finish-output (ts-stream-typescript stream))))
+    (hemlock.wire:remote-value (session-stream-wire stream)
+                               (session-buffer-finish-output (session-stream-session stream))))
   t)
 
-(defmethod hi::stream-force-output ((stream ts-stream))
+(defmethod hi::stream-force-output ((stream session-stream))
   (hi::stream-finish-output stream)
   t)
 
-(defmethod hi::stream-line-column ((stream ts-stream))
-  (ts-stream-char-pos stream))
+(defmethod hi::stream-line-column ((stream session-stream))
+  (session-stream-char-pos stream))
 
-(defmethod hi::stream-line-length ((stream ts-stream))
-  (ts-stream-line-length stream))
+(defmethod hi::stream-line-length ((stream session-stream))
+  (session-stream-line-length stream))
 
 #+NILGB ;; -- hmm.
-(defmethod interactive-stream-p ((stream ts-stream))
+(defmethod interactive-stream-p ((stream session-stream))
   t)
 
-(defmethod hi::stream-clear-output ((stream ts-stream))
-  (setf (ts-stream-output-buffer-index stream) 0))
+(defmethod hi::stream-clear-output ((stream session-stream))
+  (setf (session-stream-output-buffer-index stream) 0))
 
 ;;; %TS-STREAM-MISC -- Internal.
 ;;;
 ;;; The misc stream method.
 ;;;
 #+NILGB
-(defun %ts-stream-misc (stream operation &optional arg1 arg2)
+(defun %session-stream-misc (stream operation &optional arg1 arg2)
   (case operation
     (:get-command
-     (wait-for-typescript-input stream)
-     (etypecase (first (ts-stream-current-input stream))
+     (wait-for-session-input stream)
+     (etypecase (first (session-stream-current-input stream))
        (stream-command
-        (setf (ts-stream-input-read-index stream) 0)
-        (pop (ts-stream-current-input stream)))
+        (setf (session-stream-input-read-index stream) 0)
+        (pop (session-stream-current-input stream)))
        (string nil)))))
 
 (defmethod hi::stream-write-sequence
-    ((stream ts-stream) (seq string) start end &key)
+    ((stream session-stream) (seq string) start end &key)
   (loop for i from start below end
         do (write-char (elt seq i) stream)))
 
 (defmethod hi::stream-read-sequence
-    ((stream ts-stream) (seq string) start end &key)
+    ((stream session-stream) (seq string) start end &key)
   (loop for i from start below end
         do (setf (elt seq i) (read-char stream))))
 
-;; $Log: ts-stream.lisp,v $
+;; $Log: session-stream.lisp,v $
 ;; Revision 1.1  2004-07-09 13:38:55  gbaumann
 ;; Initial revision
 ;;

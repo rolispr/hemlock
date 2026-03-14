@@ -265,7 +265,7 @@
 (defun interactive-modes (buffer on)
   (when on (setf (buffer-minor-mode buffer "Save") nil)))
 
-#+GBNIL (add-hook typescript-mode-hook 'interactive-modes)
+#+GBNIL (add-hook session-mode-hook 'interactive-modes)
 #+GBNIL (add-hook eval-mode-hook 'interactive-modes)
 
 

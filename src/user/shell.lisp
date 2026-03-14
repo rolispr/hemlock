@@ -19,7 +19,7 @@
       :buffer buffer
       :value (make-hemlock-output-stream mark :full))
     (defhvar "Interactive History"
-      "A ring of the regions input to an interactive mode (Eval or Typescript)."
+      "A ring of the regions input to an interactive mode (Eval or Session)."
       :buffer buffer
       :value (make-ring (value interactive-history-length)))
     (defhvar "Interactive Pointer"

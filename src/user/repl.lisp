@@ -30,7 +30,7 @@
       (force-output hemlock::*original-terminal-io*))
     (let* ((name (format nil "Agent thread ~A"
                          (bt:thread-name (bt:current-thread))))
-           (ts-data (hemlock.wire:remote-value hemlock.wire:*current-wire*
-                     (hemlock::%make-extra-typescript-buffer name))))
-      (hemlock::connect-stream ts-data hemlock.wire:*current-wire*))))
+           (session-data (hemlock.wire:remote-value hemlock.wire:*current-wire*
+                     (hemlock::%make-extra-session-buffer name))))
+      (hemlock::connect-stream session-data hemlock.wire:*current-wire*))))
 

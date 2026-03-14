@@ -2,8 +2,8 @@
 ;;;
 ;;;
 ;;; This file contains code for processing input to and output from agents
-;;; using typescript streams.  It maintains the stuff that hacks on the
-;;; typescript buffer and maintains its state.
+;;; using session streams.  It maintains the stuff that hacks on the
+;;; session buffer and maintains its state.
 ;;;
 ;;;
 
@@ -11,7 +11,7 @@
 
 
 (defhvar "Input Wait Alarm"
-  "When non-nil, the user is informed when a typescript buffer goes into
+  "When non-nil, the user is informed when a session buffer goes into
    an input wait, and it is not visible.  Legal values are :message,
    :loud-message (the default), and nil."
   :value :loud-message)
@@ -20,13 +20,13 @@
 
 ;;;; Structures.
 
-(defstruct (ts-data
+(defstruct (session-data
             (:print-function
              (lambda (ts s d)
                (declare (ignore ts d))
                (write-string "#<TS Data>" s)))
             (:constructor
-             make-ts-data (buffer
+             make-session-data (buffer
                            &aux
                            (fill-mark (copy-mark (buffer-end-mark buffer)
                                                  :right-inserting)))))
@@ -45,7 +45,7 @@
 
 ;;; TS-BUFFER-OUTPUT-STRING --- internal interface.
 ;;;
-;;; Called by the agent to output stuff in the typescript.  Can also be called
+;;; Called by the agent to output stuff in the session.  Can also be called
 ;;; by other random parts of hemlock when they want to output stuff to the
 ;;; buffer.  Since this is called for value from the agent, we have to be
 ;;; careful about what values we return, so the result can be sent back.  It is
@@ -56,13 +56,13 @@
 ;;; it normally, but we also make sure we end the output in a newline for
 ;;; visibility's sake.
 ;;;
-(defun ts-buffer-output-string (ts string &optional gratuitous-p)
-  "Outputs STRING to the typescript described with TS. The output is inserted
+(defun session-buffer-output-string (ts string &optional gratuitous-p)
+  "Outputs STRING to the session described with TS. The output is inserted
    before the fill-mark and the current input."
   (when (hemlock.wire:remote-object-p ts)
     (setf ts (hemlock.wire:remote-object-value ts)))
   (without-interrupts
-    (let ((mark (ts-data-fill-mark ts)))
+    (let ((mark (session-data-fill-mark ts)))
       (cond ((and gratuitous-p (not (start-line-p mark)))
              (with-mark ((m mark :left-inserting))
                (line-start m)
@@ -79,32 +79,32 @@
 
 ;;; TS-BUFFER-FINISH-OUTPUT --- internal interface.
 ;;;
-;;; Redisplays the windows. Used by ts-stream in order to finish-output.
+;;; Redisplays the windows. Used by session-stream in order to finish-output.
 ;;;
-(defun ts-buffer-finish-output (ts)
+(defun session-buffer-finish-output (ts)
   (declare (ignore ts))
   (redisplay)
   nil)
 
 ;;; TS-BUFFER-CHARPOS --- internal interface.
 ;;;
-;;; Used by ts-stream in order to find the charpos.
+;;; Used by session-stream in order to find the charpos.
 ;;;
-(defun ts-buffer-charpos (ts)
-  (mark-charpos (ts-data-fill-mark (if (hemlock.wire:remote-object-p ts)
+(defun session-buffer-charpos (ts)
+  (mark-charpos (session-data-fill-mark (if (hemlock.wire:remote-object-p ts)
                                        (hemlock.wire:remote-object-value ts)
                                        ts))))
 
 ;;; TS-BUFFER-LINE-LENGTH --- internal interface.
 ;;;
-;;; Used by ts-stream to find out the line length.  Returns the width of the
+;;; Used by session-stream to find out the line length.  Returns the width of the
 ;;; first window, or 80 if there are no windows.
 ;;;
-(defun ts-buffer-line-length (ts)
+(defun session-buffer-line-length (ts)
   (let* ((ts (if (hemlock.wire:remote-object-p ts)
                  (hemlock.wire:remote-object-value ts)
                 ts))
-         (window (car (buffer-windows (ts-data-buffer ts)))))
+         (window (car (buffer-windows (session-data-buffer ts)))))
     (if window
         (window-width window)
         80))) ; Seems like a good number to me.
@@ -112,9 +112,9 @@
 
 ;;;; Input routines
 
-(defun ts-buffer-ask-for-input (remote)
+(defun session-buffer-ask-for-input (remote)
   (let* ((ts (hemlock.wire:remote-object-value remote))
-         (buffer (ts-data-buffer ts)))
+         (buffer (session-data-buffer ts)))
     (unless (buffer-windows buffer)
       (let ((input-wait-alarm
              (if (hemlock-bound-p 'input-wait-alarm
@@ -130,12 +130,12 @@
                    (buffer-name buffer))))))
   nil)
 
-(defun ts-buffer-clear-input (ts)
+(defun session-buffer-clear-input (ts)
   (let* ((ts (if (hemlock.wire:remote-object-p ts)
                  (hemlock.wire:remote-object-value ts)
                  ts))
-         (buffer (ts-data-buffer ts))
-         (mark (ts-data-fill-mark ts)))
+         (buffer (session-data-buffer ts))
+         (mark (session-data-fill-mark ts)))
     (unless (mark= mark (buffer-end-mark buffer))
       (with-mark ((start mark))
         (line-start start)
@@ -149,42 +149,42 @@
           (move-mark mark end)))))
   nil)
 
-(defun ts-buffer-set-stream (ts stream)
+(defun session-buffer-set-stream (ts stream)
   (let ((ts (if (hemlock.wire:remote-object-p ts)
                 (hemlock.wire:remote-object-value ts)
                 ts)))
-    (setf (ts-data-stream ts) stream)
-    (hemlock.wire:remote (ts-data-wire ts)
-      (ts-stream-set-line-length stream (ts-buffer-line-length ts))))
+    (setf (session-data-stream ts) stream)
+    (hemlock.wire:remote (session-data-wire ts)
+      (session-stream-set-line-length stream (session-buffer-line-length ts))))
   nil)
 
 
-;;;; Typescript mode.
+;;;; Session mode.
 
-(defun setup-typescript (buffer)
-  (let ((ts (make-ts-data buffer)))
+(defun setup-session (buffer)
+  (let ((ts (make-session-data buffer)))
     (defhvar "Current Package"
       "The package used for evaluation of Lisp in this buffer."
       :buffer buffer
       :value nil)
 
-    (defhvar "Typescript Data"
-      "The ts-data structure for this buffer"
+    (defhvar "Session Data"
+      "The session-data structure for this buffer"
       :buffer buffer
       :value ts)
 
     (defhvar "Buffer Input Mark"
-      "Beginning of typescript input in this buffer."
-      :value (ts-data-fill-mark ts)
+      "Beginning of session input in this buffer."
+      :value (session-data-fill-mark ts)
       :buffer buffer)
 
     (defhvar "Interactive History"
-      "A ring of the regions input to the Hemlock typescript."
+      "A ring of the regions input to the Hemlock session."
       :buffer buffer
       :value (make-ring (value interactive-history-length)))
 
     (defhvar "Interactive Pointer"
-      "Pointer into the Hemlock typescript input history."
+      "Pointer into the Hemlock session input history."
       :buffer buffer
       :value 0)
 
@@ -193,22 +193,22 @@
       :buffer buffer
       :value 0)))
 
-(defmode "Typescript"
-  :setup-function #'setup-typescript
-  :documentation "The Typescript mode is used to interact with agent lisps.")
+(defmode "Session"
+  :setup-function #'setup-session
+  :documentation "The Session mode is used to interact with agent lisps.")
 
 
 ;;; TYPESCRIPTIFY-BUFFER -- Internal interface.
 ;;;
 ;;; Buffer creation code for eval server connections calls this to setup a
-;;; typescript buffer, tie things together, and make some local Hemlock
+;;; session buffer, tie things together, and make some local Hemlock
 ;;; variables.
 ;;;
-(defun typescriptify-buffer (buffer server wire)
-  (setf (buffer-minor-mode buffer "Typescript") t)
-  (let ((info (variable-value 'typescript-data :buffer buffer)))
-    (setf (ts-data-server info) server)
-    (setf (ts-data-wire info) wire)
+(defun sessionify-buffer (buffer server wire)
+  (setf (buffer-minor-mode buffer "Session") t)
+  (let ((info (variable-value 'session-data :buffer buffer)))
+    (setf (session-data-server info) server)
+    (setf (session-data-wire info) wire)
     (defhvar "Server Info"
       "Server-info structure for this buffer."
       :buffer buffer :value server)
@@ -218,54 +218,54 @@
       :buffer buffer :value server)
     info))
 
-(defun ts-buffer-wire-connected (ts wire)
-  (setf (ts-data-wire ts) wire))
+(defun session-buffer-wire-connected (ts wire)
+  (setf (session-data-wire ts) wire))
 
-(defun ts-buffer-wire-died (ts)
-  (setf (ts-data-stream ts) nil)
-  (setf (ts-data-wire ts) nil)
-  (buffer-end (ts-data-fill-mark ts) (ts-data-buffer ts))
-  (ts-buffer-output-string ts (format nil "~%~%Agent died!~%")))
+(defun session-buffer-wire-died (ts)
+  (setf (session-data-stream ts) nil)
+  (setf (session-data-wire ts) nil)
+  (buffer-end (session-data-fill-mark ts) (session-data-buffer ts))
+  (session-buffer-output-string ts (format nil "~%~%Agent died!~%")))
 
-(defun unwedge-typescript-buffer ()
-  (typescript-agent-to-top-level-command nil)
+(defun unwedge-session-buffer ()
+  (session-agent-to-top-level-command nil)
   (buffer-end (current-point) (current-buffer)))
 
 (defhvar "Unwedge Interactive Input Fun"
   "Function to call when input is confirmed, but the point is not past the
    input mark."
-  :value #'unwedge-typescript-buffer
-  :mode "Typescript")
+  :value #'unwedge-session-buffer
+  :mode "Session")
 
 (defhvar "Unwedge Interactive Input String"
   "String to add to \"Point not past input mark.  \" explaining what will
    happen if the the user chooses to be unwedged."
   :value "Cause the agent to throw to the top level? "
-  :mode "Typescript")
+  :mode "Session")
 
 ;;; TYPESCRIPT-DATA-OR-LOSE -- internal
 ;;;
-;;; Return the typescript-data for the current buffer, or die trying.
+;;; Return the session-data for the current buffer, or die trying.
 ;;;
-(defun typescript-data-or-lose ()
-  (if (hemlock-bound-p 'typescript-data)
-      (let ((ts (value typescript-data)))
+(defun session-data-or-lose ()
+  (if (hemlock-bound-p 'session-data)
+      (let ((ts (value session-data)))
         (if ts
             ts
-            (editor-error "Can't find the typescript data?")))
-      (editor-error "Not in a typescript buffer.")))
+            (editor-error "Can't find the session data?")))
+      (editor-error "Not in a session buffer.")))
 
-(defcommand "Confirm Typescript Input" (p)
-  "Send the current input to the agent typescript."
-  "Send the current input to the agent typescript."
+(defcommand "Confirm Session Input" (p)
+  "Send the current input to the agent session."
+  "Send the current input to the agent session."
   (declare (ignore p))
-  (let ((ts (typescript-data-or-lose)))
+  (let ((ts (session-data-or-lose)))
     (let ((input (get-interactive-input)))
       (when input
         (let ((string (region-to-string input)))
           (declare (simple-string string))
           (insert-character (current-point) #\NewLine)
-          (let ((wire (ts-data-wire ts)))
+          (let ((wire (session-data-wire ts)))
             (if (eq wire :local)
                 ;; Local master eval — spawn thread, post results via later.
                 (let ((captured-ts ts))
@@ -284,25 +284,25 @@
                                            (mapcar #'prin1-to-string values))))
                              (later
                                (unless (zerop (length out-str))
-                                 (ts-buffer-output-string captured-ts out-str))
-                               (ts-buffer-output-string captured-ts result-str)))
+                                 (session-buffer-output-string captured-ts out-str))
+                               (session-buffer-output-string captured-ts result-str)))
                          (error (c)
                            (later
-                             (ts-buffer-output-string
+                             (session-buffer-output-string
                               captured-ts (format nil "Error: ~A~%" c)))))))
                    :name "hemlock-repl-eval"))
                 ;; Wire-backed agent — send over wire.
                 (progn
                   (hemlock.wire:remote wire
-                    (ts-stream-accept-input (ts-data-stream ts)
+                    (session-stream-accept-input (session-data-stream ts)
                                             (concatenate 'simple-string
                                                          string
                                                          (string #\newline))))
                   (hemlock.wire:wire-force-output wire))))
-          (buffer-end (ts-data-fill-mark ts)
-                      (ts-data-buffer ts)))))))
+          (buffer-end (session-data-fill-mark ts)
+                      (session-data-buffer ts)))))))
 
-(defcommand "Typescript Agent Break" (p)
+(defcommand "Session Agent Break" (p)
   "Interrupt the agent Lisp process associated with this interactive buffer,
    causing it to invoke BREAK."
   "Interrupt the agent Lisp process associated with this interactive buffer,
@@ -310,7 +310,7 @@
   (declare (ignore p))
   (send-oob-to-agent "B"))
 
-(defcommand "Typescript Agent to Top Level" (p)
+(defcommand "Session Agent to Top Level" (p)
   "Interrupt the agent Lisp process associated with this interactive buffer,
    causing it to throw to the top level REP loop."
   "Interrupt the agent Lisp process associated with this interactive buffer,
@@ -318,15 +318,15 @@
   (declare (ignore p))
   (send-oob-to-agent "T"))
 
-(defcommand "Typescript Agent Status" (p)
+(defcommand "Session Agent Status" (p)
   "Interrupt the agent and cause it to print status information."
   "Interrupt the agent and cause it to print status information."
   (declare (ignore p))
   (send-oob-to-agent "S"))
 
 (defun send-oob-to-agent (string)
-  (let* ((ts (typescript-data-or-lose))
-         (wire (ts-data-wire ts))
+  (let* ((ts (session-data-or-lose))
+         (wire (session-data-wire ts))
          (socket (hemlock.wire:wire-fd wire)))
     (unless socket
       (editor-error "The agent is no longer alive."))
@@ -334,7 +334,7 @@
     #+NIL
     (send-character-out-of-band socket (schar string 0))))
 
-(defcommand "Clear Typescript Buffer" (p)
+(defcommand "Clear Session Buffer" (p)
   "" ""
   (declare (ignore p))
   (let* ((input-region (get-interactive-input))

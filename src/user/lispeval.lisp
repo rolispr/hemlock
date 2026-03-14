@@ -121,12 +121,12 @@
                         (message "~A~%=> ~A" out-str result-str)))
                    (:compile
                     (when bg-ts
-                      (ts-buffer-output-string bg-ts (format nil "~A~%" text))
+                      (session-buffer-output-string bg-ts (format nil "~A~%" text))
                       (unless (zerop (length out-str))
-                        (ts-buffer-output-string bg-ts out-str)
+                        (session-buffer-output-string bg-ts out-str)
                         (unless (char= (char out-str (1- (length out-str))) #\Newline)
-                          (ts-buffer-output-string bg-ts (string #\Newline))))
-                      (ts-buffer-output-string bg-ts (format nil "=> ~A~%" result-str)))
+                          (session-buffer-output-string bg-ts (string #\Newline))))
+                      (session-buffer-output-string bg-ts (format nil "=> ~A~%" result-str)))
                     (message "=> ~A" result-str))
                    (t
                     (message "=> ~A" result-str)))))
@@ -150,15 +150,15 @@
          (server-eval-text remote
                            (note-package note)
                            (note-text note)
-                           (and ts (ts-data-stream ts)))))
+                           (and ts (session-data-stream ts)))))
       (:compile
        (hemlock.wire:remote wire
          (server-compile-text remote
                               (note-package note)
                               (note-text note)
                               (note-input-file note)
-                              (and ts (ts-data-stream ts))
-                              (and bg (ts-data-stream bg)))))
+                              (and ts (session-data-stream ts))
+                              (and bg (session-data-stream bg)))))
       (:compile-file
        (macrolet ((frob (x)
                     `(if (pathnamep ,x)
@@ -174,8 +174,8 @@
                                 (frob (note-error-file note))
                                 (frob (note-lap-file note))
                                 (note-load note)
-                                (and ts (ts-data-stream ts))
-                                (and bg (ts-data-stream bg))))))
+                                (and ts (session-data-stream ts))
+                                (and bg (session-data-stream bg))))))
       (t
        (error "Unknown note kind ~S" (note-kind note))))
     (hemlock.wire:wire-force-output wire)))

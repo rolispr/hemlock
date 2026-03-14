@@ -419,7 +419,7 @@ GB
     (*in-the-editor*
      (process-command-line-argument x))
     (*in-hemlock-agent-p*
-     (hemlock.wire:remote-value (hemlock::ts-stream-wire *terminal-io*)
+     (hemlock.wire:remote-value (hemlock::session-stream-wire *terminal-io*)
                                 (process-command-line-argument x)))
     (t
      (with-editor (:load-user-init load-user-init

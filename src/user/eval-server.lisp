@@ -148,10 +148,10 @@
       (unix:unix-close fd))
     (setf (server-info-wire server) nil))
   (when (server-info-agent-info server)
-    (ts-buffer-wire-died (server-info-agent-info server))
+    (session-buffer-wire-died (server-info-agent-info server))
     (setf (server-info-agent-info server) nil))
   (when (server-info-background-info server)
-    (ts-buffer-wire-died (server-info-background-info server))
+    (session-buffer-wire-died (server-info-background-info server))
     (setf (server-info-background-info server) nil))
   (clear-server-errors server)
   (when (eq server (variable-value 'current-eval-server :global))
@@ -264,7 +264,7 @@
 
 ;;; MAKE-BUFFERS-FOR-TYPESCRIPT -- Internal.
 ;;;
-(defun make-buffers-for-typescript (agent-name background-name)
+(defun make-buffers-for-session (agent-name background-name)
   "Make the interactive and compilation buffers agent-name and background-name.
    If either is nil, then prompt the user."
   (multiple-value-bind (agent-name background-name)
@@ -288,9 +288,9 @@
                                           :wire :wire-not-yet-established
                                           :agent-buffer agent-buffer
                                           :background-buffer background-buffer))
-           (agent-info (typescriptify-buffer agent-buffer server-info
+           (agent-info (sessionify-buffer agent-buffer server-info
                                              :wire-not-yet-established))
-           (background-info (typescriptify-buffer background-buffer server-info
+           (background-info (sessionify-buffer background-buffer server-info
                                                   :wire-not-yet-established)))
       (setf (server-info-agent-info server-info) agent-info)
       (setf (server-info-background-info server-info) background-info)
@@ -328,12 +328,12 @@
       (when (getstring background *buffer-names*)
         (editor-error "Buffer ~A is already in use." background)))
     (message "Spawning agent ... ")
-    (let ((server-info (make-buffers-for-typescript agent background)))
+    (let ((server-info (make-buffers-for-session agent background)))
       (make-process-connection
        command
        :filter (let ((ts (server-info-agent-info server-info)))
                  (lambda (connection bytes)
-                   (ts-buffer-output-string
+                   (session-buffer-output-string
                     ts
                     (default-filter connection bytes))
                    nil)))
@@ -361,15 +361,15 @@
         (editor-error "Buffer ~A is already in use." agent))
       (when (getstring background *buffer-names*)
         (editor-error "Buffer ~A is already in use." background)))
-    (let ((server-info (make-buffers-for-typescript agent background)))
+    (let ((server-info (make-buffers-for-session agent background)))
       ;; Mark the server as immediately ready — no wire handshake needed.
       ;; The wire slot holds :local to distinguish from process agents.
       (setf (server-info-wire server-info) :local)
-      ;; Update ts-data wire slots so typescript input works.
+      ;; Update session-data wire slots so session input works.
       (let ((ts (server-info-agent-info server-info))
             (bg (server-info-background-info server-info)))
-        (when ts (setf (ts-data-wire ts) :local))
-        (when bg (setf (ts-data-wire bg) :local)))
+        (when ts (setf (session-data-wire ts) :local))
+        (when bg (setf (session-data-wire bg) :local)))
       server-info)))
 
 ;;; MAYBE-CREATE-SERVER -- Internal interface.
@@ -597,9 +597,9 @@
 ;;; buffer.  Returns the stream.
 ;;;
 (defun connect-stream (remote-buffer)
-  (let ((stream (make-ts-stream hemlock.wire:*current-wire* remote-buffer)))
+  (let ((stream (make-session-stream hemlock.wire:*current-wire* remote-buffer)))
     (hemlock.wire:remote hemlock.wire:*current-wire*
-      (ts-buffer-set-stream remote-buffer
+      (session-buffer-set-stream remote-buffer
                             (hemlock.wire:make-remote-object stream)))
     stream))
 
@@ -612,7 +612,7 @@
 ;;; for synch'ing, not for values.
 ;;;
 (defvar cl-user::*io* nil)
-(defun made-buffers-for-typescript (agent-info background-info)
+(defun made-buffers-for-session (agent-info background-info)
   (setf *original-terminal-io* *terminal-io*)
   (macrolet ((frob (symbol new-value)
                `(setf ,(intern (concatenate 'simple-string
@@ -638,17 +638,17 @@
 ;;;
 (defun agent-gc-notify-before (remote-ts message)
   (let ((ts (hemlock.wire:remote-object-value remote-ts)))
-    (ts-buffer-output-string ts message t)
+    (session-buffer-output-string ts message t)
     (when (value agent-gc-alarm)
-      (message "~A is GC'ing." (buffer-name (ts-data-buffer ts)))
+      (message "~A is GC'ing." (buffer-name (session-data-buffer ts)))
       (when (eq (value agent-gc-alarm) :loud-message)
         (beep)))))
 
 (defun agent-gc-notify-after (remote-ts message)
   (let ((ts (hemlock.wire:remote-object-value remote-ts)))
-    (ts-buffer-output-string ts message t)
+    (session-buffer-output-string ts message t)
     (when (value agent-gc-alarm)
-      (message "~A is done GC'ing." (buffer-name (ts-data-buffer ts)))
+      (message "~A is done GC'ing." (buffer-name (session-data-buffer ts)))
       (when (eq (value agent-gc-alarm) :loud-message)
         (beep)))))
 
@@ -824,7 +824,7 @@
          (agent background)
          (set-up-buffers-for-agent (lisp-implementation-type)
                                    (lisp-implementation-version))
-         (made-buffers-for-typescript agent background))))
+         (made-buffers-for-session agent background))))
    'editor-died))
 
 (defun set-up-buffers-for-agent
@@ -833,11 +833,11 @@
          (agent-info (server-info-agent-info server-info))
          (background-info (server-info-background-info server-info)))
     (setf (server-info-wire server-info) wire)
-    (ts-buffer-wire-connected agent-info wire)
-    (ts-buffer-wire-connected background-info wire)
+    (session-buffer-wire-connected agent-info wire)
+    (session-buffer-wire-connected background-info wire)
     (setf (server-info-implementation-type server-info) type)
     (setf (server-info-implementation-version server-info) version)
-    (let* ((buf (ts-data-buffer agent-info))
+    (let* ((buf (session-data-buffer agent-info))
            (name (format nil "~A ~A" (buffer-name buf) type)))
       (maybe-rename-buffer buf name))
     (values (hemlock.wire:make-remote-object agent-info)
@@ -991,7 +991,7 @@
 ;;; interesting observations in the compilation can be propagated back to the
 ;;; editor.  If there is a notification point defined, we send information
 ;;; about the position and kind of error.  The actual error text is written out
-;;; using typescript operations.
+;;; using session operations.
 ;;;
 ;;; Start and End are the compiler's best guess at the file position where the
 ;;; error occurred.  Function is some string describing where the error was.
@@ -1076,9 +1076,9 @@
   (cond ((null name) *package*)
         ((find-package name))
         (t
-         (hemlock.wire:remote-value (ts-stream-wire *terminal-io*)
-           (ts-buffer-output-string
-            (ts-stream-typescript *terminal-io*)
+         (hemlock.wire:remote-value (session-stream-wire *terminal-io*)
+           (session-buffer-output-string
+            (session-stream-session *terminal-io*)
             (format nil "~&Creating package ~A.~%" name)
             t))
          (make-package name))))
@@ -1118,12 +1118,12 @@
 
 ;;;;
 
-(defun make-extra-typescript-buffer
+(defun make-extra-session-buffer
     (name &optional (server-info (get-current-eval-server t))
                     (wire (server-info-wire server-info)))
   (let ((buffer
          (make-buffer-with-unique-name name :modes '("Lisp"))))
-    (typescriptify-buffer buffer server-info wire)
+    (sessionify-buffer buffer server-info wire)
     buffer))
 
 (defun wire-to-server-info (&optional (wire hemlock.wire:*current-wire*)
@@ -1134,17 +1134,17 @@
           (error "no server info for wire: ~A" wire)
           error-value)))
 
-(defun %make-extra-typescript-buffer (name)
+(defun %make-extra-session-buffer (name)
   (let* ((wire hemlock.wire:*current-wire*)
          (info ;; hmm, do we need the server info?
           :server-info-for-extra-buffer-not-set)
-         (buffer (make-extra-typescript-buffer
+         (buffer (make-extra-session-buffer
                   name
                   (wire-to-server-info wire nil info)
                   wire))
-         (ts-data (variable-value 'typescript-data :buffer buffer)))
+         (session-data (variable-value 'session-data :buffer buffer)))
     (change-to-buffer buffer)
-    (hemlock.wire:make-remote-object ts-data)))
+    (hemlock.wire:make-remote-object session-data)))
 
 
 ;;;; Wire-readiness predicate.
@@ -1159,7 +1159,7 @@
 
 ;; Alias for prepl.lisp which calls this from eval threads
 (setf (fdefinition 'make-extra-repl-buffer-impl)
-      #'%make-extra-typescript-buffer)
+      #'%make-extra-session-buffer)
 
 
 ;;;; Auto-start agent on editor entry.

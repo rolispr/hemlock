@@ -326,21 +326,21 @@
 (bind-key "Editor Describe Symbol" #k"control-meta-S" :mode "Editor")
 (bind-key "Editor Fuzzy Complete Symbol" #k"control-c meta-i" :mode "Editor")
 
-;;;; Typescript.
-(bind-key "Confirm Typescript Input" #k"return" :mode "Typescript")
-(bind-key "Interactive Beginning of Line" #k"control-a" :mode "Typescript")
-(bind-key "Interactive Beginning of Line" #k"home" :mode "Typescript")
-(bind-key "Kill Interactive Input" #k"meta-i" :mode "Typescript")
-(bind-key "Previous Interactive Input" #k"meta-p" :mode "Typescript")
-(bind-key "Search Previous Interactive Input" #k"meta-P" :mode "Typescript")
-(bind-key "Next Interactive Input" #k"meta-n" :mode "Typescript")
-(bind-key "Reenter Interactive Input" #k"control-return" :mode "Typescript")
-(bind-key "Typescript Agent Break" #k"hyper-b" :mode "Typescript")
-(bind-key "Typescript Agent to Top Level" #k"hyper-g" :mode "Typescript")
-(bind-key "Typescript Agent Status" #k"hyper-s" :mode "Typescript")
+;;;; Session.
+(bind-key "Confirm Session Input" #k"return" :mode "Session")
+(bind-key "Interactive Beginning of Line" #k"control-a" :mode "Session")
+(bind-key "Interactive Beginning of Line" #k"home" :mode "Session")
+(bind-key "Kill Interactive Input" #k"meta-i" :mode "Session")
+(bind-key "Previous Interactive Input" #k"meta-p" :mode "Session")
+(bind-key "Search Previous Interactive Input" #k"meta-P" :mode "Session")
+(bind-key "Next Interactive Input" #k"meta-n" :mode "Session")
+(bind-key "Reenter Interactive Input" #k"control-return" :mode "Session")
+(bind-key "Session Agent Break" #k"hyper-b" :mode "Session")
+(bind-key "Session Agent to Top Level" #k"hyper-g" :mode "Session")
+(bind-key "Session Agent Status" #k"hyper-s" :mode "Session")
 (bind-key "Select Agent" #k"control-meta-\c")
 (bind-key "Select Compilation" #k"control-meta-C")
-(bind-key "Clear Typescript Buffer" #k"control-c meta-o" :mode "Typescript")
+(bind-key "Clear Session Buffer" #k"control-c meta-o" :mode "Session")
 
 #+port-user-lispeval
 (progn

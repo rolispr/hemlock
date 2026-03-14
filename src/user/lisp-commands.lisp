@@ -84,7 +84,7 @@
         :buffer buffer
         :value (make-hemlock-output-stream point))
       (defhvar "Interactive History"
-        "A ring of the regions input to an interactive mode (Eval or Typescript)."
+        "A ring of the regions input to an interactive mode (Eval or Session)."
         :buffer buffer
         :value (make-ring (value interactive-history-length)))
       (defhvar "Interactive Pointer"
@@ -238,7 +238,7 @@
 
 
 
-;;;; General interactive commands used in eval and typescript buffers.
+;;;; General interactive commands used in eval and session buffers.
 
 (defun fresh-prompt (&aux (*standard-output* (value eval-output-stream)))
   (let ((buffer (current-buffer)))
@@ -361,7 +361,7 @@
         (incf base))))
 
 (defcommand "Previous Interactive Input" (p)
-  "Insert the previous input in an interactive mode (Eval or Typescript).
+  "Insert the previous input in an interactive mode (Eval or Session).
    If repeated, keep rotating the history.  With prefix argument, rotate
    that many times."
   "Pop the *interactive-history* at the point."
@@ -394,8 +394,8 @@
   (previous-interactive-input-command (- (or p 1))))
 
 (defcommand "Kill Interactive Input" (p)
-  "Kill any input to an interactive mode (Eval or Typescript)."
-  "Kill any input to an interactive mode (Eval or Typescript)."
+  "Kill any input to an interactive mode (Eval or Session)."
+  "Kill any input to an interactive mode (Eval or Session)."
   (declare (ignore p))
   (let ((point (buffer-point (current-buffer)))
         (mark (value buffer-input-mark)))
