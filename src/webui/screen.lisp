@@ -13,8 +13,18 @@
 
 ;;;; Initial HTML page
 
+(defun generate-palette-css ()
+  (with-output-to-string (out)
+    (dotimes (i 16)
+      (let ((rgb (hemlock.term:color-index-to-rgb i)))
+        (when rgb
+          (format out ".fg-~D{color:rgb(~D,~D,~D)} .bg-~D{background:rgb(~D,~D,~D)} "
+                  i (aref rgb 0) (aref rgb 1) (aref rgb 2)
+                  i (aref rgb 0) (aref rgb 1) (aref rgb 2)))))))
+
 (defparameter *webui-initial-html*
-  "<!DOCTYPE html><html><head><meta charset=\"utf-8\">
+  (concatenate 'string
+    "<!DOCTYPE html><html><head><meta charset=\"utf-8\">
 <script src=\"webui.js\"></script>
 <style>
   * { box-sizing: border-box; }
@@ -23,14 +33,13 @@
          font-size:14px; line-height:1.2; overflow:hidden; margin:0; padding:0; }
   #editor-container { display:flex; flex-direction:column; height:100vh; }
   .hem-window  { flex:1; white-space:pre; overflow:hidden; font-family:inherit; background:#252526; }
-  .hem-echo    { height:2em; flex:none; white-space:pre; overflow:hidden; font-family:inherit; background:#252526; }
-  .hem-ml      { background:#3a3a3a; color:#ccc; white-space:pre; overflow:hidden;
-                 font-family:inherit; font-size:12px; padding:2px 4px; flex:none; }
+  .hem-echo    { height:3.6em; flex:none; white-space:pre; overflow:hidden; font-family:inherit; background:#252526; }
+  .hem-ml      { height:1.2em; background:#3a3a3a; color:#ccc; white-space:pre; overflow:hidden;
+                 font-family:inherit; flex:none; }
   .cursor      { background:#528bff; color:#fff; }
-  .fg-0{color:#000} .fg-1{color:#cc0000} .fg-2{color:#00aa00} .fg-3{color:#888800}
-  .fg-4{color:#3366aa} .fg-5{color:#880088} .fg-6{color:#008888} .fg-7{color:#cccccc}
-  .fg-8{color:#555555} .fg-9{color:#ff5555} .fg-10{color:#55ff55} .fg-11{color:#ffff55}
-  .fg-12{color:#5555ff} .fg-13{color:#ff55ff} .fg-14{color:#55ffff} .fg-15{color:#ffffff}
+  "
+    (generate-palette-css)
+    "
   .bold{font-weight:bold} .underline{text-decoration:underline}
   .reverse{filter:invert(100%)} .italic{font-style:italic}
 </style></head>
@@ -59,15 +68,11 @@ function updateLines(id, changesJson) {
 document.addEventListener('keydown', function(e) {
   var m = '';
   if (e.ctrlKey)  m += 'Control-';
-  // On macOS: Command key sets metaKey, Option sets altKey.
-  // Option often mangles e.key (e.g. Option-x -> a special char),
-  // so treat both as Meta and recover the base key from e.code.
   var isMeta = e.altKey || e.metaKey;
   if (isMeta) m += 'Meta-';
   if (e.shiftKey && e.key.length > 1) m += 'Shift-';
   var k;
   if (isMeta && e.code && e.code.startsWith('Key')) {
-    // e.code is 'KeyX' etc. — extract the letter in the right case.
     k = e.shiftKey ? e.code.charAt(3).toUpperCase() : e.code.charAt(3).toLowerCase();
   } else if (isMeta && e.code && e.code.startsWith('Digit')) {
     k = e.code.charAt(5);
@@ -96,8 +101,6 @@ function _measureGrid() {
   if (!sz) return;
   webui.call('hemlock_resize', sz).catch(function(){});
 }
-// Retry sending the resize until the WebSocket connection is ready.
-// webui.call rejects if the socket is not yet open; keep retrying.
 function _measureGridWithRetry(attemptsLeft) {
   var sz = _getGridSize();
   if (!sz) return;
@@ -109,7 +112,7 @@ function _measureGridWithRetry(attemptsLeft) {
 }
 window.addEventListener('load',   function() { _measureGridWithRetry(40); });
 window.addEventListener('resize', _measureGrid);
-</script></body></html>")
+</script></body></html>"))
 
 
 ;;;; Device variables

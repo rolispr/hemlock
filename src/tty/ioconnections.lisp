@@ -165,7 +165,33 @@
 
 (defmethod connection-pid ((connection process-connection/sb-sys))
   (let ((p (connection-process connection)))
-    (when p (sb-ext:process-pid p))))
+    (etypecase p
+      (null nil)
+      (integer p)
+      (sb-impl::process (sb-ext:process-pid p)))))
+
+(pushnew (merge-pathnames "src/tty/"
+                          (asdf:system-source-directory :hemlock.base))
+         cffi:*foreign-library-directories*
+         :test #'equal)
+
+(cffi:define-foreign-library libspawn-ctty
+  (t (:default "libspawn-ctty")))
+
+(cffi:use-foreign-library libspawn-ctty)
+
+(defun alloc-c-string-array (strings)
+  (let* ((n (length strings))
+         (arr (cffi:foreign-alloc :pointer :count (1+ n))))
+    (loop for i from 0 for s in strings
+          do (setf (cffi:mem-aref arr :pointer i) (cffi:foreign-string-alloc s)))
+    (setf (cffi:mem-aref arr :pointer n) (cffi:null-pointer))
+    (values arr n)))
+
+(defun free-c-string-array (arr count)
+  (dotimes (i count)
+    (cffi:foreign-string-free (cffi:mem-aref arr :pointer i)))
+  (cffi:foreign-free arr))
 
 (defmethod initialize-instance :after
     ((instance process-connection/sb-sys) &key)
@@ -179,31 +205,33 @@
     (let* ((prog (car command))
            (args (cdr command)))
       (if slave-fd
-          ;; PTY mode: child's stdin/stdout/stderr go through the slave PTY fd.
-          ;; The pipelike-connection reads/writes the master side, so we do NOT
-          ;; set read-fd/write-fd or install a read handler here.
-          (let* ((slave-stream (sb-sys:make-fd-stream slave-fd :input t :output t
-                                                      :external-format :utf-8
-                                                      :name "PTY slave"))
-                 (custom-env (hemlock.command::connection-environment instance))
+          (let* ((custom-env (hemlock.command::connection-environment instance))
                  (env (or custom-env
                           (list* "TERM=dumb"
                                  (remove-if (lambda (s)
                                               (or (uiop:string-prefix-p "TERM=" s)
                                                   (uiop:string-prefix-p "COLORTERM=" s)))
                                             (sb-ext:posix-environ)))))
-                 (proc (sb-ext:run-program prog args
-                                           :input  slave-stream
-                                           :output slave-stream
-                                           :error  slave-stream
-                                           :wait   nil
-                                           :pty    nil
-                                           :environment env
-                                           :directory (or directory
-                                                         (uiop:getcwd)))))
-            ;; Don't close slave-stream here — sb-ext:run-program dups the fd
-            ;; and the caller closes the slave fd after we return.
-            (setf process proc))
+                 (dir (namestring (or directory (uiop:getcwd))))
+                 (shell-cmd (list "/bin/sh" "-c"
+                                  (format nil "cd ~A && exec ~{~A~^ ~}"
+                                          (uiop:escape-sh-token dir)
+                                          (mapcar #'uiop:escape-sh-token
+                                                  (cons prog args))))))
+            (multiple-value-bind (argv argv-n) (alloc-c-string-array shell-cmd)
+              (multiple-value-bind (envp envp-n) (alloc-c-string-array env)
+                (unwind-protect
+                    (let ((pid (cffi:foreign-funcall "spawn_with_ctty"
+                                                     :int slave-fd
+                                                     :string "/bin/sh"
+                                                     :pointer argv
+                                                     :pointer envp
+                                                     :int)))
+                      (if (minusp pid)
+                          (error "fork failed")
+                          (setf process pid)))
+                  (free-c-string-array argv argv-n)
+                  (free-c-string-array envp envp-n)))))
           ;; Pipe mode: use sb-ext:run-program's built-in pipes.
           (let ((proc (sb-ext:run-program prog args
                                           :input  :stream

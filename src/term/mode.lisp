@@ -223,6 +223,8 @@
                 (insert-string point (make-string new-w :initial-element #\Space))
                 (when (< y (1- new-h))
                   (insert-character point #\Newline)))))
+          (dolist (w (buffer-windows buffer))
+            (move-mark (window-display-start w) (buffer-start-mark buffer)))
           (setf (terminal-state-font-info-cache state)
                 (make-array new-h :initial-element nil))
           (setf (terminal-state-dirty state) t))))))

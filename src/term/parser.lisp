@@ -293,10 +293,10 @@
           ((string= code-str "10")
            (when (and (string= data "?") (term-input-fn term))
              (funcall (term-input-fn term) term
-                      (format nil "~C]10;rgb:ffff/ffff/ffff~C\\"
+                      (format nil "~C]10;rgb:d8d8/d8d8/d8d8~C\\"
                               #\Escape #\Escape))))
           ((string= code-str "11")
            (when (and (string= data "?") (term-input-fn term))
              (funcall (term-input-fn term) term
-                      (format nil "~C]11;rgb:0000/0000/0000~C\\"
+                      (format nil "~C]11;rgb:1818/1818/1818~C\\"
                               #\Escape #\Escape)))))))))

@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  SBCL_VERSION: '2.5.9'
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Roswell
+        uses: 40ants/setup-lisp@v4
+        with:
+          lisp: sbcl-bin/${{ env.SBCL_VERSION }}
+
+      - name: Install ocicl
+        run: curl -sL https://raw.githubusercontent.com/ocicl/ocicl/main/install.sh | bash
+
+      - name: Install dependencies
+        run: ocicl install
+
+      - name: Run tests
+        run: make test
