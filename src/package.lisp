@@ -1869,17 +1869,9 @@
   (:use :common-lisp :hemlock.text :hemlock.command)
   (:shadowing-import-from :hemlock.text #:char-code-limit)
   (:export
-   ;; event loop — sb-sys backend methods
-   #:invoke-with-new-event-loop
-   #:make-event-loop
-   #:invoke-with-existing-event-loop
-   #:dispatch-events-with-backend
-   #:dispatch-events-no-hang-with-backend
-   #:dispatch-events-with-timeout-backend
-   #:invoke-later
-   #:drain-pending-invocations
    ;; fd utilities
-   #:fd-readable-p))
+   #:fd-readable-p
+   #:drain-pending-invocations))
 
 (defpackage :hemlock.terminfo
   (:use :common-lisp)
@@ -1897,7 +1889,8 @@
   (:nicknames :tty))
 
 (defpackage :hemlock.webui
-  (:use :common-lisp :hemlock.text :hemlock.command :hemlock :hemlock.display)
+  (:use :common-lisp :hemlock.text :hemlock.command :hemlock :hemlock.display
+        :hemlock.io)
   (:shadowing-import-from :hemlock.text #:char-code-limit))
 
 

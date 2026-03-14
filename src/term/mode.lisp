@@ -90,7 +90,7 @@
     (loop
       (when (>= total +terminal-drain-cap+)
         (return))
-      (unless (hemlock.tty::fd-readable-p fd)
+      (unless (hemlock.io:fd-readable-p fd)
         (return))
       (let ((n (cffi:with-pointer-to-vector-data (ptr buf)
                  (cffi:foreign-funcall "read"

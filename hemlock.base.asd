@@ -84,9 +84,14 @@
                (:file "syntax-highlight")
                (:file "connections")
                (:file "repl" :pathname "../user/repl" :depends-on ("macros" "rompsite" "connections"))))
+     (:module io
+              :pathname "src/io/"
+              :depends-on (core-2)
+              :components
+              ((:file "ioconnections")))
      (:module root-1
               :pathname "src/command/"
-              :depends-on (core-2 core-1)
+              :depends-on (core-2 core-1 io)
               :components
               ((:file "font")
                (:file "streams")
