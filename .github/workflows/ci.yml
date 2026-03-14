@@ -12,15 +12,23 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            sbcl_arch: x86-64-linux
+          - os: macos-latest
+            sbcl_arch: arm64-darwin
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Roswell
-        uses: 40ants/setup-lisp@v4
-        with:
-          lisp: sbcl-bin/${{ env.SBCL_VERSION }}
+      - name: Install SBCL
+        run: |
+          curl -fsSL -o sbcl.tar.bz2 \
+            "https://downloads.sourceforge.net/project/sbcl/sbcl/${{ env.SBCL_VERSION }}/sbcl-${{ env.SBCL_VERSION }}-${{ matrix.sbcl_arch }}-binary.tar.bz2"
+          tar xjf sbcl.tar.bz2
+          cd sbcl-${{ env.SBCL_VERSION }}-${{ matrix.sbcl_arch }}
+          sudo bash install.sh
+          sbcl --version
 
       - name: Install ocicl
         run: curl -sL https://raw.githubusercontent.com/ocicl/ocicl/main/install.sh | bash
