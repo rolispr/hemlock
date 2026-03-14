@@ -19,6 +19,7 @@ build: src/tty/libspawn-ctty.$(SHLIB_EXT)
 	$(SBCL) --non-interactive --load init.lisp \
 		--eval '(push :deploy-console *features*)' \
 		--eval '(asdf:load-system :hemlock)' \
+		--eval '(defmethod deploy:output-file ((op deploy:deploy-op)) (merge-pathnames "bin/hemlock" (uiop:getcwd)))' \
 		--eval '(asdf:make :hemlock)'
 
 test: src/tty/libspawn-ctty.$(SHLIB_EXT)
