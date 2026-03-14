@@ -55,6 +55,6 @@
   (is-true (fboundp 'hemlock::make-extra-repl-buffer-impl)))
 
 (test alias-same-function
-  "make-extra-repl-buffer-impl is the same function as %make-extra-typescript-buffer."
+  "make-extra-repl-buffer-impl is the same function as %make-extra-session-buffer."
   (is (eq (fdefinition 'hemlock::make-extra-repl-buffer-impl)
-          (fdefinition 'hemlock::%make-extra-typescript-buffer))))
+          (fdefinition 'hemlock::%make-extra-session-buffer))))
