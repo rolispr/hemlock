@@ -34,10 +34,29 @@
   (sb-sys:serve-event seconds))
 
 ;;; invoke-later: push onto a list and drain at the next dispatch point.
+;;; A self-pipe wakes up serve-event so draining happens immediately.
 (defvar *pending-invocations* nil)
+(defvar *wakeup-read-fd* nil)
+(defvar *wakeup-write-fd* nil)
+
+(defun setup-wakeup-pipe ()
+  "Create a self-pipe for waking up the event loop from eval threads."
+  (cffi:with-foreign-object (fds :int 2)
+    (when (zerop (cffi:foreign-funcall "pipe" :pointer fds :int))
+      (setf *wakeup-read-fd* (cffi:mem-aref fds :int 0)
+            *wakeup-write-fd* (cffi:mem-aref fds :int 1))
+      (sb-sys:add-fd-handler *wakeup-read-fd* :input
+        (lambda (fd)
+          (cffi:with-foreign-object (buf :char 64)
+            (cffi:foreign-funcall "read" :int fd :pointer buf :size 64 :long))
+          (drain-pending-invocations))))))
 
 (defmethod invoke-later ((backend (eql :sb-sys)) fun)
-  (push fun *pending-invocations*))
+  (push fun *pending-invocations*)
+  (when *wakeup-write-fd*
+    (cffi:with-foreign-object (byte :char 1)
+      (setf (cffi:mem-ref byte :char) 1)
+      (cffi:foreign-funcall "write" :int *wakeup-write-fd* :pointer byte :size 1 :long))))
 
 (defun drain-pending-invocations ()
   (loop while *pending-invocations*
@@ -247,7 +266,9 @@
 (defmethod delete-connection :before ((connection process-connection/sb-sys))
   (let ((p (connection-process connection)))
     (when p
-      (sb-ext:process-kill p 15)
+      (etypecase p
+        (integer (ignore-errors (sb-posix:kill p 15)))
+        (sb-impl::process (sb-ext:process-kill p 15)))
       (setf (connection-process connection) nil))))
 
 

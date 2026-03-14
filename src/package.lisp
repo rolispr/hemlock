@@ -1863,7 +1863,8 @@
    #:serve-unmap-notify))
 
 (defpackage :hemlock-user
-    (:use :common-lisp :hemlock))
+    (:use :common-lisp :hemlock.text :hemlock.command :hemlock)
+  (:shadowing-import-from :hemlock.text #:char-code-limit))
 
 (defpackage :hemlock.io
   (:use :common-lisp :hemlock.text :hemlock.command)
@@ -1871,7 +1872,8 @@
   (:export
    ;; fd utilities
    #:fd-readable-p
-   #:drain-pending-invocations))
+   #:drain-pending-invocations
+   #:setup-wakeup-pipe))
 
 (defpackage :hemlock.terminfo
   (:use :common-lisp)

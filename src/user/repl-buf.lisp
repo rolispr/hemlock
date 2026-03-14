@@ -265,12 +265,40 @@
         (let ((string (region-to-string input)))
           (declare (simple-string string))
           (insert-character (current-point) #\NewLine)
-          (hemlock.wire:remote (ts-data-wire ts)
-            (ts-stream-accept-input (ts-data-stream ts)
-                                    (concatenate 'simple-string
-                                                 string
-                                                 (string #\newline))))
-          (hemlock.wire:wire-force-output (ts-data-wire ts))
+          (let ((wire (ts-data-wire ts)))
+            (if (eq wire :local)
+                ;; Local master eval — spawn thread, post results via later.
+                (let ((captured-ts ts))
+                  (sb-thread:make-thread
+                   (lambda ()
+                     (let ((output (make-string-output-stream)))
+                       (handler-case
+                           (let* ((*standard-output* output)
+                                  (*error-output* output)
+                                  (*trace-output* output)
+                                  (values (multiple-value-list
+                                           (eval (read-from-string string))))
+                                  (out-str (get-output-stream-string output))
+                                  (result-str
+                                   (format nil "=> ~{~#[~;~A~:;~A, ~]~}~%"
+                                           (mapcar #'prin1-to-string values))))
+                             (later
+                               (unless (zerop (length out-str))
+                                 (ts-buffer-output-string captured-ts out-str))
+                               (ts-buffer-output-string captured-ts result-str)))
+                         (error (c)
+                           (later
+                             (ts-buffer-output-string
+                              captured-ts (format nil "Error: ~A~%" c)))))))
+                   :name "hemlock-repl-eval"))
+                ;; Wire-backed agent — send over wire.
+                (progn
+                  (hemlock.wire:remote wire
+                    (ts-stream-accept-input (ts-data-stream ts)
+                                            (concatenate 'simple-string
+                                                         string
+                                                         (string #\newline))))
+                  (hemlock.wire:wire-force-output wire))))
           (buffer-end (ts-data-fill-mark ts)
                       (ts-data-buffer ts)))))))
 

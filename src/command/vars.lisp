@@ -21,11 +21,21 @@
 ;;;    Complain about an undefined Hemlock variable in a helpful fashion.
 ;;;
 (defun undefined-variable-error (name)
-  (if (eq (symbol-package name) (find-package :hemlock))
+  (if (and (symbolp name)
+           (eq (symbol-package name) (find-package :hemlock)))
       (error "Undefined Hemlock variable ~A." name)
-      (error "Hemlock variables must be in the :hemlock package, but~%~
-             ~S is in the ~S package."
-             name (package-name (symbol-package name)))))
+      (error "Undefined Hemlock variable ~S." name)))
+
+(defun resolve-variable-symbol (name)
+  (etypecase name
+    (symbol
+     (or (and (get name 'hemlock-variable-value) name)
+         (let ((sym (find-symbol (symbol-name name) :hemlock)))
+           (if (and sym (get sym 'hemlock-variable-value))
+               sym
+               name))))
+    (string
+     (string-to-variable name))))
 
 ;;; GET-MODE-OBJECT  --  Internal
 ;;;
@@ -53,6 +63,7 @@
 ;;; or die trying.
 ;;;
 (defun get-variable-object (name kind where)
+  (let ((name (resolve-variable-symbol name)))
   (case kind
     (:current
      (let ((obj (get name 'hemlock-variable-value)))
@@ -79,7 +90,7 @@
          (error "~S is not a defined Hemlock variable in mode ~S." name where))
        (binding-object binding)))
     (t
-     (error "~S is not a defined value for Kind." kind))))
+     (error "~S is not a defined value for Kind." kind)))))
 
 ;;; VARIABLE-VALUE  --  Public
 ;;;
@@ -95,7 +106,8 @@
 ;;; current buffer is returned.
 ;;;
 (defun %value (name)
-  (let ((obj (get name 'hemlock-variable-value)))
+  (let* ((sym (resolve-variable-symbol name))
+         (obj (get sym 'hemlock-variable-value)))
     (unless obj (undefined-variable-error name))
     (variable-object-value obj)))
 
@@ -104,9 +116,10 @@
 ;;;    The setf-inverse of Value, set the current value.
 ;;;
 (defun %set-value (var new-value)
-  (let ((obj (get var 'hemlock-variable-value)))
+  (let* ((sym (resolve-variable-symbol var))
+         (obj (get sym 'hemlock-variable-value)))
     (unless obj (undefined-variable-error var))
-    (invoke-hook (variable-object-hooks obj) var :current nil new-value)
+    (invoke-hook (variable-object-hooks obj) sym :current nil new-value)
     (setf (variable-object-value obj) new-value)))
 
 ;;; %SET-VARIABLE-VALUE  --  Internal
@@ -186,18 +199,19 @@
 (defun hemlock-bound-p (name &optional (kind :current) where)
   "Returns T Name is a Hemlock variable defined in the specifed place, or
   NIL otherwise."
-  (case kind
-    (:current (not (null (get name 'hemlock-variable-value))))
-    (:buffer
-     (check-type where buffer)
-     (not (null (find-binding name (buffer-var-values where)))))
-    (:global
-     (do ((obj (get name 'hemlock-variable-value)
-               (variable-object-down obj)))
-         ((symbolp obj) (eq obj :global))))
-    (:mode
-     (not (null (find-binding name (mode-object-var-values
-                                    (get-mode-object where))))))))
+  (let ((name (resolve-variable-symbol name)))
+    (case kind
+      (:current (not (null (get name 'hemlock-variable-value))))
+      (:buffer
+       (check-type where buffer)
+       (not (null (find-binding name (buffer-var-values where)))))
+      (:global
+       (do ((obj (get name 'hemlock-variable-value)
+                 (variable-object-down obj)))
+           ((symbolp obj) (eq obj :global))))
+      (:mode
+       (not (null (find-binding name (mode-object-var-values
+                                      (get-mode-object where)))))))))
 
 (declaim (special *global-variable-names*))
 

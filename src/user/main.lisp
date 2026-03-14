@@ -278,15 +278,16 @@ GB
 ;;; that stray writes from background threads (or usercode) don't write raw
 ;;; bytes to the terminal while Hemlock owns the display.
 (after-editor-initializations
- (let* ((buf (or (getstring "*Standard Output*" *buffer-names*)
-                 (make-buffer "*Standard Output*" :modes '("Fundamental"))))
+ (let* ((buf (or (getstring "*Messages*" *buffer-names*)
+                 (make-buffer "*Messages*" :modes '("Fundamental"))))
         (stream (make-hemlock-output-stream (buffer-end-mark buf) :full)))
    (setf *original-standard-output* *standard-output*
          *original-error-output*    *error-output*
          *original-trace-output*    *trace-output*)
    (setf *standard-output* stream
          *error-output*    stream
-         *trace-output*    stream)))
+         *trace-output*    stream))
+ (hemlock.io:setup-wakeup-pipe))
 
 #-(or cmu scl)
 (defvar *command-line-options* nil)

@@ -20,9 +20,8 @@
   agent-info                  ; Ts-Info used in "Agent Lisp" buffer
                               ;  (formerly the "Lisp Listener" buffer).
   agent-buffer                ; "Agent Lisp" buffer for agent's *terminal-io*.
-  background-info             ; Ts-Info structure of typescript we use in
-                              ;  "background" buffer.
-  background-buffer           ; Buffer "background" typescript is in.
+  background-info             ; Ts-Info structure for the compilation buffer.
+  background-buffer           ; Buffer for compilation/background output.
   (errors                     ; Array of errors while compiling
    (make-array 16 :adjustable t :fill-pointer 0))
   error-index                 ; Index of current error.
@@ -37,7 +36,7 @@
 (defstruct (error-info (:print-function print-error-info))
   buffer                      ; Buffer this error is for.
   message                     ; Error Message
-  line                        ; Pointer to message in log buffer.
+  line                        ; Pointer to message in compilation buffer.
   region)                     ; Region of faulty text
 ;;;
 (defun print-error-info (obj stream n)
@@ -266,7 +265,7 @@
 ;;; MAKE-BUFFERS-FOR-TYPESCRIPT -- Internal.
 ;;;
 (defun make-buffers-for-typescript (agent-name background-name)
-  "Make the interactive and background buffers agent-name and background-name.
+  "Make the interactive and compilation buffers agent-name and background-name.
    If either is nil, then prompt the user."
   (multiple-value-bind (agent-name background-name)
                        (cond ((not (and agent-name background-name))
@@ -315,7 +314,7 @@
     (editor-error "Buffer ~A is already in use." name))
   (multiple-value-bind (agent background)
       (if name
-          (values name (format nil "Background ~A" name))
+          (values name (format nil "Compilation ~A" name))
           (pick-agent-buffer-names))
     (when (value confirm-agent-creation)
       (setf agent (prompt-for-string
@@ -323,7 +322,7 @@
                    :help "Enter the name to use for the newly created agent."
                    :default agent
                    :default-string agent))
-      (setf background (format nil "Background ~A" agent))
+      (setf background (format nil "Compilation ~A" agent))
       (when (getstring agent *buffer-names*)
         (editor-error "Buffer ~A is already in use." agent))
       (when (getstring background *buffer-names*)
@@ -342,15 +341,14 @@
 
 ;;; CREATE-AGENT-IN-THREAD -- Public.
 ;;;
-(defun create-agent-in-thread (&optional name)
-  "Create a local eval agent backed by a background thread.
-   No wire protocol — evaluates directly in the master image.
-   Returns a server-info structure with the typescript buffers set up."
+(defun create-local-eval (&optional name)
+  "Create the master's own eval server.
+   Evaluates directly in hemlock's image — no wire, no remote process."
   (when (and name (getstring name *buffer-names*))
     (editor-error "Buffer ~A is already in use." name))
   (multiple-value-bind (agent background)
       (if name
-          (values name (format nil "Background ~A" name))
+          (values name (format nil "Compilation ~A" name))
           (pick-agent-buffer-names))
     (when (value confirm-agent-creation)
       (setf agent (prompt-for-string
@@ -358,7 +356,7 @@
                    :help "Enter the name to use for the newly created agent."
                    :default agent
                    :default-string agent))
-      (setf background (format nil "Background ~A" agent))
+      (setf background (format nil "Compilation ~A" agent))
       (when (getstring agent *buffer-names*)
         (editor-error "Buffer ~A is already in use." agent))
       (when (getstring background *buffer-names*)
@@ -367,6 +365,11 @@
       ;; Mark the server as immediately ready — no wire handshake needed.
       ;; The wire slot holds :local to distinguish from process agents.
       (setf (server-info-wire server-info) :local)
+      ;; Update ts-data wire slots so typescript input works.
+      (let ((ts (server-info-agent-info server-info))
+            (bg (server-info-background-info server-info)))
+        (when ts (setf (ts-data-wire ts) :local))
+        (when bg (setf (ts-data-wire bg) :local)))
       server-info)))
 
 ;;; MAYBE-CREATE-SERVER -- Internal interface.
@@ -390,9 +393,9 @@
                                     "Enter the name of an existing eval agent."
                                     :must-exist t)
               (declare (ignore name))
-              (or info (create-agent-in-thread)))
-            (create-agent-in-thread)))
-      (create-agent-in-thread)))
+              (or info (create-local-eval)))
+            (create-local-eval)))
+      (create-local-eval)))
 
 
 (defvar *next-agent-index* 0
@@ -400,17 +403,20 @@
 
 ;;; PICK-AGENT-BUFFER-NAMES -- Internal.
 ;;;
-;;; Return two unused names to use for the agent and background buffers.
+;;; Return two unused names to use for the agent and compilation buffers.
 ;;;
 (defun pick-agent-buffer-names (&optional info)
-  (loop
-    (let ((agent (format nil "Agent~@[ ~A~] ~D"
-                         info
-                         (incf *next-agent-index*)))
-          (background (format nil "Background Agent ~D" *next-agent-index*)))
-      (unless (or (getstring agent *buffer-names*)
-                  (getstring background *buffer-names*))
-        (return (values agent background))))))
+  "Generate buffer names for an eval server connection pair."
+  (let* ((parent (or info
+                     (buffer-name (current-buffer))))
+         (type "M"))
+    (loop
+      (let* ((n (incf *next-agent-index*))
+             (fg (format nil "REPL ~A ~A:~D" parent type n))
+             (bg (format nil "Compilation ~A ~A:~D" parent type n)))
+        (unless (or (getstring fg *buffer-names*)
+                    (getstring bg *buffer-names*))
+          (return (values fg bg)))))))
 
 
 
@@ -449,10 +455,10 @@
 ;;; clbuild command helpers and process-spawn commands deleted — clbuild is dead.
 
 (defcommand "Eval Async" (p)
-  "Create a local eval agent backed by a background thread.
+  "Create a local eval agent backed by a eval thread.
    No wire protocol — evaluates directly in the master image."
   ""
-  (let ((info (create-agent-in-thread (pick-agent-buffer-names "Eval"))))
+  (let ((info (create-local-eval (pick-agent-buffer-names "Eval"))))
     (change-to-buffer (server-info-agent-buffer info))))
 
 (defcommand "Select Agent" (p)
@@ -464,17 +470,15 @@
       (editor-error "The current eval agent doesn't have an agent buffer!"))
     (change-to-buffer agent)))
 
-(defcommand "Select Background" (p)
-  "Switch to the current agent's background buffer. When given an argument, use
-   the current compile server instead of the current eval server."
-  "Switch to the current agent's background buffer. When given an argument, use
-   the current compile server instead of the current eval server."
+(defcommand "Select Compilation" (p)
+  "Switch to the current eval server's compilation buffer."
+  "Switch to the current eval server's compilation buffer."
   (let* ((info (if p
                  (get-current-compile-server t)
                  (get-current-eval-server t)))
          (background (server-info-background-buffer info)))
     (unless background
-      (editor-error "The current ~A agent doesn't have a background buffer!"
+      (editor-error "The current ~A server doesn't have a compilation buffer!"
                     (if p "compile" "eval")))
     (change-to-buffer background)))
 
@@ -509,9 +513,9 @@
 #+NILGB
 (defcommand "Kill Agent and Buffers" (p)
   "This is the same as \"Kill Agent\", but it also deletes the agent's
-   interaction and background buffers."
+   interaction and compilation buffers."
   "This is the same as \"Kill Agent\", but it also deletes the agent's
-   interaction and background buffers."
+   interaction and compilation buffers."
   (declare (ignore p))
   (let ((default (and (value current-eval-server)
                       (server-info-name (value current-eval-server)))))
@@ -584,7 +588,7 @@
   "Handle on original *trace-output* so we can restore it.")
 
 (defvar *background-io* nil
-  "Stream connected to the editor's background buffer in case we want to use it
+  "Stream connected to the editor's compilation buffer in case we want to use it
   in the future.")
 
 ;;; CONNECT-STREAM -- internal
@@ -1047,13 +1051,13 @@
 ;;;    Compiles the file sending error info back to the editor.
 ;;;
 (defun server-compile-file (note package input output error trace
-                            load terminal background)
+                            load terminal background-stream)
   (declare (ignore output error trace load))
   (macrolet ((frob (x)
                `(if (hemlock.wire:remote-object-p ,x)
                   (hemlock.wire:remote-object-value ,x)
                   ,x)))
-    (let ((error-stream (frob background)))
+    (let ((error-stream (frob background-stream)))
       (do-compiler-operation (note package terminal error-stream)
         (multiple-value-bind (fasl warning-free-p)
             (compile-file (frob input))
@@ -1153,7 +1157,7 @@
          (or (eq wire :local)
              (hemlock.wire:wire-p wire)))))
 
-;; Alias for prepl.lisp which calls this from background threads
+;; Alias for prepl.lisp which calls this from eval threads
 (setf (fdefinition 'make-extra-repl-buffer-impl)
       #'%make-extra-typescript-buffer)
 
@@ -1162,4 +1166,4 @@
 
 (add-hook entry-hook
   (lambda ()
-    (ignore-errors (create-agent-in-thread))))
+    (ignore-errors (create-local-eval))))

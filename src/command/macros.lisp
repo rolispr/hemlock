@@ -39,7 +39,8 @@
 ;;; if there is no such variable.
 ;;;
 (defmacro with-variable-object (name &body forms)
-  `(let ((obj (get ,name 'hemlock-variable-value)))
+  `(let* ((%vname (resolve-variable-symbol ,name))
+          (obj (get %vname 'hemlock-variable-value)))
      (unless obj (undefined-variable-error ,name))
      ,@forms))
 

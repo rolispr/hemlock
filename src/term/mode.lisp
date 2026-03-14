@@ -246,7 +246,7 @@
 
 (add-hook hemlock::redisplay-hook #'terminal-redisplay-hook)
 
-(defun make-terminal-buffer (&key (command "/bin/bash --norc --noprofile")
+(defun make-terminal-buffer (&key (command (value hemlock::shell-utility))
                                   (rows 24) (cols 80))
   (let* ((term (hemlock.term:make-term
                 :width cols :height rows
@@ -260,7 +260,10 @@
          (name (format nil "Terminal ~D" (hash-table-count *terminal-buffers*))))
     (multiple-value-bind (master-fd proc-conn)
         (hemlock.term:spawn-pty-process command :rows rows :cols cols)
-      (let* ((buffer (make-buffer name :modes '("Terminal")))
+      (let* ((buffer (make-buffer name
+                        :modes '("Terminal")
+                        :delete-hook (list (lambda (buffer)
+                                            (terminal-kill-process buffer)))))
              (conn (make-pipelike-connection
                     master-fd master-fd
                     :name name
@@ -288,9 +291,11 @@
 (defun terminal-kill-process (buffer)
   (let ((state (terminal-state-for-buffer buffer)))
     (when state
-      (when (terminal-state-connection state)
-        (delete-connection (terminal-state-connection state)))
-      (remhash buffer *terminal-buffers*))))
+      (remhash buffer *terminal-buffers*)
+      (let ((conn (terminal-state-connection state)))
+        (when conn
+          (setf (terminal-state-connection state) nil)
+          (delete-connection conn))))))
 
 (defcommand "Terminal Send Self" (p)
   "Send the last typed key to the terminal process."
@@ -403,7 +408,7 @@
   "Open a terminal emulator buffer running a specific command."
   (declare (ignore p))
   (let* ((command (prompt-for-string
-                   :default "/bin/bash" :trim t
+                   :default (value hemlock::shell-utility) :trim t
                    :prompt "Command: "
                    :help "Command to run in terminal."))
          (buffer (make-terminal-buffer

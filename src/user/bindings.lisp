@@ -339,7 +339,7 @@
 (bind-key "Typescript Agent to Top Level" #k"hyper-g" :mode "Typescript")
 (bind-key "Typescript Agent Status" #k"hyper-s" :mode "Typescript")
 (bind-key "Select Agent" #k"control-meta-\c")
-(bind-key "Select Background" #k"control-meta-C")
+(bind-key "Select Compilation" #k"control-meta-C")
 (bind-key "Clear Typescript Buffer" #k"control-c meta-o" :mode "Typescript")
 
 #+port-user-lispeval

@@ -82,11 +82,66 @@
       (send-note next))))
 
 (defun send-note (note)
-  (let* ((remote (hemlock.wire:make-remote-object note))
-         (server (note-server note))
-         (ts (server-info-agent-info server))
-         (bg (server-info-background-info server))
+  (let* ((server (note-server note))
          (wire (server-info-wire server)))
+    (if (eq wire :local)
+        (send-note-locally note server)
+        (send-note-via-wire note server wire))))
+
+(defun send-note-locally (note server)
+  "Evaluate a note in a background thread. Post results back via LATER."
+  (setf (note-state note) :running)
+  (let* ((text (note-text note))
+         (pkg-name (note-package note))
+         (kind (note-kind note))
+         (fg-ts (server-info-agent-info server))
+         (bg-ts (server-info-background-info server)))
+    (sb-thread:make-thread
+     (lambda ()
+       (let* ((pkg (if pkg-name (find-package pkg-name) *package*))
+              (*package* (or pkg *package*))
+              (output (make-string-output-stream)))
+         (handler-case
+             (let* ((*standard-output* output)
+                    (*error-output* output)
+                    (*trace-output* output)
+                    (values (multiple-value-list (eval (read-from-string text))))
+                    (out-str (get-output-stream-string output))
+                    (result-str (format nil "~{~A~^, ~}"
+                                        (mapcar #'prin1-to-string values))))
+               (later
+                 (setf (note-state note) :dead)
+                 (setf (server-info-notes server)
+                       (delete note (server-info-notes server)))
+                 ;; :eval → echo area only. :compile → compilation buffer.
+                 (case kind
+                   (:eval
+                    (if (zerop (length out-str))
+                        (message "=> ~A" result-str)
+                        (message "~A~%=> ~A" out-str result-str)))
+                   (:compile
+                    (when bg-ts
+                      (ts-buffer-output-string bg-ts (format nil "~A~%" text))
+                      (unless (zerop (length out-str))
+                        (ts-buffer-output-string bg-ts out-str)
+                        (unless (char= (char out-str (1- (length out-str))) #\Newline)
+                          (ts-buffer-output-string bg-ts (string #\Newline))))
+                      (ts-buffer-output-string bg-ts (format nil "=> ~A~%" result-str)))
+                    (message "=> ~A" result-str))
+                   (t
+                    (message "=> ~A" result-str)))))
+           (error (c)
+             (later
+               (setf (note-state note) :dead)
+               (setf (server-info-notes server)
+                     (delete note (server-info-notes server)))
+               (message "Error: ~A" c))))))
+     :name "hemlock-local-eval")))
+
+(defun send-note-via-wire (note server wire)
+  (let* ((remote (hemlock.wire:make-remote-object note))
+         (ts (server-info-agent-info server))
+         (bg (server-info-background-info server)))
     (setf (note-state note) :pending)
     (message "Sending ~A." (note-context note))
     (case (note-kind note)
