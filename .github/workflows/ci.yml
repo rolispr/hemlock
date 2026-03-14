@@ -35,8 +35,9 @@ jobs:
       - name: Install ocicl (Linux)
         if: runner.os == 'Linux'
         run: |
-          wget -q https://github.com/ocicl/ocicl/releases/latest/download/ocicl_2.14.1-1_amd64.deb
-          sudo apt install -y ./ocicl_2.14.1-1_amd64.deb
+          OCICL_VERSION=$(curl -sI https://github.com/ocicl/ocicl/releases/latest | grep -i ^location | sed 's|.*/v||;s/\r//')
+          wget -q "https://github.com/ocicl/ocicl/releases/download/v${OCICL_VERSION}/ocicl_${OCICL_VERSION}-1_amd64.deb"
+          sudo apt install -y ./ocicl_${OCICL_VERSION}-1_amd64.deb
           ocicl setup
 
       - name: Install ocicl (macOS)
