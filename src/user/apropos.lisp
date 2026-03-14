@@ -1,6 +1,6 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; Slave Apropos (as opposed to "hemlock com>mand name apropos" aka Apropos)
+;;; Agent Apropos (as opposed to "hemlock command name apropos" aka Apropos)
 
 (in-package :hemlock)
 
@@ -12,16 +12,16 @@
 
 (defstruct (apropos-entry
              (:constructor internal-make-apropos-entry
-                           (slavesym kind docstring)))
-  slavesym
+                           (agentsym kind docstring)))
+  agentsym
   kind
   docstring)
 
 (defun parse-apropos-entry (slot-list)
-  (destructuring-bind (slavesym &optional (kind :unbound) docstring)
+  (destructuring-bind (agentsym &optional (kind :unbound) docstring)
                       slot-list
     (internal-make-apropos-entry
-     slavesym
+     agentsym
      kind
      (if (eq docstring :not-documented) nil docstring))))
 
@@ -40,7 +40,7 @@
 ;;;; Commands.
 
 (defmode "Apropos" :major-p t
-  :documentation "Apropos mode presents a list of slave symbols.")
+  :documentation "Apropos mode presents a list of agent symbols.")
 
 (defcommand "Apropos Quit" (p)
   "Kill the apropos buffer."
@@ -76,7 +76,7 @@
 
 (defun make-apropos-buffer (entries)
   (let ((buf (or *apropos-buffer*
-                 (make-buffer "*Slave Apropos*" :modes '("Apropos")))))
+                 (make-buffer "*Agent Apropos*" :modes '("Apropos")))))
     (setf *apropos-buffer* buf)
     (refresh-apropos buf entries)
     (let ((fields (buffer-modeline-fields *apropos-buffer*)))
@@ -94,7 +94,7 @@
 
 (defun apropos-write-line (entry s)
   (format s "~A~%  ~:(~A~)~:[~;: ~:*~A~]~%~%"
-          (apropos-entry-slavesym entry)
+          (apropos-entry-agentsym entry)
           (apropos-entry-kind entry)
           (let ((docstring (apropos-entry-docstring entry)))
             (when docstring
@@ -109,15 +109,15 @@
   (declare (ignore p))
   (describe-mode-command nil "Apropos"))
 
-(defcommand "Slave Apropos Ignoring Point"
+(defcommand "Agent Apropos Ignoring Point"
             (p &optional (str
                           (prompt-for-string
                            :prompt "Apropos string: ")))
   "" ""
   (declare (ignore p))
-  (slave-apropos str))
+  (agent-apropos str))
 
-(defcommand "Slave Apropos" (p)
+(defcommand "Agent Apropos" (p)
   "" ""
   (declare (ignore p))
   (let ((default (hemlock::symbol-string-at-point)))
@@ -127,13 +127,13 @@
     ;; and give up.
     (when (find #\newline default)
       (setf default nil))
-    (slave-apropos
+    (agent-apropos
      (prompt-for-string
       :prompt "Apropos string: "
       :default default))))
 
-(defun slave-apropos (str)
-  (hemlock::eval-in-slave `(%apropos ',str)))
+(defun agent-apropos (str)
+  (hemlock::eval-in-agent `(%apropos ',str)))
 
 (defun %describe-symbol-for-hemlock (sym)
   "Return (kind) or (kind docstring) for SYM, matching parse-apropos-entry format."
@@ -151,7 +151,7 @@
 (defun %apropos (str)
   (let ((data
          (mapcar (lambda (sym)
-                   (cons (make-slave-symbol sym)
+                   (cons (make-agent-symbol sym)
                          (%describe-symbol-for-hemlock sym)))
                  (apropos-list str))))
     (hemlock::eval-in-master `(%apropos-results ',data ',str))))

@@ -27,7 +27,7 @@
                              (values (subseq prefix 0 p)
                                      (string-downcase (subseq prefix (1+ p))))
                              (values nil (string-downcase prefix))))
-    (hemlock::eval-in-slave
+    (hemlock::eval-in-agent
      `(%fuzzy-complete-symbol/request
        ,(or packname (package-at-point) :cl)
        ,symname))))

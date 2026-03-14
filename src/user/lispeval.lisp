@@ -84,7 +84,7 @@
 (defun send-note (note)
   (let* ((remote (hemlock.wire:make-remote-object note))
          (server (note-server note))
-         (ts (server-info-slave-info server))
+         (ts (server-info-agent-info server))
          (bg (server-info-background-info server))
          (wire (server-info-wire server)))
     (setf (note-state note) :pending)
@@ -242,11 +242,11 @@
 ;;;; Stuff to send noise to the server.
 
 ;; fixme: these two should be the same
-(defun eval-safely-in-slave (form)
+(defun eval-safely-in-agent (form)
   (handler-case
       (eval form)
     (error (c)
-      (warn "ignoring error in slave request: ~A" c))))
+      (warn "ignoring error in agent request: ~A" c))))
 (defun eval-safely-in-master (form)
   (let (ok)
     (block nil
@@ -257,19 +257,25 @@
         (unless ok
           (return "fell through)"))))))
 
-(defvar *synchronous-evaluation-of-slave-requests-in-the-master* nil)
+(defvar *synchronous-evaluation-of-agent-requests-in-the-master* nil)
 
 (defun eval-in-master (form)
-  (if *synchronous-evaluation-of-slave-requests-in-the-master*
+  (if *synchronous-evaluation-of-agent-requests-in-the-master*
       (eval form)
       (hemlock.wire:remote hemlock.wire::*current-wire*
         (eval-safely-in-master form))))
 
-(defun eval-in-slave (form)
-  (if *synchronous-evaluation-of-slave-requests-in-the-master*
-      (eval form)
-      (hemlock.wire:remote (server-info-wire (get-current-eval-server))
-        (eval-safely-in-slave form))))
+(defun eval-in-agent (form)
+  (let* ((info (get-current-eval-server))
+         (wire (server-info-wire info)))
+    (cond (*synchronous-evaluation-of-agent-requests-in-the-master*
+           (eval form))
+          ((eq wire :local)
+           ;; Local thread agent — eval directly, no wire protocol.
+           (eval form))
+          (t
+           (hemlock.wire:remote wire
+             (eval-safely-in-agent form))))))
 
 ;;; EVAL-FORM-IN-SERVER -- Public.
 ;;;
@@ -277,7 +283,7 @@
                             &optional (package (package-at-point)))
   "This evals form, a simple-string, in the server for server-info.  Package
    is the name of the package in which the server reads form, and it defaults
-   to the value of \"Current Package\".  If package is nil, then the slave uses
+   to the value of \"Current Package\".  If package is nil, then the agent uses
    the value of *package*.  If server is busy with other requests, this signals
    an editor-error to prevent commands using this from hanging.  If the server
    dies while evaluating form, then this signals an editor-error.  This returns
@@ -285,14 +291,23 @@
    returned by form in the server."
   (declare (simple-string form))
   (when (server-info-notes server-info)
-    (editor-error "Server ~S is currently busy.  See \"List Operations\"."
+    (editor-error "Agent ~S is currently busy.  See \"List Operations\"."
                   (server-info-name server-info)))
-  (multiple-value-bind (values error)
-                       (hemlock.wire:remote-value (server-info-wire server-info)
-                         (server-eval-form package form))
-    (when error
-      (editor-error "The server died before finishing"))
-    values))
+  (let ((wire (server-info-wire server-info)))
+    (if (eq wire :local)
+        ;; Local thread agent — eval directly in master image.
+        (let* ((pkg (if package (find-package package) *package*))
+               (*package* (or pkg *package*)))
+          (mapcar #'prin1-to-string
+                  (multiple-value-list
+                   (eval (read-from-string form)))))
+        ;; Process agent — go through wire.
+        (multiple-value-bind (values error)
+            (hemlock.wire:remote-value wire
+              (server-eval-form package form))
+          (when error
+            (editor-error "The agent died before finishing"))
+          values))))
 
 ;;; EVAL-FORM-IN-SERVER-1 -- Public.
 ;;;
@@ -313,7 +328,7 @@
                                      "evaluation of ~S"
                                      string)))
   "Queues the evaluation of string on an eval server.  String is a simple
-   string.  If package is not supplied, the string is eval'ed in the slave's
+   string.  If package is not supplied, the string is eval'ed in the agent's
    current package."
   (declare (simple-string string))
   (queue-note (make-note :kind :eval
@@ -329,7 +344,7 @@
                     (package (package-at-point))
                     (context (region-context region "evaluation")))
   "Queues the evaluation of a region of text on an eval server.  If package
-   is not supplied, the string is eval'ed in the slave's current package."
+   is not supplied, the string is eval'ed in the agent's current package."
   (let ((region (region (copy-mark (region-start region) :left-inserting)
                         (copy-mark (region-end region) :left-inserting))))
     (queue-note (make-note :kind :eval
@@ -345,7 +360,7 @@
                        (server (get-current-eval-server))
                        (package (package-at-point)))
   "Queues a compilation on an eval server.  If package is not supplied, the
-   string is eval'ed in the slave's current package."
+   string is eval'ed in the agent's current package."
   (let* ((region (region (copy-mark (region-start region) :left-inserting)
                          (copy-mark (region-end region) :left-inserting)))
          (buf (line-buffer (mark-line (region-start region))))
@@ -370,7 +385,7 @@
 ;;;; File compiling noise.
 
 (defhvar "Remote Compile File"
-  "When set (the default), this causes slave file compilations to assume the
+  "When set (the default), this causes agent file compilations to assume the
    compilation is occurring on a remote machine.  This means the source file
    must be world readable.  Unsetting this, causes no file accesses to go
    through the super root."
@@ -397,7 +412,7 @@
    output file is used that is publicly writeable in case the client is on
    another machine.  This file is renamed or deleted after compilation.
    Setting \"Remote Compile File\" to nil, inhibits this.  If package is not
-   supplied, the string is eval'ed in the slave's current package."
+   supplied, the string is eval'ed in the agent's current package."
 
   (let* ((file (truename file)) ; in case of search-list in pathname.
          (namestring (namestring file))
@@ -497,9 +512,9 @@
 ;;;; Commands (Gosh, wow gee!)
 
 (defcommand "Editor Server Name" (p)
-  "Echos the editor server's name which can be supplied with the -slave switch
+  "Echos the editor server's name which can be supplied with the -agent switch
    to connect to a designated editor."
-  "Echos the editor server's name which can be supplied with the -slave switch
+  "Echos the editor server's name which can be supplied with the -agent switch
    to connect to a designated editor."
   (declare (ignore p))
   (if *editor-name*
@@ -516,41 +531,41 @@
 (defmacro save-excursion (&body body)
   `(invoke-with-save-excursion (lambda () ,@body)))
 
-(defclass slave-symbol (hemlock.wire::serializable-object)
+(defclass agent-symbol (hemlock.wire::serializable-object)
   ((package-name :initarg :package-name
-                 :accessor slave-symbol-package-name)
+                 :accessor agent-symbol-package-name)
    (name :initarg :name
-         :accessor slave-symbol-name)))
+         :accessor agent-symbol-name)))
 
-(defmethod hemlock.wire::serialize ((x slave-symbol))
-  (values 'slave-symbol
-          (list (coerce (slave-symbol-package-name x) 'simple-string)
-                (coerce (slave-symbol-name x) 'simple-string))))
+(defmethod hemlock.wire::serialize ((x agent-symbol))
+  (values 'agent-symbol
+          (list (coerce (agent-symbol-package-name x) 'simple-string)
+                (coerce (agent-symbol-name x) 'simple-string))))
 
 (defmethod hemlock.wire::deserialize-with-type
-    ((type (eql 'slave-symbol)) data)
+    ((type (eql 'agent-symbol)) data)
   (destructuring-bind (package-name symbol-name) data
-    (make-slave-symbol symbol-name package-name)))
+    (make-agent-symbol symbol-name package-name)))
 
-(defmethod print-object ((object slave-symbol) stream)
+(defmethod print-object ((object agent-symbol) stream)
   (flet ((% ()
            (format stream "~A:~A"
-                   (slave-symbol-package-name object)
-                   (slave-symbol-name object))))
+                   (agent-symbol-package-name object)
+                   (agent-symbol-name object))))
     (if *print-escape*
         (print-unreadable-object (object stream :type t :identity nil) (%))
         (%))))
 
-(defmethod slave-symbol-name ((x symbol))
+(defmethod agent-symbol-name ((x symbol))
   (symbol-name x))
 
-(defmethod slave-symbol-package-name ((x symbol))
+(defmethod agent-symbol-package-name ((x symbol))
   (package-name (symbol-package x)))
 
-(defun resolve-slave-symbol
-    (slave-symbol &optional (if-does-not-exist :intern)
+(defun resolve-agent-symbol
+    (agent-symbol &optional (if-does-not-exist :intern)
                             (if-does-not-exist-value nil))
-  (with-slots (name package-name) slave-symbol
+  (with-slots (name package-name) agent-symbol
     (let ((package (find-package package-name)))
       (cond
        ((null package)
@@ -566,13 +581,13 @@
                          package-name name))
           ((nil) if-does-not-exist-value)))))))
 
-(defun make-slave-symbol (name &optional package)
+(defun make-agent-symbol (name &optional package)
   (multiple-value-bind (name package)
                        (if (symbolp name)
                            (values (symbol-name name)
                                    (symbol-package name))
                            (values name package))
-    (make-instance 'slave-symbol
+    (make-instance 'agent-symbol
                    :package-name (etypecase package
                                    (package (package-name package))
                                    (string package)
@@ -615,16 +630,16 @@
     (values token package (or (not package) internp))))
 
 ;; adapted from swank
-(defun parse-slave-symbol (string &optional package)
+(defun parse-agent-symbol (string &optional package)
   (multiple-value-bind (sname pname) (tokenize-symbol-thoroughly string)
     (when (plusp (length sname))
-      (make-slave-symbol sname
+      (make-agent-symbol sname
                          (cond ((equal pname "") (symbol-name :keyword))
-                               (pname (canonicalize-slave-package-name pname))
+                               (pname (canonicalize-agent-package-name pname))
                                (t package))))))
 
-(defun slave-symbol-at-point ()
-  (parse-slave-symbol (symbol-string-at-point)))
+(defun agent-symbol-at-point ()
+  (parse-agent-symbol (symbol-string-at-point)))
 
 (defun symbol-string-at-point ()
   (with-mark ((mark1 (current-point))
@@ -632,7 +647,7 @@
     (mark-symbol mark1 mark2)
     (region-to-string (region mark1 mark2))))
 
-(defun canonicalize-slave-package-name (str)
+(defun canonicalize-agent-package-name (str)
   (cl-ppcre:regex-replace "^SB!" (canonical-case str) "SB-"))
 
 (defun package-at-point ()
@@ -641,8 +656,8 @@
 
 (defcommand "Set Buffer Package" (p)
   "Set the package to be used by Lisp evaluation and compilation commands
-   while in this buffer.  When in a slave's interactive buffers, do NOT
-   set the editor's package variable, but changed the slave's *package*."
+   while in this buffer.  When in an agent's interactive buffers, do NOT
+   set the editor's package variable, but changed the agent's *package*."
   "Prompt for a package to make into a buffer-local variable current-package."
   (declare (ignore p))
   (let* ((name (string (prompt-for-expression
@@ -651,7 +666,7 @@
          (buffer (current-buffer))
          (info (value current-eval-server)))
     (cond ((and info
-                (or (eq (server-info-slave-buffer info) buffer)
+                (or (eq (server-info-agent-buffer info) buffer)
                     (eq (server-info-background-buffer info) buffer)))
            (hemlock.wire:remote (server-info-wire info)
              (server-set-package name))
@@ -669,7 +684,7 @@
 
 (defcommand "Current Compile Server" (p)
   "Echos the current compile server's name.  With prefix argument,
-   shows global one.  Does not signal an error or ask about creating a slave."
+   shows global one.  Does not signal an error or ask about creating an agent."
   "Echos the current compile server's name.  With prefix argument,
   shows global one."
   (let ((info (if p
@@ -700,9 +715,9 @@
 
 (defcommand "Current Eval Server" (p)
   "Echos the current eval server's name.  With prefix argument, shows
-   global one.  Does not signal an error or ask about creating a slave."
+   global one.  Does not signal an error or ask about creating an agent."
   "Echos the current eval server's name.  With prefix argument, shows
-   global one.  Does not signal an error or ask about creating a slave."
+   global one.  Does not signal an error or ask about creating an agent."
   (let ((info (if p
                   (variable-value 'current-eval-server :global)
                   (value current-eval-server))))
@@ -1054,7 +1069,7 @@
   (declare (ignore p))
   (let* ((server (get-current-eval-server))
          (wire (server-info-wire server)))
-    ;; Tell the slave to abort the current operation and to ignore any further
+    ;; Tell the agent to abort the current operation and to ignore any further
     ;; operations.
     (dolist (note (server-info-notes server))
       (setf (note-state note) :aborted))

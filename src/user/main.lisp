@@ -303,11 +303,11 @@ GB
     `(("help"
        :type boolean
        :documentation "show this help")
-      ("slave"
-       ;(undocumented) start a slave?
+      ("agent"
+       ;(undocumented) start an agent?
        :type boolean)
       ("editor"
-       ;(undocumented) if slave: connect to this editor
+       ;(undocumented) if agent: connect to this editor
        :type string)
       (("backend" "backend-type")
        :type string
@@ -372,15 +372,15 @@ GB
                        (command-line-arguments:process-command-line-options
                         *command-line-spec*
                         arg-list)
-    (destructuring-bind (&key slave help &allow-other-keys)
+    (destructuring-bind (&key agent help &allow-other-keys)
                         keys
       (cond
        (help
         (show-cmd-line-help)
         (force-output))
-       (slave
+       (agent
         (assert (null rest))
-        (apply #'hemlock:start-slave keys))
+        (apply #'hemlock:start-agent keys))
        (t
         (apply #'hemlock rest keys))))))
 
@@ -396,7 +396,7 @@ GB
 ;;;
 ;;; In addition to those, it runs entry and exit hooks.
 ;;;
-;;; This function may also be when already in the editor, or when in a slave,
+;;; This function may also be when already in the editor, or when in an agent,
 ;;; and merely processes the command line argument in that case, allowing ED
 ;;; to work when already in Hemlock.
 ;;;
@@ -417,7 +417,7 @@ GB
   (cond
     (*in-the-editor*
      (process-command-line-argument x))
-    (*in-hemlock-slave-p*
+    (*in-hemlock-agent-p*
      (hemlock.wire:remote-value (hemlock::ts-stream-wire *terminal-io*)
                                 (process-command-line-argument x)))
     (t
@@ -517,7 +517,7 @@ GB
      (error
       "~S is not a symbol or pathname.  I can't edit it!" x))))
 
-(defvar *in-hemlock-slave-p* nil)
+(defvar *in-hemlock-agent-p* nil)
 
 (defun hemlock-ed-function (&optional x)
   (hemlock x)

@@ -618,7 +618,7 @@
   "If true, do not attempt to handle errors and go directly to the
    Lisp's low-level debugger.  Note that this variable does not enable
    Hemlock-specific debugging features.  To debug Hemlock interactively,
-   use slime or slave debugging.")
+   use slime or agent debugging.")
 
 (defvar *stack-trace-on-error* nil
   "If true (the default), handle errors by showing a stack trace in a buffer.

@@ -1,16 +1,16 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; Slave debugging
+;;; Agent debugging
 
 (in-package :hemlock)
 
 
-(defvar *slave-stack-frames* nil)
-(defvar *slave-stack-frames-end* nil)
+(defvar *agent-stack-frames* nil)
+(defvar *agent-stack-frames-end* nil)
 ;;;
 
-(defstruct (slave-stack-frame
-             (:constructor make-slave-stack-frame (label remote-frame)))
+(defstruct (agent-stack-frame
+             (:constructor make-agent-stack-frame (label remote-frame)))
   label
   remote-frame)
 
@@ -24,13 +24,13 @@
 (defun delete-debug-buffers (buffer)
   (when (eq buffer *debug-buffer*)
     (setf *debug-buffer* nil)
-    (setf *slave-stack-frames* nil)))
+    (setf *agent-stack-frames* nil)))
 
 
 ;;;; Commands.
 
 (defmode "Debug" :major-p t
-  :documentation "Debug mode presents a list of slave symbols.")
+  :documentation "Debug mode presents a list of agent symbols.")
 
 (defcommand "Debug Quit" (p)
   "Kill the debug buffer."
@@ -38,14 +38,14 @@
   (declare (ignore p))
   (when *debug-buffer* (delete-buffer-if-possible *debug-buffer*)))
 
-(defun slave-stack-frame-from-mark (mark)
+(defun agent-stack-frame-from-mark (mark)
   )
 
 (defun refresh-debug (buf entries)
   (with-writable-buffer (buf)
     (delete-region (buffer-region buf))
-    (setf *slave-stack-frames-end* (length entries))
-    (setf *slave-stack-frames* (coerce entries 'vector))
+    (setf *agent-stack-frames-end* (length entries))
+    (setf *agent-stack-frames* (coerce entries 'vector))
     (with-output-to-mark (s (buffer-point buf))
       (loop for entry in entries
             for i from 0
@@ -55,13 +55,13 @@
 
 (defun make-debug-buffer (context entries impl thread)
   (let ((buf (or *debug-buffer*
-                 (make-buffer (format nil "Slave Debugger ~A" impl thread)
+                 (make-buffer (format nil "Agent Debugger ~A" impl thread)
                               :modes '("Debug")))))
     (setf *debug-buffer* buf)
     (setf *debug-context* context)
     (refresh-debug buf
                    (mapcar (lambda (entry)
-                             (make-slave-stack-frame (car entry)
+                             (make-agent-stack-frame (car entry)
                                                      (cdr entry)))
                            entries))
     (let ((fields (buffer-modeline-fields *debug-buffer*)))
@@ -78,7 +78,7 @@
     (change-to-buffer buf)))
 
 (defun debug-write-line (i entry s)
-  (format s "~D: ~A~%" i (slave-stack-frame-label entry)))
+  (format s "~D: ~A~%" i (agent-stack-frame-label entry)))
 
 (defun debug-using-master (&optional (start 0) (end 10))
   (let ((frames
@@ -180,7 +180,7 @@ Non-nil means we are inside master-agent-debugger.")
 
 
 (defun master-agent-debugger (condition-type condition-msg restart-strings frame-strings)
-  "Called via wire from agent-debugger on the slave side.
+  "Called via wire from agent-debugger on the agent side.
 Returns the chosen restart index (integer) or NIL for abort."
   (let* ((buf (or (getstring "*Agent Debugger*" *buffer-names*)
                   (make-buffer "*Agent Debugger*" :modes '("Debugger"))))

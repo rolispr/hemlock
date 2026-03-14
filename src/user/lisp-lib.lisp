@@ -87,8 +87,8 @@
                            (lisp-library-command nil))))))
 
 (defcommand "Load Library Entry" (p)
-  "Loads the current library entry into the current slave."
-  "Loads the current library entry into the current slave."
+  "Loads the current library entry into the current agent."
+  "Loads the current library entry into the current agent."
   (declare (ignore p))
   (unless (hemlock-bound-p 'library-entries :buffer (current-buffer))
     (editor-error "Not in a Lisp Library buffer."))
@@ -96,8 +96,8 @@
                        (namestring (library-entry-load-file nil)))))
 
 (defcommand "Load Pointer Library Entry" (p)
-  "Loads the library entry indicated by the mouse into the current slave."
-  "Loads the library entry indicated by the mouse into the current slave."
+  "Loads the library entry indicated by the mouse into the current agent."
+  "Loads the library entry indicated by the mouse into the current agent."
   (declare (ignore p))
   (unless (hemlock-bound-p 'library-entries :buffer (current-buffer))
     (editor-error "Not in a Lisp Library buffer."))

@@ -43,6 +43,11 @@
          (info (hemlock::make-server-info :name "test-ready" :wire wire)))
     (is-true (hemlock.command:eval-server-ready-p info))))
 
+(test ready-p-local-agent
+  "Server-info with :local wire (thread agent) → ready."
+  (let ((info (hemlock::make-server-info :name "test-local" :wire :local)))
+    (is-true (hemlock.command:eval-server-ready-p info))))
+
 ;;; ---- make-extra-repl-buffer-impl alias ------------------------------------
 
 (test alias-bound

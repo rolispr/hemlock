@@ -5,7 +5,7 @@
 ;;;
 ;;; A typescript stream is a bidirectional stream which uses remote
 ;;; function calls to interact with a Hemlock typescript buffer. That
-;;; is: the code in this file is executed on the slave side.
+;;; is: the code in this file is executed on the agent side.
 ;;;
 ;;;
 
@@ -60,7 +60,7 @@
     :accessor ts-stream-current-input
     :type list
     :documentation "This is a list of strings and stream-commands whose order manifests the
-                    input provided by remote procedure calls into the slave of
+                    input provided by remote procedure calls into the agent of
                     TS-STREAM-ACCEPT-INPUT.")
 
    (input-read-index
@@ -86,11 +86,11 @@
 
 
 
-;;;; Editor remote calls into slave.
+;;;; Editor remote calls into agent.
 
 ;;; TS-STREAM-ACCEPT-INPUT -- Internal Interface.
 ;;;
-;;; The editor calls this remotely in the slave to indicate that the user has
+;;; The editor calls this remotely in the agent to indicate that the user has
 ;;; provided input.  Input is a string, symbol, or list.  If it is a list, the
 ;;; the CAR names the command, and the CDR is the arguments.
 ;;;
@@ -408,6 +408,6 @@
 ;; Initial revision
 ;;
 ;; Revision 1.3  2003/08/05 19:51:13  gilbert
-;; initial slave lisp support, still not ready for prime time.
+;; initial agent lisp support, still not ready for prime time.
 ;;
 ;;

@@ -38,13 +38,13 @@
       env)))
 
 (defun spawn-pty-process (command &key (rows 24) (cols 80))
-  (multiple-value-bind (master slave slave-name)
+  (multiple-value-bind (master agent agent-name)
       (hemlock::find-a-pty)
     (set-pty-size master rows cols)
     (let ((pc (hemlock::make-process-connection
                (list "/bin/sh" "-c" command)
-               :slave-pty-name slave-name
-               :slave-fd slave
+               :agent-pty-name agent-name
+               :agent-fd agent
                :environment (make-terminal-env))))
-      (sb-posix:close slave)
+      (sb-posix:close agent)
       (values master pc))))

@@ -1,7 +1,7 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
 ;;;
-;;; This file contains code for processing input to and output from slaves
+;;; This file contains code for processing input to and output from agents
 ;;; using typescript streams.  It maintains the stuff that hacks on the
 ;;; typescript buffer and maintains its state.
 ;;;
@@ -31,8 +31,8 @@
                            (fill-mark (copy-mark (buffer-end-mark buffer)
                                                  :right-inserting)))))
   buffer                      ; The buffer we are in
-  stream                      ; Stream in the slave.
-  wire                        ; Wire to slave
+  stream                      ; Stream in the agent.
+  wire                        ; Wire to agent
   server                      ; Server info struct.
   fill-mark                   ; Mark where output goes.  This is actually the
                               ;   "Buffer Input Mark" which is :right-inserting,
@@ -45,9 +45,9 @@
 
 ;;; TS-BUFFER-OUTPUT-STRING --- internal interface.
 ;;;
-;;; Called by the slave to output stuff in the typescript.  Can also be called
+;;; Called by the agent to output stuff in the typescript.  Can also be called
 ;;; by other random parts of hemlock when they want to output stuff to the
-;;; buffer.  Since this is called for value from the slave, we have to be
+;;; buffer.  Since this is called for value from the agent, we have to be
 ;;; careful about what values we return, so the result can be sent back.  It is
 ;;; called for value only as a synchronization thing.
 ;;;
@@ -195,7 +195,7 @@
 
 (defmode "Typescript"
   :setup-function #'setup-typescript
-  :documentation "The Typescript mode is used to interact with slave lisps.")
+  :documentation "The Typescript mode is used to interact with agent lisps.")
 
 
 ;;; TYPESCRIPTIFY-BUFFER -- Internal interface.
@@ -225,10 +225,10 @@
   (setf (ts-data-stream ts) nil)
   (setf (ts-data-wire ts) nil)
   (buffer-end (ts-data-fill-mark ts) (ts-data-buffer ts))
-  (ts-buffer-output-string ts (format nil "~%~%Slave died!~%")))
+  (ts-buffer-output-string ts (format nil "~%~%Agent died!~%")))
 
 (defun unwedge-typescript-buffer ()
-  (typescript-slave-to-top-level-command nil)
+  (typescript-agent-to-top-level-command nil)
   (buffer-end (current-point) (current-buffer)))
 
 (defhvar "Unwedge Interactive Input Fun"
@@ -240,7 +240,7 @@
 (defhvar "Unwedge Interactive Input String"
   "String to add to \"Point not past input mark.  \" explaining what will
    happen if the the user chooses to be unwedged."
-  :value "Cause the slave to throw to the top level? "
+  :value "Cause the agent to throw to the top level? "
   :mode "Typescript")
 
 ;;; TYPESCRIPT-DATA-OR-LOSE -- internal
@@ -256,8 +256,8 @@
       (editor-error "Not in a typescript buffer.")))
 
 (defcommand "Confirm Typescript Input" (p)
-  "Send the current input to the slave typescript."
-  "Send the current input to the slave typescript."
+  "Send the current input to the agent typescript."
+  "Send the current input to the agent typescript."
   (declare (ignore p))
   (let ((ts (typescript-data-or-lose)))
     (let ((input (get-interactive-input)))
@@ -274,35 +274,35 @@
           (buffer-end (ts-data-fill-mark ts)
                       (ts-data-buffer ts)))))))
 
-(defcommand "Typescript Slave Break" (p)
-  "Interrupt the slave Lisp process associated with this interactive buffer,
+(defcommand "Typescript Agent Break" (p)
+  "Interrupt the agent Lisp process associated with this interactive buffer,
    causing it to invoke BREAK."
-  "Interrupt the slave Lisp process associated with this interactive buffer,
+  "Interrupt the agent Lisp process associated with this interactive buffer,
    causing it to invoke BREAK."
   (declare (ignore p))
-  (send-oob-to-slave "B"))
+  (send-oob-to-agent "B"))
 
-(defcommand "Typescript Slave to Top Level" (p)
-  "Interrupt the slave Lisp process associated with this interactive buffer,
+(defcommand "Typescript Agent to Top Level" (p)
+  "Interrupt the agent Lisp process associated with this interactive buffer,
    causing it to throw to the top level REP loop."
-  "Interrupt the slave Lisp process associated with this interactive buffer,
+  "Interrupt the agent Lisp process associated with this interactive buffer,
    causing it to throw to the top level REP loop."
   (declare (ignore p))
-  (send-oob-to-slave "T"))
+  (send-oob-to-agent "T"))
 
-(defcommand "Typescript Slave Status" (p)
-  "Interrupt the slave and cause it to print status information."
-  "Interrupt the slave and cause it to print status information."
+(defcommand "Typescript Agent Status" (p)
+  "Interrupt the agent and cause it to print status information."
+  "Interrupt the agent and cause it to print status information."
   (declare (ignore p))
-  (send-oob-to-slave "S"))
+  (send-oob-to-agent "S"))
 
-(defun send-oob-to-slave (string)
+(defun send-oob-to-agent (string)
   (let* ((ts (typescript-data-or-lose))
          (wire (ts-data-wire ts))
          (socket (hemlock.wire:wire-fd wire)))
     (unless socket
-      (editor-error "The slave is no longer alive."))
-    (error "SEND-OOB-TO-SLAVE seeks an implementation.")
+      (editor-error "The agent is no longer alive."))
+    (error "SEND-OOB-TO-AGENT seeks an implementation.")
     #+NIL
     (send-character-out-of-band socket (schar string 0))))
 

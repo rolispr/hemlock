@@ -146,9 +146,25 @@
 
 ;;;; Describe command, key, pointer.
 
+(defun print-source-location (function-name stream)
+  "Print the source location of FUNCTION-NAME to STREAM, if available."
+  (ignore-errors
+    (let ((defs (hemlock.introspect:find-definitions
+                 (string function-name))))
+      (when defs
+        (dolist (def defs)
+          (destructuring-bind (label &rest props) def
+            (declare (ignore label))
+            (let ((file (getf props :file))
+                  (pos  (getf props :position)))
+              (when file
+                (format stream "~&Defined in ~A~@[:~A~]~%"
+                        file pos)))))))))
+
 (defcommand "Describe Command" (p)
   "Describe a command.
-  Prompts for a command and then prints out it's full documentation."
+  Prompts for a command and then prints out its full documentation,
+  key bindings, and source location."
   "Print out the command documentation for a command which is prompted for."
   (declare (ignore p))
   (multiple-value-bind (nam com)
@@ -156,7 +172,8 @@
                         (list *command-names*)
                         :prompt "Describe command: "
                         :help "Name of a command to document.")
-    (let ((bindings (command-bindings com)))
+    (let ((bindings (command-bindings com))
+          (fun (command-function com)))
       (with-pop-up-display (s)
         (format s "Documentation for ~S:~%   ~A~%"
                 nam (command-documentation com))
@@ -168,7 +185,12 @@
                 "This can be invoked in the following ways:" s)
                (write-string "   " s)
                (print-command-bindings bindings s)
-               (terpri s)))))))
+               (terpri s)))
+        (when fun
+          (let ((fname (nth-value 2 (function-lambda-expression fun))))
+            (when fname
+              (format s "~&Function: ~A~%" fname)
+              (print-source-location fname s))))))))
 
 (defcommand "Describe Key" (p)
   "Prompt for a sequence of characters.  When the first character is typed that
@@ -198,8 +220,14 @@
                        (with-pop-up-display (s)
                          (print-pretty-key (copy-seq *prompt-key*) s)
                          (format s " is bound to ~S.~%" (command-name res))
-                         (format s "Documentation for this command:~%   ~A"
-                                 (command-documentation res)))
+                         (format s "Documentation for this command:~%   ~A~%"
+                                 (command-documentation res))
+                         (let ((fun (command-function res)))
+                           (when fun
+                             (let ((fname (nth-value 2 (function-lambda-expression fun))))
+                               (when fname
+                                 (format s "~&Function: ~A~%" fname)
+                                 (print-source-location fname s))))))
                        (return))
                       ((not (eq res :prefix))
                        (with-pop-up-display (s :height 1)
@@ -437,3 +465,54 @@
        (print-pretty-key (car key) stream))
     (print-pretty-key (car key) stream)
     (write-string ", " stream)))
+
+
+;;;; List all bindings.
+
+(defcommand "List Bindings" (p)
+  "Show all key bindings active in the current buffer.
+   Groups by global bindings, then each active mode."
+  ""
+  (declare (ignore p))
+  (let ((buffer (current-buffer))
+        (sections nil))
+    ;; Collect global bindings.
+    (let ((global nil)
+          (max 0))
+      (map-bindings (lambda (key cmd)
+                      (unless (member (command-name cmd)
+                                      *describe-mode-ignore*
+                                      :test #'string-equal)
+                        (let ((str (key-to-string key)))
+                          (setf max (max max (length str)))
+                          (push (cons str cmd) global))))
+                    :global)
+      (when global
+        (push (list "Global" max (sort global #'string< :key #'car)) sections)))
+    ;; Collect per-mode bindings for each active mode.
+    (dolist (mode-name (buffer-modes buffer))
+      (let ((bindings nil)
+            (max 0))
+        (map-bindings (lambda (key cmd)
+                        (unless (member (command-name cmd)
+                                        *describe-mode-ignore*
+                                        :test #'string-equal)
+                          (let ((str (key-to-string key)))
+                            (setf max (max max (length str)))
+                            (push (cons str cmd) bindings))))
+                      :mode mode-name)
+        (when bindings
+          (push (list mode-name max (sort bindings #'string< :key #'car))
+                sections))))
+    (setf sections (nreverse sections))
+    (with-pop-up-display (s)
+      (dolist (section sections)
+        (destructuring-bind (name max bindings) section
+          (format s "~%~A bindings:~%" name)
+          (format s "~V,,,'-A~%" (+ max 4 20) "")
+          (dolist (cell bindings)
+            (destructuring-bind (str . cmd) cell
+              (write-string str s)
+              (write-string (make-string (max 1 (- (+ max 2) (length str)))
+                                         :initial-element #\Space) s)
+              (format s "~A~%" (command-name cmd)))))))))

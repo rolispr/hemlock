@@ -607,7 +607,7 @@
                           (string-downcase (subseq prefix (1+ p))))
                   (values nil
                           (string-downcase prefix))))
-          (hemlock::eval-in-slave
+          (hemlock::eval-in-agent
            `(%find-symbol-completion/request
              ',(and show-matches-p t)
              ',package-prefix

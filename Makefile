@@ -12,19 +12,19 @@ endif
 
 .PHONY: build test clean
 
-src/tty/libspawn-ctty.$(SHLIB_EXT): src/tty/spawn-ctty.c
+src/io/libspawn-ctty.$(SHLIB_EXT): src/io/spawn-ctty.c
 	$(CC) $(SHLIB_FLAG) -o $@ $<
 
-build: src/tty/libspawn-ctty.$(SHLIB_EXT)
+build: src/io/libspawn-ctty.$(SHLIB_EXT)
 	$(SBCL) --non-interactive --load init.lisp \
 		--eval '(push :deploy-console *features*)' \
 		--eval '(asdf:load-system :hemlock)' \
 		--eval '(defmethod deploy:output-file ((op deploy:deploy-op)) (merge-pathnames "bin/hemlock" (uiop:getcwd)))' \
 		--eval '(asdf:make :hemlock)'
 
-test: src/tty/libspawn-ctty.$(SHLIB_EXT)
+test: src/io/libspawn-ctty.$(SHLIB_EXT)
 	$(SBCL) --non-interactive --load init.lisp \
 		--eval '(asdf:test-system :hemlock-tests)'
 
 clean:
-	rm -rf bin/ src/tty/libspawn-ctty.so src/tty/libspawn-ctty.dylib
+	rm -rf bin/ src/io/libspawn-ctty.so src/io/libspawn-ctty.dylib

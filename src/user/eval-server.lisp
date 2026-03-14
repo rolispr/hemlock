@@ -17,9 +17,9 @@
   wire                        ; Wire connected to this server.
   notes                       ; List of note objects for operations
                               ;  which have not yet completed.
-  slave-info                  ; Ts-Info used in "Slave Lisp" buffer
+  agent-info                  ; Ts-Info used in "Agent Lisp" buffer
                               ;  (formerly the "Lisp Listener" buffer).
-  slave-buffer                ; "Slave Lisp" buffer for slave's *terminal-io*.
+  agent-buffer                ; "Agent Lisp" buffer for agent's *terminal-io*.
   background-info             ; Ts-Info structure of typescript we use in
                               ;  "background" buffer.
   background-buffer           ; Buffer "background" typescript is in.
@@ -59,11 +59,11 @@
   "T iff we are currenly working on an operation. A catcher for the tag
    abort-operation will be established whenever this is T.")
 
-(defparameter *slave-connect-wait* 300)
+(defparameter *agent-connect-wait* 300)
 
 ;;; Used internally for communications.
 ;;;
-(defvar *newly-created-slave* nil)
+(defvar *newly-created-agent* nil)
 (defvar *compiler-wire* nil)
 (defvar *compiler-error-stream* nil)
 (defvar *compiler-note* nil)
@@ -83,25 +83,25 @@
    instead."
   :value nil)
 
-(defhvar "Slave Utility"
-  "This is the pathname of the utility to fire up slave Lisps.  It defaults
+(defhvar "Agent Utility"
+  "This is the pathname of the utility to fire up agent Lisps.  It defaults
    to \"cmucl\"."
   :value "cmucl")
 
-(defhvar "Slave Utility Switches"
-  "These are additional switches to pass to the Slave Utility.
-   For example, (list \"-core\" <core-file-name>).  The -slave
+(defhvar "Agent Utility Switches"
+  "These are additional switches to pass to the Agent Utility.
+   For example, (list \"-core\" <core-file-name>).  The agent
    switch and the editor name are always supplied, and they should
    not be present in this variable."
   :value nil)
 
 (defhvar "Ask About Old Servers"
   "When set (the default), Hemlock will prompt for an existing server's name
-   in preference to prompting for a new slave's name and creating it."
+   in preference to prompting for a new agent's name and creating it."
   :value t)
 
-(defhvar "Confirm Slave Creation"
-  "When set, Hemlock always confirms a slave's creation for whatever reason."
+(defhvar "Confirm Agent Creation"
+  "When set, Hemlock always confirms an agent's creation for whatever reason."
   ;; I'm not certain what this reason would be, so I'm disabling it.
   ;; In any case, I think the user should determine interactively whether
   ;; he wants this kind of question or not using the command prefix --
@@ -110,19 +110,19 @@
   :value nil)
 
 
-(defhvar "Slave GC Alarm"
-  "Determines that is done when the slave notifies that it is GCing.
+(defhvar "Agent GC Alarm"
+  "Determines what is done when the agent notifies that it is GCing.
   :MESSAGE prints a message in the echo area, :LOUD-MESSAGE beeps as well.
   NIL does nothing."
   :value :message)
 
 
-;;;; Slave destruction.
+;;;; Agent destruction.
 
 ;;; WIRE-DIED -- Internal.
 ;;;
 ;;; The routine is called whenever a wire dies.  We roll through all the
-;;; servers looking for any that use this wire and nuke them with server-died.
+;;; Scan all servers looking for any that use this wire and clean them up.
 ;;;
 (defun wire-died (wire)
   (let ((servers nil))
@@ -131,26 +131,26 @@
       (when (eq wire (server-info-wire info))
         (push info servers)))
     (dolist (server servers)
-      (server-died server))))
+      (agent-died server))))
 
 ;;; SERVER-DIED -- Internal.
 ;;;
 ;;; Clean up the server. Remove any references to it from variables, etc.
 ;;;
-(defun server-died (server)
+(defun agent-died (server)
   (declare (special *breakpoints*))
   (let ((name (server-info-name server)))
     (delete-string name *server-names*)
-    (message "Server ~A just died." name))
+    (message "Agent ~A just died." name))
   (when (server-info-wire server)
     #+NILGB
     (let ((fd (hemlock.wire:wire-fd (server-info-wire server))))
       (system:invalidate-descriptor fd)
       (unix:unix-close fd))
     (setf (server-info-wire server) nil))
-  (when (server-info-slave-info server)
-    (ts-buffer-wire-died (server-info-slave-info server))
-    (setf (server-info-slave-info server) nil))
+  (when (server-info-agent-info server)
+    (ts-buffer-wire-died (server-info-agent-info server))
+    (setf (server-info-agent-info server) nil))
   (when (server-info-background-info server)
     (ts-buffer-wire-died (server-info-background-info server))
     (setf (server-info-background-info server) nil))
@@ -165,7 +165,7 @@
                  (eq (variable-value var :buffer buffer) server))
         (delete-variable var :buffer buffer))))
   (setf *breakpoints* (delete-if #'(lambda (b)
-                                     (eq (breakpoint-info-slave b) server))
+                                     (eq (breakpoint-info-agent b) server))
                                  *breakpoints*)))
 
 ;;; SERVER-CLEANUP -- Internal.
@@ -179,9 +179,9 @@
   (let ((info (if (hemlock-bound-p 'server-info :buffer buffer)
                   (variable-value 'server-info :buffer buffer))))
     (when info
-      (when (eq buffer (server-info-slave-buffer info))
-        (setf (server-info-slave-buffer info) nil)
-        (setf (server-info-slave-info info) nil))
+      (when (eq buffer (server-info-agent-buffer info))
+        (setf (server-info-agent-buffer info) nil)
+        (setf (server-info-agent-info info) nil))
       (when (eq buffer (server-info-background-buffer info))
         (setf (server-info-background-buffer info) nil)
         (setf (server-info-background-info info) nil))))
@@ -225,7 +225,7 @@
 
 
 
-;;;; Slave creation.
+;;;; Agent creation.
 
 ;;; INITIALIZE-SERVER-STUFF -- Internal.
 ;;;
@@ -240,7 +240,7 @@
 #+(or) ;disabled.  If the original switch was important, let's find a
        ; different way to to this.  -dfl
 (defvar *accept-connections* t
-  "When set, allow slaves to connect to the editor.")
+  "When set, allow agents to connect to the editor.")
 
 ;;; GET-EDITOR-NAME -- Internal.
 ;;;
@@ -265,76 +265,74 @@
 
 ;;; MAKE-BUFFERS-FOR-TYPESCRIPT -- Internal.
 ;;;
-(defun make-buffers-for-typescript (slave-name background-name)
-  "Make the interactive and background buffers slave-name and background-name.
+(defun make-buffers-for-typescript (agent-name background-name)
+  "Make the interactive and background buffers agent-name and background-name.
    If either is nil, then prompt the user."
-  (multiple-value-bind (slave-name background-name)
-                       (cond ((not (and slave-name background-name))
-                              (pick-slave-buffer-names))
-                             ((getstring slave-name *server-names*)
+  (multiple-value-bind (agent-name background-name)
+                       (cond ((not (and agent-name background-name))
+                              (pick-agent-buffer-names))
+                             ((getstring agent-name *server-names*)
                               (multiple-value-bind
                                   (new-sn new-bn)
-                                  (pick-slave-buffer-names)
+                                  (pick-agent-buffer-names)
                                 (message "~S is already an eval server; ~
                                           using ~S instead."
-                                         slave-name new-sn)
+                                         agent-name new-sn)
                                 (values new-sn new-bn)))
-                             (t (values slave-name background-name)))
-    (let* ((slave-buffer (or (getstring slave-name *buffer-names*)
-                             (make-buffer slave-name :modes '("Lisp"))))
+                             (t (values agent-name background-name)))
+    (let* ((agent-buffer (or (getstring agent-name *buffer-names*)
+                             (make-buffer agent-name :modes '("Lisp"))))
            (background-buffer (or (getstring background-name *buffer-names*)
                                   (make-buffer background-name
                                                :modes '("Lisp"))))
-           (server-info (make-server-info :name slave-name
+           (server-info (make-server-info :name agent-name
                                           :wire :wire-not-yet-established
-                                          :slave-buffer slave-buffer
+                                          :agent-buffer agent-buffer
                                           :background-buffer background-buffer))
-           (slave-info (typescriptify-buffer slave-buffer server-info
+           (agent-info (typescriptify-buffer agent-buffer server-info
                                              :wire-not-yet-established))
            (background-info (typescriptify-buffer background-buffer server-info
                                                   :wire-not-yet-established)))
-      (setf (server-info-slave-info server-info) slave-info)
+      (setf (server-info-agent-info server-info) agent-info)
       (setf (server-info-background-info server-info) background-info)
-      (setf (getstring slave-name *server-names*) server-info)
+      (setf (getstring agent-name *server-names*) server-info)
       (setf (variable-value 'current-eval-server :global) server-info)
       server-info)))
 
 
-;;; CREATE-SLAVE -- Public.
+;;; CREATE-AGENT -- Public.
 ;;;
+;;; clbuild command variables deleted — clbuild is dead.
 
-(defvar *clbuild-slave-command* '("clbuild" "run" "hemlock-slave"))
-(defvar *slave-command* *clbuild-slave-command*)
-
-(defun create-slave (command &optional name)
-  "This creates a slave that tries to connect to the editor.  A preliminary
-   slave-information structure is returned immediately, whose details will
-   be filled in later by the slave once the wire has been established.
+(defun create-agent (command &optional name)
+  "This creates an agent that tries to connect to the editor.  A preliminary
+   server-info structure is returned immediately, whose details will
+   be filled in later by the agent once the wire has been established.
    Name is the name of the interactive buffer.  If name is nil, this generates
    a name.  If name is supplied, and a buffer with that name already exists,
    this signals an error."
   (when (and name (getstring name *buffer-names*))
     (editor-error "Buffer ~A is already in use." name))
-  (multiple-value-bind (slave background)
+  (multiple-value-bind (agent background)
       (if name
           (values name (format nil "Background ~A" name))
-          (pick-slave-buffer-names))
-    (when (value confirm-slave-creation)
-      (setf slave (prompt-for-string
-                   :prompt "New slave name? "
-                   :help "Enter the name to use for the newly created slave."
-                   :default slave
-                   :default-string slave))
-      (setf background (format nil "Background ~A" slave))
-      (when (getstring slave *buffer-names*)
-        (editor-error "Buffer ~A is already in use." slave))
+          (pick-agent-buffer-names))
+    (when (value confirm-agent-creation)
+      (setf agent (prompt-for-string
+                   :prompt "New agent name? "
+                   :help "Enter the name to use for the newly created agent."
+                   :default agent
+                   :default-string agent))
+      (setf background (format nil "Background ~A" agent))
+      (when (getstring agent *buffer-names*)
+        (editor-error "Buffer ~A is already in use." agent))
       (when (getstring background *buffer-names*)
         (editor-error "Buffer ~A is already in use." background)))
-    (message "Spawning slave ... ")
-    (let ((server-info (make-buffers-for-typescript slave background)))
+    (message "Spawning agent ... ")
+    (let ((server-info (make-buffers-for-typescript agent background)))
       (make-process-connection
        command
-       :filter (let ((ts (server-info-slave-info server-info)))
+       :filter (let ((ts (server-info-agent-info server-info)))
                  (lambda (connection bytes)
                    (ts-buffer-output-string
                     ts
@@ -342,56 +340,33 @@
                    nil)))
       server-info)))
 
-;;; CREATE-SLAVE-IN-THREAD -- Public.
+;;; CREATE-AGENT-IN-THREAD -- Public.
 ;;;
-(defun create-slave-in-thread (&optional name)
-  "This creates a slave that tries to connect to the editor.  A preliminary
-   slave-information structure is returned immediately, whose details will
-   be filled in later by the slave once the wire has been established.
-   Name is the name of the interactive buffer.  If name is nil, this generates
-   a name.  If name is supplied, and a buffer with that name already exists,
-   this signals an error."
+(defun create-agent-in-thread (&optional name)
+  "Create a local eval agent backed by a background thread.
+   No wire protocol — evaluates directly in the master image.
+   Returns a server-info structure with the typescript buffers set up."
   (when (and name (getstring name *buffer-names*))
     (editor-error "Buffer ~A is already in use." name))
-  (multiple-value-bind (slave background)
+  (multiple-value-bind (agent background)
       (if name
           (values name (format nil "Background ~A" name))
-          (pick-slave-buffer-names))
-    (when (value confirm-slave-creation)
-      (setf slave (prompt-for-string
-                   :prompt "New slave name? "
-                   :help "Enter the name to use for the newly created slave."
-                   :default slave
-                   :default-string slave))
-      (setf background (format nil "Background ~A" slave))
-      (when (getstring slave *buffer-names*)
-        (editor-error "Buffer ~A is already in use." slave))
+          (pick-agent-buffer-names))
+    (when (value confirm-agent-creation)
+      (setf agent (prompt-for-string
+                   :prompt "New agent name? "
+                   :help "Enter the name to use for the newly created agent."
+                   :default agent
+                   :default-string agent))
+      (setf background (format nil "Background ~A" agent))
+      (when (getstring agent *buffer-names*)
+        (editor-error "Buffer ~A is already in use." agent))
       (when (getstring background *buffer-names*)
         (editor-error "Buffer ~A is already in use." background)))
-    (let ((server-info (make-buffers-for-typescript slave background)))
-      (bt:make-thread
-       (let ((editor-name (get-editor-name))
-             (backend-type *default-backend*))
-         (lambda ()
-           (macrolet ((rebinding ((&rest vars) &body body)
-                        `(let ,(mapcar (lambda (var)
-                                         (list var var))
-                                       vars)
-                           ,@body)))
-             (let ((*print-readably* nil))
-               (rebinding (*terminal-io*
-                           *standard-input*
-                           *standard-output*
-                           *error-output*
-                           *debug-io*
-                           *query-io*
-                           *trace-output*)
-               (start-slave :slave t
-                            :editor editor-name
-                            :backend-type backend-type
-                            :slave-buffer slave
-                            :background-buffer background))))))
-       :name slave)
+    (let ((server-info (make-buffers-for-typescript agent background)))
+      ;; Mark the server as immediately ready — no wire handshake needed.
+      ;; The wire slot holds :local to distinguish from process agents.
+      (setf (server-info-wire server-info) :local)
       server-info)))
 
 ;;; MAYBE-CREATE-SERVER -- Internal interface.
@@ -412,34 +387,34 @@
                                     :default first-server-name
                                     :default-string first-server-name
                                     :help
-                                    "Enter the name of an existing eval server."
+                                    "Enter the name of an existing eval agent."
                                     :must-exist t)
               (declare (ignore name))
-              (or info (create-slave (slave-command-with-arguments))))
-            (create-slave (slave-command-with-arguments))))
-      (create-slave (slave-command-with-arguments))))
+              (or info (create-agent-in-thread)))
+            (create-agent-in-thread)))
+      (create-agent-in-thread)))
 
 
-(defvar *next-slave-index* 0
-  "Number to use when creating the next slave.")
+(defvar *next-agent-index* 0
+  "Number to use when creating the next agent.")
 
-;;; PICK-SLAVE-BUFFER-NAMES -- Internal.
+;;; PICK-AGENT-BUFFER-NAMES -- Internal.
 ;;;
-;;; Return two unused names to use for the slave and background buffers.
+;;; Return two unused names to use for the agent and background buffers.
 ;;;
-(defun pick-slave-buffer-names (&optional info)
+(defun pick-agent-buffer-names (&optional info)
   (loop
-    (let ((slave (format nil "Slave~@[ ~A~] ~D"
+    (let ((agent (format nil "Agent~@[ ~A~] ~D"
                          info
-                         (incf *next-slave-index*)))
-          (background (format nil "Background Slave ~D" *next-slave-index*)))
-      (unless (or (getstring slave *buffer-names*)
+                         (incf *next-agent-index*)))
+          (background (format nil "Background Agent ~D" *next-agent-index*)))
+      (unless (or (getstring agent *buffer-names*)
                   (getstring background *buffer-names*))
-        (return (values slave background))))))
+        (return (values agent background))))))
 
 
 
-;;;; Slave selection.
+;;;; Agent selection.
 
 ;;; GET-CURRENT-EVAL-SERVER -- Public.
 ;;;
@@ -452,7 +427,7 @@
   (let ((info (value current-eval-server)))
     (cond (info)
           (errorp
-           (editor-error "No current eval server."))
+           (editor-error "No current eval agent."))
           (t
            (setf (value current-eval-server) (maybe-create-server))))))
 
@@ -471,71 +446,44 @@
 
 ;;;; Server Manipulation commands.
 
-(defun slave-command-with-arguments (&optional (prefix *slave-command*))
-  (append prefix
-          (list "--editor" (get-editor-name)
-                "--backend" (symbol-name *default-backend*))))
+;;; clbuild command helpers and process-spawn commands deleted — clbuild is dead.
 
-(defun prompt-for-slave-command ()
-  (cl-ppcre:split
-   " "
-   (prompt-for-string
-    :prompt "Command: "
-    :default (format nil "~{~A~^ ~}"
-                     (slave-command-with-arguments)))))
-
-(defcommand "Start Slave Process" (p)
-  "Create a new slave.  When given an argument, ask for a command first."
+(defcommand "Eval Async" (p)
+  "Create a local eval agent backed by a background thread.
+   No wire protocol — evaluates directly in the master image."
   ""
-  (let ((info (create-slave (if p
-                                (prompt-for-slave-command)
-                                (slave-command-with-arguments))
-                            (pick-slave-buffer-names "Process"))))
-    (change-to-buffer (server-info-slave-buffer info))))
+  (let ((info (create-agent-in-thread (pick-agent-buffer-names "Eval"))))
+    (change-to-buffer (server-info-agent-buffer info))))
 
-(defcommand "Start Slave Using Clbuild" (p)
-  "Create a new slave.  When given an argument, ask for a command first.
-   Always defaults to clbuild as the slave startup method, even when
-   the host lisp has a different default method."
-  ""
-  (let ((*slave-command* *clbuild-slave-command*))
-    (start-slave-process-command p)))
-
-(defcommand "Start Slave Thread" (p)
-  "Create a new thread acting as a slave."
-  ""
-  (let ((info (create-slave-in-thread (pick-slave-buffer-names "Thread"))))
-    (change-to-buffer (server-info-slave-buffer info))))
-
-(defcommand "Select Slave" (p)
+(defcommand "Select Agent" (p)
   "" ""
   (let* ((info (or (get-current-eval-server)
-                   (editor-error "No current eval server yet")))
-         (slave (server-info-slave-buffer info)))
-    (unless slave
-      (editor-error "The current eval server doesn't have a slave buffer!"))
-    (change-to-buffer slave)))
+                   (editor-error "No current eval agent yet")))
+         (agent (server-info-agent-buffer info)))
+    (unless agent
+      (editor-error "The current eval agent doesn't have an agent buffer!"))
+    (change-to-buffer agent)))
 
 (defcommand "Select Background" (p)
-  "Switch to the current slave's background buffer. When given an argument, use
+  "Switch to the current agent's background buffer. When given an argument, use
    the current compile server instead of the current eval server."
-  "Switch to the current slave's background buffer. When given an argument, use
+  "Switch to the current agent's background buffer. When given an argument, use
    the current compile server instead of the current eval server."
   (let* ((info (if p
                  (get-current-compile-server t)
                  (get-current-eval-server t)))
          (background (server-info-background-buffer info)))
     (unless background
-      (editor-error "The current ~A server doesn't have a background buffer!"
+      (editor-error "The current ~A agent doesn't have a background buffer!"
                     (if p "compile" "eval")))
     (change-to-buffer background)))
 
 #+NILGB
-(defcommand "Kill Slave" (p)
-  "This aborts any operations in the slave, tells the slave to QUIT, and shuts
+(defcommand "Kill Agent" (p)
+  "This aborts any operations in the agent, tells the agent to QUIT, and shuts
    down the connection to the specified eval server.  This makes no attempt to
    assure the eval server actually dies."
-  "This aborts any operations in the slave, tells the slave to QUIT, and shuts
+  "This aborts any operations in the agent, tells the agent to QUIT, and shuts
    down the connection to the specified eval server.  This makes no attempt to
    assure the eval server actually dies."
   (declare (ignore p))
@@ -545,8 +493,8 @@
         (name info)
         (prompt-for-keyword
          (list *server-names*)
-         :prompt "Kill Slave: "
-         :help "Enter the name of the eval server you wish to destroy."
+         :prompt "Kill Agent: "
+         :help "Enter the name of the eval agent you wish to destroy."
          :must-exist t
          :default default
          :default-string default)
@@ -556,13 +504,13 @@
           (ext:send-character-out-of-band (hemlock.wire:wire-fd wire) #\N)
           (hemlock.wire:remote wire (ext:quit))
           (hemlock.wire:wire-force-output wire)))
-      (server-died info))))
+      (agent-died info))))
 
 #+NILGB
-(defcommand "Kill Slave and Buffers" (p)
-  "This is the same as \"Kill Slave\", but it also deletes the slaves
+(defcommand "Kill Agent and Buffers" (p)
+  "This is the same as \"Kill Agent\", but it also deletes the agent's
    interaction and background buffers."
-  "This is the same as \"Kill Slave\", but it also deletes the slaves
+  "This is the same as \"Kill Agent\", but it also deletes the agent's
    interaction and background buffers."
   (declare (ignore p))
   (let ((default (and (value current-eval-server)
@@ -571,8 +519,8 @@
         (name info)
         (prompt-for-keyword
          (list *server-names*)
-         :prompt "Kill Slave: "
-         :help "Enter the name of the eval server you wish to destroy."
+         :prompt "Kill Agent: "
+         :help "Enter the name of the eval agent you wish to destroy."
          :must-exist t
          :default default
          :default-string default)
@@ -582,20 +530,20 @@
           (ext:send-character-out-of-band (hemlock.wire:wire-fd wire) #\N)
           (hemlock.wire:remote wire (ext:quit))
           (hemlock.wire:wire-force-output wire)))
-      (let ((buffer (server-info-slave-buffer info)))
+      (let ((buffer (server-info-agent-buffer info)))
         (when buffer (delete-buffer-if-possible buffer)))
       (let ((buffer (server-info-background-buffer info)))
         (when buffer (delete-buffer-if-possible buffer)))
-      (server-died info))))
+      (agent-died info))))
 
 #+(or)
-(defcommand "Accept Slave Connections" (p)
-  "This causes Hemlock to accept slave connections and displays the port of
-   the editor's connections request server.  This is suitable for use with the
-   Lisp's -slave switch.  Given an argument, this inhibits slave connections."
-  "This causes Hemlock to accept slave connections and displays the port of
-   the editor's connections request server.  This is suitable for use with the
-   Lisp's -slave switch.  Given an argument, this inhibits slave connections."
+(defcommand "Accept Agent Connections" (p)
+  "This causes Hemlock to accept agent connections and displays the port of
+   the editor's connections request server.  Given an argument, this inhibits
+   agent connections."
+  "This causes Hemlock to accept agent connections and displays the port of
+   the editor's connections request server.  Given an argument, this inhibits
+   agent connections."
   (let ((accept (not p)))
     (setf *accept-connections* accept)
     (message "~:[Inhibiting~;Accepting~] connections to ~S"
@@ -603,7 +551,7 @@
 
 
 
-;;;; Slave initialization junk.
+;;;; Agent initialization.
 
 (defvar *original-beep-function* nil
   "Handle on original beep function.")
@@ -641,7 +589,7 @@
 
 ;;; CONNECT-STREAM -- internal
 ;;;
-;;; Run in the slave to create a new stream and connect it to the supplied
+;;; Run in the agent to create a new stream and connect it to the supplied
 ;;; buffer.  Returns the stream.
 ;;;
 (defun connect-stream (remote-buffer)
@@ -653,14 +601,14 @@
 
 ;;; MADE-BUFFERS-FOR-TYPESCRIPT -- Internal Interface.
 ;;;
-;;; Run in the slave by the editor with the two buffers' info structures,
-;;; actually remote-objects in the slave.  Does any necessary stream hacking.
+;;; Run in the agent by the editor with the two buffers' info structures,
+;;; actually remote-objects in the agent.  Does any necessary stream hacking.
 ;;; Return nil to make sure no weird objects try to go back over the wire
-;;; since the editor calls this in the slave for value.  The editor does this
+;;; since the editor calls this in the agent for value.  The editor does this
 ;;; for synch'ing, not for values.
 ;;;
 (defvar cl-user::*io* nil)
-(defun made-buffers-for-typescript (slave-info background-info)
+(defun made-buffers-for-typescript (agent-info background-info)
   (setf *original-terminal-io* *terminal-io*)
   (macrolet ((frob (symbol new-value)
                `(setf ,(intern (concatenate 'simple-string
@@ -668,7 +616,7 @@
                                             (subseq (string symbol) 1)))
                  ,symbol
                  ,symbol ,new-value)))
-    (frob *terminal-io* (connect-stream slave-info))
+    (frob *terminal-io* (connect-stream agent-info))
     (frob *standard-input* (make-synonym-stream '*terminal-io*))
     (frob *standard-output* *standard-input*)
     (frob *error-output* *standard-input*)
@@ -680,29 +628,29 @@
   (setf cl-user::*io* *terminal-io*)
   nil)
 
-;;; SLAVE-GC-NOTIFY-BEFORE and SLAVE-GC-NOTIFY-AFTER -- internal
+;;; AGENT-GC-NOTIFY-BEFORE and AGENT-GC-NOTIFY-AFTER -- internal
 ;;;
-;;; These two routines are run in the editor by the slave's gc notify routines.
+;;; These two routines are run in the editor by the agent's gc notify routines.
 ;;;
-(defun slave-gc-notify-before (remote-ts message)
+(defun agent-gc-notify-before (remote-ts message)
   (let ((ts (hemlock.wire:remote-object-value remote-ts)))
     (ts-buffer-output-string ts message t)
-    (when (value slave-gc-alarm)
+    (when (value agent-gc-alarm)
       (message "~A is GC'ing." (buffer-name (ts-data-buffer ts)))
-      (when (eq (value slave-gc-alarm) :loud-message)
+      (when (eq (value agent-gc-alarm) :loud-message)
         (beep)))))
 
-(defun slave-gc-notify-after (remote-ts message)
+(defun agent-gc-notify-after (remote-ts message)
   (let ((ts (hemlock.wire:remote-object-value remote-ts)))
     (ts-buffer-output-string ts message t)
-    (when (value slave-gc-alarm)
+    (when (value agent-gc-alarm)
       (message "~A is done GC'ing." (buffer-name (ts-data-buffer ts)))
-      (when (eq (value slave-gc-alarm) :loud-message)
+      (when (eq (value agent-gc-alarm) :loud-message)
         (beep)))))
 
 ;;; EDITOR-DIED -- internal
 ;;;
-;;; Run in the slave when the editor goes belly up.
+;;; Run in the agent when the editor goes belly up.
 ;;;
 (defun editor-died ()
   (macrolet ((frob (symbol)
@@ -749,17 +697,17 @@
    '*original-terminal-io*
    (constantly *original-terminal-io*)))
 
-;;; START-SLAVE -- internal
+;;; START-AGENT -- internal
 ;;;
-;;; Initiate the process by which a lisp becomes a slave.
+;;; Initiate the process by which a lisp becomes an agent.
 ;;;
-(defun %start-slave
+(defun %start-agent
        (&key editor
-             slave
-             slave-buffer
+             agent
+             agent-buffer
              background-buffer
              (backend-type *default-backend*))
-  (assert slave)
+  (assert agent)
   (let ((*connection-backend*
          (ecase backend-type
            (:qt :qt)
@@ -772,7 +720,7 @@
     (install-special-variables-for-background-threads)
     (let ((machine (subseq editor 0 seperator))
           (port (parse-integer editor :start (1+ seperator)))
-          (*in-hemlock-slave-p* t)
+          (*in-hemlock-agent-p* t)
           ;; override --disable-debugger from this point on:
           (*debugger-hook*
            (lambda (c orig)
@@ -787,7 +735,7 @@
       (format t "Connecting to ~A:~D~%" machine port)
       (with-new-event-loop ()
         (let ((hemlock.wire::*current-wire* :wire-not-yet-known))
-          (connect-to-editor machine port slave-buffer background-buffer)
+          (connect-to-editor machine port agent-buffer background-buffer)
           (dispatch-events-no-hang)
           (loop until cl-user::*io*
                 do (dispatch-events)
@@ -805,13 +753,13 @@
        (terpri stream)
        (incf i)))))
 
-(defun start-slave (&rest args)
+(defun start-agent (&rest args)
   (let ((*original-terminal-io* *terminal-io*))
     (block nil
       (handler-bind
           ((serious-condition
             (lambda (c)
-              ;; The streams having changed indicates that the slave has
+              ;; The streams having changed indicates that the agent has
               ;; started up successfully.  From that point on, don't
               ;; keep it from entering the debugger.
               (when (eq *original-terminal-io* *terminal-io*)
@@ -819,15 +767,15 @@
                 (simple-backtrace *original-terminal-io*)
                 (force-output *original-terminal-io*)
                 (return)))))
-        (apply #'%start-slave args)))))
+        (apply #'%start-agent args)))))
 
 
-;;; PRINT-SLAVE-STATUS  --  Internal
+;;; PRINT-AGENT-STATUS  --  Internal
 ;;;
-;;;    Print out some useful information about what the slave is up to.
+;;;    Print out some useful information about what the agent is up to.
 ;;;
 #+NILGB
-(defun print-slave-status ()
+(defun print-agent-status ()
   (ignore-errors
     (multiple-value-bind (sys user faults)
                          (system:get-system-info)
@@ -860,8 +808,8 @@
 ;;;
 ;;; Do the actual connect to the editor.
 ;;;
-(defun connect-to-editor (machine port &optional (slave nil) (background nil))
-  (declare (ignore slave background))
+(defun connect-to-editor (machine port &optional (agent nil) (background nil))
+  (declare (ignore agent background))
   (connect-to-remote-server
    machine
    port
@@ -869,26 +817,26 @@
      (let ()
        (setf hemlock.wire::*current-wire* wire)
        (hemlock.wire:remote-value-bind wire
-         (slave background)
-         (set-up-buffers-for-slave (lisp-implementation-type)
+         (agent background)
+         (set-up-buffers-for-agent (lisp-implementation-type)
                                    (lisp-implementation-version))
-         (made-buffers-for-typescript slave background))))
+         (made-buffers-for-typescript agent background))))
    'editor-died))
 
-(defun set-up-buffers-for-slave
+(defun set-up-buffers-for-agent
     (type version &optional (wire hemlock.wire:*current-wire*))
   (let* ((server-info (variable-value 'current-eval-server :global))
-         (slave-info (server-info-slave-info server-info))
+         (agent-info (server-info-agent-info server-info))
          (background-info (server-info-background-info server-info)))
     (setf (server-info-wire server-info) wire)
-    (ts-buffer-wire-connected slave-info wire)
+    (ts-buffer-wire-connected agent-info wire)
     (ts-buffer-wire-connected background-info wire)
     (setf (server-info-implementation-type server-info) type)
     (setf (server-info-implementation-version server-info) version)
-    (let* ((buf (ts-data-buffer slave-info))
+    (let* ((buf (ts-data-buffer agent-info))
            (name (format nil "~A ~A" (buffer-name buf) type)))
       (maybe-rename-buffer buf name))
-    (values (hemlock.wire:make-remote-object slave-info)
+    (values (hemlock.wire:make-remote-object agent-info)
             (hemlock.wire:make-remote-object background-info))))
 
 ;;; CONNECT-TO-EDITOR-FOR-BACKGROUND-THREAD -- internal
@@ -1198,16 +1146,20 @@
 ;;;; Wire-readiness predicate.
 
 (defun eval-server-ready-p (info)
-  "Return true only when INFO is a server-info with an established wire."
-  (and info (hemlock.wire:wire-p (server-info-wire info))))
+  "Return true when INFO is a server-info with an established connection.
+   Accepts both wire-backed (process agents) and :local (thread agents)."
+  (and info
+       (let ((wire (server-info-wire info)))
+         (or (eq wire :local)
+             (hemlock.wire:wire-p wire)))))
 
 ;; Alias for prepl.lisp which calls this from background threads
 (setf (fdefinition 'make-extra-repl-buffer-impl)
       #'%make-extra-typescript-buffer)
 
 
-;;;; Auto-start slave on editor entry.
+;;;; Auto-start agent on editor entry.
 
 (add-hook entry-hook
   (lambda ()
-    (ignore-errors (create-slave-in-thread))))
+    (ignore-errors (create-agent-in-thread))))

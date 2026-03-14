@@ -19,7 +19,7 @@
 
 ;;; *request-server-interface*
 ;;;
-;;; Address to listen on for connections from slaves.
+;;; Address to listen on for connections from agents.
 ;;;
 (defvar *request-server-interface* "127.0.0.1")
 

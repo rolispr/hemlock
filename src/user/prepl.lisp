@@ -33,7 +33,7 @@
 
 (defun call-with-typeout-for-thread-debugger (cont)
   (with-new-event-loop ()
-    (let ((*in-hemlock-slave-p* t)
+    (let ((*in-hemlock-agent-p* t)
           (hemlock.wire:*current-wire* :not-yet))
       (connect-to-editor-for-background-thread
        (car *master-machine-and-port*)
@@ -46,7 +46,7 @@
                     *original-terminal-io*)
         (force-output *original-terminal-io*))
       (with-typeout-pop-up-in-master
-          (*terminal-io* (format nil "Slave thread ~A"
+          (*terminal-io* (format nil "Agent thread ~A"
                                  (bt:thread-name (bt:current-thread))))
         (call-with-standard-synonym-streams cont)))))
 

@@ -101,7 +101,7 @@
   (ticks -1)
   (line-number 1 :type (integer 1))
   (syntax-info nil :type (or null syntax-info))
-  (package (symbol-name :cl-user) :type (or null string)))
+  (package (symbol-name :hemlock-user) :type (or null string)))
 
 
 ;;; Line-Signature  --  Public

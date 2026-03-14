@@ -1291,10 +1291,10 @@
   (declare (ignore p))
   (center-window (current-window) (current-point)))
 
-(defun quickselect-slave-repl (&optional *)
+(defun quickselect-agent-repl (&optional *)
   (let ((info (variable-value 'current-eval-server :global)))
     (when info
-      (change-to-buffer (server-info-slave-buffer info)))))
+      (change-to-buffer (server-info-agent-buffer info)))))
 
 (defun quickselect-help (&optional *)
   (with-pop-up-display (s)
@@ -1302,8 +1302,8 @@
     (terpri s)
     (format s "  h  this help~%")
     (terpri s)
-    (format s "  S  List Slaves (also c for slime compatibility)~%")
-    (format s "  r  Slave REPL~%")
+    (format s "  S  List Agents (also c for slime compatibility)~%")
+    (format s "  r  Agent REPL~%")
     (terpri s)
     (format s "  b  Bufed~%")
     (format s "  C  Coned~%"))
@@ -1318,10 +1318,10 @@
                     (setf (current-window) *echo-area-window*)
                     (display-prompt-nicely "Quickselect? [?hrCcSb]")
                     (key-event-case
-                     ((#k"r") 'quickselect-slave-repl)
+                     ((#k"r") 'quickselect-agent-repl)
                      ((#k"?" #k"h") 'quickselect-help)
                      ((#k"C") 'coned-command)
-                     ((#k"c" #k"S") 'list-slaves-command)
+                     ((#k"c" #k"S") 'list-agents-command)
                      ((#k"b") 'bufed-command)
                      (t (lambda ()))))
                (setf (current-window) old-window)))

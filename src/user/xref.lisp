@@ -162,7 +162,7 @@
                                (sb-introspect:who-specializes-generally sym)))))
 
 (defun %find-definitions (label xref-fun name)
-  (let* ((sym (hemlock::resolve-slave-symbol name nil))
+  (let* ((sym (hemlock::resolve-agent-symbol name nil))
          (data (and sym (funcall xref-fun sym))))
     (hemlock::eval-in-master `(%definitions-found ',label ',name ',data))))
 
@@ -177,7 +177,7 @@
       (make-xref-buffer entries)))))
 
 (defun find-definitions (name)
-  (hemlock::eval-in-slave
+  (hemlock::eval-in-agent
    `(%find-definitions "definition" '%sbcl-find-definitions ',name)))
 
 (defcommand "Find Definitions" (p)
@@ -190,7 +190,7 @@
     (when (find #\newline default)
       (setf default nil))
     (find-definitions
-     (hemlock::parse-slave-symbol
+     (hemlock::parse-agent-symbol
       (if (or p (not default))
           (prompt-for-string
            :prompt "Name: "
@@ -206,14 +206,14 @@
               (when (find #\newline default)
                 (setf default nil))
               (,fun
-               (hemlock::parse-slave-symbol
+               (hemlock::parse-agent-symbol
                 (if (or p (not default))
                     (prompt-for-string
                      :prompt "Name: "
                      :default default)
                     default)))))
           (defun ,fun (name)
-            (hemlock::eval-in-slave
+            (hemlock::eval-in-agent
              (list '%find-definitions
                    (list 'quote ',name)
                    (list 'quote ',sbcl-fun)

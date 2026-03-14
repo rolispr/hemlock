@@ -922,7 +922,7 @@
    #:eval-server-ready-p
 
    ;; backend-facing internals (used by tty, term, webui backends)
-   #:slave-fd
+   #:agent-fd
    #:connection-environment
    #:*free-font-changes*
    #:alloc-font-change
@@ -1751,7 +1751,7 @@
            #:main
            #:with-editor
            #:call-with-editor
-           #:start-slave
+           #:start-agent
            #:*background-image*
            #:linedit
            #:formedit

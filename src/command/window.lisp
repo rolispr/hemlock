@@ -360,6 +360,20 @@
                      " "))))
 
 (make-modeline-field
+ :name :agent-status
+ :function #'(lambda (buffer window)
+               "Returns agent connection status for buffer, or empty string."
+               (declare (ignore window))
+               (let ((server (and (hemlock-bound-p 'hemlock::current-eval-server
+                                                   :buffer buffer)
+                                  (variable-value 'hemlock::current-eval-server
+                                                  :buffer buffer))))
+                 (cond ((null server) "")
+                       ((not (eval-server-ready-p server)) "[connecting] ")
+                       (t (format nil "[~A] "
+                                  (hemlock::server-info-name server)))))))
+
+(make-modeline-field
  :name :modes
  :function #'(lambda (buffer window)
                "Returns buffer's modes followed by one space."
@@ -444,6 +458,7 @@
 
 (defvar *default-modeline-fields*
   (list (modeline-field :hemlock-literal)
+        (modeline-field :agent-status)
         (modeline-field :package)
         (modeline-field :modes)
         (modeline-field :modifiedp)

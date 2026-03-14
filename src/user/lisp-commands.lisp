@@ -113,7 +113,7 @@
 
 (defhvar "Editor Definition Info"
   "When this is non-nil, the editor Lisp is used to determine definition
-   editing information; otherwise, the slave Lisp is used."
+   editing information; otherwise, the agent Lisp is used."
   :value t
   :mode "Eval")
 
@@ -456,7 +456,7 @@
 
 (defhvar "Editor Definition Info"
   "When this is non-nil, the editor Lisp is used to determine definition
-   editing information; otherwise, the slave Lisp is used."
+   editing information; otherwise, the agent Lisp is used."
   :value t
   :mode "Editor")
 

@@ -60,6 +60,12 @@
 (bind-key "Help" #k"control-h")
 (bind-key "Help" #k"control-_")
 (bind-key "Describe Key" #k"meta-?")
+(bind-key "Describe and Show Variable" #k"hyper-h v")
+(bind-key "Describe Command" #k"hyper-h c")
+(bind-key "Describe Mode" #k"hyper-h m")
+(bind-key "List Bindings" #k"hyper-h b")
+(bind-key "Where Is" #k"hyper-h w")
+(bind-key "Apropos" #k"hyper-h a")
 
 
 (bind-key "Here to Top of Window" #k"leftdown")
@@ -329,10 +335,10 @@
 (bind-key "Search Previous Interactive Input" #k"meta-P" :mode "Typescript")
 (bind-key "Next Interactive Input" #k"meta-n" :mode "Typescript")
 (bind-key "Reenter Interactive Input" #k"control-return" :mode "Typescript")
-(bind-key "Typescript Slave Break" #k"hyper-b" :mode "Typescript")
-(bind-key "Typescript Slave to Top Level" #k"hyper-g" :mode "Typescript")
-(bind-key "Typescript Slave Status" #k"hyper-s" :mode "Typescript")
-(bind-key "Select Slave" #k"control-meta-\c")
+(bind-key "Typescript Agent Break" #k"hyper-b" :mode "Typescript")
+(bind-key "Typescript Agent to Top Level" #k"hyper-g" :mode "Typescript")
+(bind-key "Typescript Agent Status" #k"hyper-s" :mode "Typescript")
+(bind-key "Select Agent" #k"control-meta-\c")
 (bind-key "Select Background" #k"control-meta-C")
 (bind-key "Clear Typescript Buffer" #k"control-c meta-o" :mode "Typescript")
 
@@ -789,9 +795,9 @@
 
 
 
-;;;; (Slave) Apropos.
+;;;; (Agent) Apropos.
 
-(bind-key "Slave Apropos" #k"control-c ?")
+(bind-key "Agent Apropos" #k"control-c ?")
 
 (bind-key "Find Definitions" #k"meta-." :mode "Apropos")
 

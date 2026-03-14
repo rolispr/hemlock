@@ -9,7 +9,7 @@
 
 (defvar *buffer-package*
   nil
-  "Special variable, bound by certain wire requests, telling the slave
+  "Special variable, bound by certain wire requests, telling the agent
    what value the master sees for (package-at-point).")
 
 (defun completions (string default-package-name)

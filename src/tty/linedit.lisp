@@ -816,7 +816,7 @@ empty string."
   "Reads a single line of input with line-editing."
   (let ((editor nil)
         (*linedit-redisplay-mode* :linedit-redisplay)
-        (hemlock::*synchronous-evaluation-of-slave-requests-in-the-master* t)
+        (hemlock::*synchronous-evaluation-of-agent-requests-in-the-master* t)
         (*linedit-buffers* nil))
     (hemlock:with-editor (:backend-type :mini :load-user-init nil)
       (setf editor (current-device))
@@ -1115,26 +1115,26 @@ to the appropriate home directory."
                     eof-value))
 
 (defcommand "Linedit Describe Symbol"
-    (p &optional (sym (hemlock::slave-symbol-at-point)))
+    (p &optional (sym (hemlock::agent-symbol-at-point)))
     "" ""
   (declare (ignore p))
   (newline (current-device))
   (let* ((marker 'eof)
          (sym (if sym
-                  (hemlock::resolve-slave-symbol sym)
+                  (hemlock::resolve-agent-symbol sym)
                   (inner-formedit "Describe symbol: " nil marker))))
     (unless (eq sym marker)
       (describe sym)
       (newline (current-device)))))
 
 (defcommand "Linedit Apropos"
-    (p &optional (sym (hemlock::slave-symbol-at-point)))
+    (p &optional (sym (hemlock::agent-symbol-at-point)))
     "" ""
   (declare (ignore p))
   (newline (current-device))
   (let* ((marker 'eof)
          (sym (if sym
-                  (hemlock::resolve-slave-symbol sym)
+                  (hemlock::resolve-agent-symbol sym)
                   (inner-formedit "Apropos symbol: " nil marker))))
     (unless (eq sym marker)
       (print-in-lines (current-device)
@@ -1160,10 +1160,10 @@ to the appropriate home directory."
                         (force-output)
                         (inner-linedit :prompt "Find definition for: ")))))
     (when (plusp (length default))
-      (let ((slavesym (hemlock::parse-slave-symbol default)))
+      (let ((agentsym (hemlock::parse-agent-symbol default)))
         (tty-excursion (lambda ()
                          (hemlock::find-definitions
-                          slavesym))
+                          agentsym))
                        :clear-screen-before-p :prompt
                        :split-screen-p t)))))
 
@@ -1216,7 +1216,7 @@ to the appropriate home directory."
         (newline device))))))
 
 (defcommand "Linedit Test"
-    (p &optional (sym (hemlock::slave-symbol-at-point)))
+    (p &optional (sym (hemlock::agent-symbol-at-point)))
     "" ""
   (declare (ignore p))
   (tty-excursion (lambda ()
@@ -1226,7 +1226,7 @@ to the appropriate home directory."
 ;; TTY-EXCURSION would be more effective if Unix terminals weren't that
 ;; useless.  Perhaps we should give up and do without it.
 (defcommand "Linedit Fuzzy Complete"
-    (p &optional (sym (hemlock::slave-symbol-at-point)))
+    (p &optional (sym (hemlock::agent-symbol-at-point)))
     "" ""
   (declare (ignore p))
   (tty-excursion (lambda ()

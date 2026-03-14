@@ -64,7 +64,7 @@
 
 ;;; Definition Editing Commands.
 
-;;; These commands use a slave Lisp to determine the file the function is
+;;; These commands use a agent Lisp to determine the file the function is
 ;;; defined in.  They do a synchronous evaluation of DEFIITION-EDITING-INFO.
 ;;; Then, in the editor Lisp, GO-TO-DEFINITION possibly translates the file
 ;;; name, finds the file, and tries to search for the defining form.
@@ -110,7 +110,7 @@
 
 (defhvar "Editor Definition Info"
   "When this is non-nil, the editor Lisp is used to determine definition
-   editing information; otherwise, the slave Lisp is used."
+   editing information; otherwise, the agent Lisp is used."
   :value nil)
 
 ;;; JDz: Brought here from eval-server.lisp, because this is used in
@@ -288,7 +288,7 @@
                  :name file-name))
 
 
-;;; DEFINITION-EDITING-INFO runs in a slave Lisp and returns the pathname
+;;; DEFINITION-EDITING-INFO runs in a agent Lisp and returns the pathname
 ;;; that the global definition of the symbol whose name is string is defined
 ;;; in.
 ;;;

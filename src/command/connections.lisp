@@ -247,12 +247,12 @@
    (exit-status :initform nil
                 :initarg :exit-status
                 :accessor connection-exit-status)
-   (slave-pty-name :initform nil
-                   :initarg :slave-pty-name
-                   :accessor connection-slave-pty-name)
-   (slave-fd :initform nil
-             :initarg :slave-fd
-             :accessor connection-slave-fd)
+   (agent-pty-name :initform nil
+                   :initarg :agent-pty-name
+                   :accessor connection-agent-pty-name)
+   (agent-fd :initform nil
+             :initarg :agent-fd
+             :accessor connection-agent-fd)
    (directory :initform nil
               :initarg :directory
               :accessor connection-directory)
@@ -263,9 +263,9 @@
 (defun make-process-connection
        (command
         &rest args
-        &key name buffer stream filter sentinel slave-pty-name slave-fd directory
+        &key name buffer stream filter sentinel agent-pty-name agent-fd directory
              environment)
-  (declare (ignore buffer stream filter sentinel slave-pty-name slave-fd directory
+  (declare (ignore buffer stream filter sentinel agent-pty-name agent-fd directory
                    environment))
   (apply #'make-instance
          (class-for *connection-backend* 'process-connection-mixin)
@@ -348,7 +348,7 @@
 (cffi:defcfun ("ptsname"      %ptsname)      :string (fd :int))
 
 (defun find-a-pty ()
-  "Allocate a PTY pair.  Returns (values master-fd slave-fd slave-name)."
+  "Allocate a PTY pair.  Returns (values master-fd agent-fd agent-name)."
   (let ((master (%posix-openpt sb-posix:o-rdwr)))
     (when (minusp master)
       (error "posix_openpt failed"))
@@ -358,21 +358,21 @@
     (when (minusp (%unlockpt master))
       (sb-posix:close master)
       (error "unlockpt failed"))
-    (let ((slave-name (%ptsname master)))
-      (unless slave-name
+    (let ((agent-name (%ptsname master)))
+      (unless agent-name
         (sb-posix:close master)
         (error "ptsname failed"))
-      (let ((slave (sb-posix:open slave-name sb-posix:o-rdwr)))
-        (values master slave slave-name)))))
+      (let ((agent (sb-posix:open agent-name sb-posix:o-rdwr)))
+        (values master agent agent-name)))))
 
 (defun make-process-with-pty-connection
     (command &key name (buffer nil bufferp) stream)
-  (multiple-value-bind (master slave slave-name)
+  (multiple-value-bind (master agent-fd agent-name)
       (find-a-pty)
     (let ((pc (make-process-connection command
-                                       :slave-pty-name slave-name
-                                       :slave-fd slave)))
-      (sb-posix:close slave)
+                                       :agent-pty-name agent-name
+                                       :agent-fd agent-fd)))
+      (sb-posix:close agent-fd)
       (make-pipelike-connection master
                                 master
                                 :name (or name (princ-to-string command))

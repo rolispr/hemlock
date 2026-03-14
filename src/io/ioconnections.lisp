@@ -196,7 +196,7 @@
 (defmethod initialize-instance :after
     ((instance process-connection/sb-sys) &key)
   (with-slots (read-fd write-fd process command directory
-               (slave-fd slave-fd)) instance
+               (agent-fd agent-fd)) instance
     (connection-note-event instance :initialized)
     (when (stringp command)
       (setf command (cl-ppcre:split " " command)))
@@ -204,7 +204,7 @@
     (assert command)
     (let* ((prog (car command))
            (args (cdr command)))
-      (if slave-fd
+      (if agent-fd
           (let* ((custom-env (connection-environment instance))
                  (env (or custom-env
                           (list* "TERM=dumb"
@@ -222,7 +222,7 @@
               (multiple-value-bind (envp envp-n) (alloc-c-string-array env)
                 (unwind-protect
                     (let ((pid (cffi:foreign-funcall "spawn_with_ctty"
-                                                     :int slave-fd
+                                                     :int agent-fd
                                                      :string "/bin/sh"
                                                      :pointer argv
                                                      :pointer envp
