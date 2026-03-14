@@ -21,7 +21,7 @@ build: src/tty/libspawn-ctty.$(SHLIB_EXT)
 		--eval '(asdf:load-system :hemlock)' \
 		--eval '(asdf:make :hemlock)'
 
-test:
+test: src/tty/libspawn-ctty.$(SHLIB_EXT)
 	$(SBCL) --non-interactive --load init.lisp \
 		--eval '(asdf:test-system :hemlock-tests)'
 
