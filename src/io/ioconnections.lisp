@@ -3,7 +3,7 @@
 ;;; Native backend: sb-sys event loop + sb-bsd-sockets + sb-ext:run-program.
 ;;; Replaces iolib entirely.
 
-(in-package :hemlock.tty)
+(in-package :hemlock.io)
 
 #+sbcl (declaim (optimize (speed 2)))
 

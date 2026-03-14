@@ -27,13 +27,13 @@
                   :command-line-arguments)
     :components
     ((:module wire
-              :pathname "src/"
+              :pathname "src/wire/"
               :depends-on ()
               :serial t
               :components
               ((:file "wire-package")
                (:file "port")
-               (:file "introspect")
+               (:file "introspect" :pathname "../introspect")
                (:file "wire")
                (:file "remote")))
      (:module core-1
@@ -41,12 +41,12 @@
               :depends-on (wire)
               :components
               ((:file "package")
-               (:file "lispdep" :depends-on ("package"))
-               (:file "hemlock-ext" :depends-on ("package"))
-               (:file "decls" :depends-on ("package"))
-               (:file "struct" :depends-on ("package"))
-               (:file "char-attrs" :depends-on ("package"))
-               (:file "key-event" :depends-on ("package" "char-attrs"))
+               (:file "lispdep" :pathname "text/lispdep" :depends-on ("package"))
+               (:file "hemlock-ext" :pathname "command/hemlock-ext" :depends-on ("package"))
+               (:file "decls" :pathname "text/decls" :depends-on ("package"))
+               (:file "struct" :pathname "text/struct" :depends-on ("package"))
+               (:file "char-attrs" :pathname "text/char-attrs" :depends-on ("package"))
+               (:file "key-event" :pathname "text/key-event" :depends-on ("package" "char-attrs"))
                ))
      (:module bitmap-1
               :pathname "src/"
@@ -54,27 +54,27 @@
               :components
               ((:file "keysym-defs")))
      (:module core-2
-              :pathname "src/"
+              :pathname "src/command/"
               :depends-on (bitmap-1 core-1)
               :serial t
               :components
               ((:file "rompsite")
                (:file "input")
                (:file "macros")
-               (:file "line")
-               (:file "ring")
-               (:file "text-primitives")
+               (:file "line" :pathname "../text/line")
+               (:file "ring" :pathname "../text/ring")
+               (:file "text-primitives" :pathname "../text/text-primitives")
                (:file "buffer")
                (:file "vars")
                (:file "key-dispatch")
                (:file "syntax")
-               (:file "text-ops")
-               (:file "text-insert")
-               (:file "text-delete")
+               (:file "text-ops" :pathname "../text/text-ops")
+               (:file "text-insert" :pathname "../text/text-insert")
+               (:file "text-delete" :pathname "../text/text-delete")
                (:file "files")
-               (:file "search1")
-               (:file "search2")
-               (:file "table")
+               (:file "search1" :pathname "../text/search1")
+               (:file "search2" :pathname "../text/search2")
+               (:file "table" :pathname "../text/table")
                (:file "winimage")
                (:file "window")
                (:file "screen")
@@ -83,35 +83,25 @@
                (:file "display")
                (:file "syntax-highlight")
                (:file "connections")
-               (:file "repl" :depends-on ("macros" "rompsite" "connections"))))
-     (:module ioconn
-              :pathname "src/tty/"
-              :depends-on (core-2 root-1)
-              :components
-              ((:file "ioconnections")))
+               (:file "repl" :pathname "../user/repl" :depends-on ("macros" "rompsite" "connections"))))
      (:module root-1
-              :pathname "src/"
+              :pathname "src/command/"
               :depends-on (core-2 core-1)
-              :components
-              ((:file "pop-up-stream")))
-     (:module root-2
-              :pathname "src/"
-              :depends-on (root-1 core-1 wire)
               :components
               ((:file "font")
                (:file "streams")
-               (:file "main")
-               (:file "prepl" :depends-on ("main"))
+               (:file "main" :pathname "../user/main")
+               (:file "prepl" :pathname "../user/prepl" :depends-on ("main"))
                (:file "echo")
                (:file "undo-system")))
      (:module core-3
-              :pathname "src/"
+              :pathname "src/command/"
               :depends-on (bitmap-1 core-1 core-2)
               :components
               ((:file "typeout")))
      (:module user-1
-              :pathname "src/"
-              :depends-on (root-2 core-1 wire)
+              :pathname "src/user/"
+              :depends-on (root-1 core-1 wire)
               :components
               ((:file "completion-source")
                (:file "echo-commands")
@@ -137,9 +127,9 @@
                (:file "eval-server")
                (:file "lisp-commands" :depends-on ("file-commands"))
                (:file "lispeval" :depends-on ("eval-server"))
-               (:file "spell-rt")
-               (:file "spell-corr" :depends-on ("spell-rt"))
-               (:file "spell-aug" :depends-on ("spell-corr"))
+               (:file "spell-rt" :pathname "../spell/spell-rt")
+               (:file "spell-corr" :pathname "../spell/spell-corr" :depends-on ("spell-rt"))
+               (:file "spell-aug" :pathname "../spell/spell-aug" :depends-on ("spell-corr"))
                (:file "spell-commands" :depends-on ("spell-aug" "file-commands"))
                (:file "comments")
                (:file "overwrite")
@@ -149,9 +139,8 @@
                (:file "edit-defs")
                (:file "auto-save")
                (:file "register")
-               (:file "x-commands")
                (:file "highlight")
-               (:file "dired")
+               (:file "dired" :pathname "../dired/dired")
                (:file "dired-commands" :depends-on ("dired"))
                (:file "buflist")
                (:file "connections-ui")

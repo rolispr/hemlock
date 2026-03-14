@@ -14,7 +14,8 @@
     ((:module tty-1
               :pathname "src/tty/"
               :components
-              ((:file "render")
+              ((:file "ioconnections")
+               (:file "render")
                (:file "terminfo")
                (:file "termcap" :depends-on ("terminfo"))
                (:file "output" :depends-on ("render"))

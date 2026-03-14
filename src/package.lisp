@@ -1865,6 +1865,22 @@
 (defpackage :hemlock-user
     (:use :common-lisp :hemlock))
 
+(defpackage :hemlock.io
+  (:use :common-lisp :hemlock.text :hemlock.command)
+  (:shadowing-import-from :hemlock.text #:char-code-limit)
+  (:export
+   ;; event loop — sb-sys backend methods
+   #:invoke-with-new-event-loop
+   #:make-event-loop
+   #:invoke-with-existing-event-loop
+   #:dispatch-events-with-backend
+   #:dispatch-events-no-hang-with-backend
+   #:dispatch-events-with-timeout-backend
+   #:invoke-later
+   #:drain-pending-invocations
+   ;; fd utilities
+   #:fd-readable-p))
+
 (defpackage :hemlock.terminfo
   (:use :common-lisp)
   (:export #:*terminfo-directories*
@@ -1876,7 +1892,7 @@
 
 (defpackage :hemlock.tty
   (:use :common-lisp :hemlock.text :hemlock.command :hemlock :hemlock.display
-        :trivial-gray-streams)
+        :hemlock.io :trivial-gray-streams)
   (:shadowing-import-from :hemlock.text #:char-code-limit)
   (:nicknames :tty))
 

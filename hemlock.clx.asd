@@ -15,6 +15,7 @@
               :pathname "src/clx/"
               :components
               ((:file "object-set")
+               (:file "pop-up-stream")
                (:file "device")
                (:file "drawing" :depends-on ("device"))
                (:file "site")
@@ -22,4 +23,5 @@
                (:file "display" :depends-on ("drawing"))
                (:file "screen")
                (:file "events")
-               (:file "typeout")))))
+               (:file "typeout")
+               (:file "x-commands")))))

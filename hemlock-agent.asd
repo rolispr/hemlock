@@ -26,9 +26,9 @@
     :pathname "src"
     :serial t
     :components
-    ((:file "wire-package")
-     (:file "port")
-     (:file "wire")
-     (:file "remote")
+    ((:file "wire-package" :pathname "wire/wire-package")
+     (:file "port" :pathname "wire/port")
+     (:file "wire" :pathname "wire/wire")
+     (:file "remote" :pathname "wire/remote")
      (:file "introspect")
      (:file "agent")))))
