@@ -30,8 +30,18 @@ jobs:
           sudo bash install.sh
           sbcl --version
 
-      - name: Install ocicl
-        run: curl -sL https://raw.githubusercontent.com/ocicl/ocicl/main/install.sh | bash
+      - name: Install ocicl (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wget -q https://github.com/ocicl/ocicl/releases/latest/download/ocicl_2.14.1-1_amd64.deb
+          sudo apt install -y ./ocicl_2.14.1-1_amd64.deb
+          ocicl setup
+
+      - name: Install ocicl (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install ocicl
+          ocicl setup
 
       - name: Install dependencies
         run: ocicl install
