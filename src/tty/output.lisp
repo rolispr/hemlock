@@ -84,7 +84,8 @@
   (defconstant cflag-vstart  8)
   (defconstant cflag-vstop   9)
   (defconstant cflag-vsusp  10)
-  (defconstant cflag-veol   11))
+  (defconstant cflag-veol   11)
+  (defconstant cflag-vmin   16))
 
 ;;; c_iflag bits
 #+darwin
