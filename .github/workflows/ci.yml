@@ -5,29 +5,31 @@ on:
     branches: [main]
   pull_request:
 
-env:
-  SBCL_VERSION: '2.5.9'
-
 jobs:
   test:
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
-            sbcl_arch: x86-64-linux
           - os: macos-latest
-            sbcl_arch: arm64-darwin
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install SBCL
+      - name: Install SBCL (Linux)
+        if: runner.os == 'Linux'
         run: |
           curl -fsSL -o sbcl.tar.bz2 \
-            "https://downloads.sourceforge.net/project/sbcl/sbcl/${{ env.SBCL_VERSION }}/sbcl-${{ env.SBCL_VERSION }}-${{ matrix.sbcl_arch }}-binary.tar.bz2"
+            "https://downloads.sourceforge.net/project/sbcl/sbcl/2.5.9/sbcl-2.5.9-x86-64-linux-binary.tar.bz2"
           tar xjf sbcl.tar.bz2
-          cd sbcl-${{ env.SBCL_VERSION }}-${{ matrix.sbcl_arch }}
+          cd sbcl-2.5.9-x86-64-linux
           sudo bash install.sh
+          sbcl --version
+
+      - name: Install SBCL (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install sbcl
           sbcl --version
 
       - name: Install ocicl (Linux)
