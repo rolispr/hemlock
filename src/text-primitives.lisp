@@ -67,7 +67,7 @@
   "Stuffs the characters in the currently open line back into the line they
   came from, and sets open-line to Nil."
   (when open-line
-    (hemlock-ext:without-interrupts
+    (without-interrupts
       (let* ((length (+ left-open-pos (- line-cache-length right-open-pos)))
              (string (make-string length)))
         (%sp-byte-blt open-chars 0 string 0 left-open-pos)
@@ -161,8 +161,8 @@
         (when *buffer-modified-notifier*
           (funcall *buffer-modified-notifier* buffer t)))
       (setf (buffer-modified-tick buffer) (tick)))
-    ;; FIXME: what is hemlock-ext:without-interrupts for?
-    (hemlock-ext:without-interrupts (funcall fun))))
+    ;; FIXME: what is without-interrupts for?
+    (without-interrupts (funcall fun))))
 
 (defmacro modifying-buffer (buffer &body forms)
   "Does groovy stuff for modifying buffers."

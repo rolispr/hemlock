@@ -196,7 +196,7 @@
 (defmethod initialize-instance :after
     ((instance process-connection/sb-sys) &key)
   (with-slots (read-fd write-fd process command directory
-               (slave-fd hemlock.command::slave-fd)) instance
+               (slave-fd slave-fd)) instance
     (connection-note-event instance :initialized)
     (when (stringp command)
       (setf command (cl-ppcre:split " " command)))
@@ -205,7 +205,7 @@
     (let* ((prog (car command))
            (args (cdr command)))
       (if slave-fd
-          (let* ((custom-env (hemlock.command::connection-environment instance))
+          (let* ((custom-env (connection-environment instance))
                  (env (or custom-env
                           (list* "TERM=dumb"
                                  (remove-if (lambda (s)

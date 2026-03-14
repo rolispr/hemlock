@@ -61,7 +61,7 @@
    If Ask-User is non-nil, Hemlock prompts the user for missing X, Y, Width,
    and Height arguments to make a new group of windows that behave in a stack
    orientation as windows do on the terminal.  This occurs by invoking
-   hi::*create-window-hook*.  X and Y are supplied as pixels, but Width and
+   *create-window-hook*.  X and Y are supplied as pixels, but Width and
    Height are supplied in characters."
 
   (let* ((device (or device (device-hunk-device (window-hunk (current-window)))))
@@ -74,7 +74,7 @@
 
 (defun delete-window (window)
   "Make Window go away, removing it from the screen.  This uses
-   hi::*delete-window-hook* to get rid of parent windows on a bitmap device
+   *delete-window-hook* to get rid of parent windows on a bitmap device
    when you delete the last Hemlock window in a group."
   (when (<= (length *window-list*) 2)
     (error "Cannot kill the only window."))

@@ -7,7 +7,7 @@
   "Grep results")
 
 (defcommand "Grep"
-    (p &optional (command (hi::prompt-for-string
+    (p &optional (command (prompt-for-string
                            :prompt "Run grep (like this): "
                            :default "grep -nH -e "))
                  (directory (default-directory)))

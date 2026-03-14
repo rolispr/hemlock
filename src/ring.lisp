@@ -35,7 +35,7 @@
   "Make a ring-buffer which can hold up to Size objects.  Delete-Function
   is a function which is called with each object that falls off the
   end."
-  (unless (and (hemlock-ext:fixnump size) (> size 0))
+  (unless (and (fixnump size) (> size 0))
     (error "Ring size, ~S is not a positive fixnum." size))
   (internal-make-ring :delete-function delete-function
                       :vector (make-array size)

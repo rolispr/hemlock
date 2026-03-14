@@ -6,9 +6,9 @@
 (in-package :hemlock)
 
 (defun delete-line-italic-marks (line)
-  (dolist (m (hi::line-marks line))
-    (when (and (hi::fast-font-mark-p m)
-               (eql (hi::font-mark-font m) 1))
+  (dolist (m (line-marks line))
+    (when (and (fast-font-mark-p m)
+               (eql (font-mark-font m) 1))
       (delete-font-mark m))))
 
 (defun set-comment-font (region font)

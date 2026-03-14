@@ -213,7 +213,7 @@
   (cond
    ((and (not always-overwrite-p)
          (let ((pn (probe-file pathname)))
-           (and pn (hemlock-ext:file-writable pn))))
+           (and pn (file-writable pn))))
     ;; File exists and is writable so check and see if the user really
     ;; wants to check it out.
     (command-case (:prompt
@@ -455,7 +455,7 @@
     (if (probe-file rcs-file)
         ;; This is an RCS file
         (let ((probe-file (probe-file pathname)))
-          (cond ((and probe-file (hemlock-ext:file-writable probe-file))
+          (cond ((and probe-file (file-writable probe-file))
                  :locked)
                 ((or (not probe-file)
                      (< (file-write-date pathname)

@@ -184,26 +184,26 @@
     (unwind-protect
         (progn
           #+echo-area-is-separate-window
-          (setf (current-window) hi::*echo-area-window*)
+          (setf (current-window) *echo-area-window*)
           (display-prompt-nicely "Describe key: " nil)
           (setf (fill-pointer *prompt-key*) 0)
           (loop
             (let ((key-event (get-key-event *editor-input*)))
               (vector-push-extend key-event *prompt-key*)
               (let ((res (get-command *prompt-key* :current)))
-                (hemlock-ext:print-pretty-key-event key-event *echo-area-stream*)
+                (print-pretty-key-event key-event *echo-area-stream*)
                 (write-char #\space *echo-area-stream*)
                 (finish-output *echo-area-stream*)
                 (cond ((commandp res)
                        (with-pop-up-display (s)
-                         (hemlock-ext:print-pretty-key (copy-seq *prompt-key*) s)
+                         (print-pretty-key (copy-seq *prompt-key*) s)
                          (format s " is bound to ~S.~%" (command-name res))
                          (format s "Documentation for this command:~%   ~A"
                                  (command-documentation res)))
                        (return))
                       ((not (eq res :prefix))
                        (with-pop-up-display (s :height 1)
-                         (hemlock-ext:print-pretty-key (copy-seq *prompt-key*) s)
+                         (print-pretty-key (copy-seq *prompt-key*) s)
                          (write-string " is not bound to anything." s))
                        (return)))))))
       #+echo-area-is-separate-window
@@ -236,7 +236,7 @@
         (let ((key (car b)))
           (declare (simple-vector key))
           (when (dotimes (i (length key) nil)
-                  (when (member (hemlock-ext:make-key-event (svref key i))
+                  (when (member (make-key-event (svref key i))
                                 (list #k"Leftdown" #k"Leftup" #k"Middledown"
                                       #k"Middleup" #k"Rightdown" #k"Rightup"))
                     (push cmd result)
@@ -381,7 +381,7 @@
 
 (defun key-to-string (key)
   (with-output-to-string (s)
-    (hemlock-ext:print-pretty-key key s)))
+    (print-pretty-key key s)))
 
 
 
@@ -396,7 +396,7 @@
       (format s "The last ~D characters typed:~%" num)
       (do ((i (1- num) (1- i)))
           ((minusp i))
-        (hemlock-ext:print-pretty-key-event (ring-ref *key-event-history* i) s)
+        (print-pretty-key-event (ring-ref *key-event-history* i) s)
         (write-char #\space s)))))
 
 (defun print-command-bindings (bindings stream)
@@ -434,6 +434,6 @@
 (defun print-some-keys (keys stream)
   (do ((key keys (cdr key)))
       ((null (cdr key))
-       (hemlock-ext:print-pretty-key (car key) stream))
-    (hemlock-ext:print-pretty-key (car key) stream)
+       (print-pretty-key (car key) stream))
+    (print-pretty-key (car key) stream)
     (write-string ", " stream)))

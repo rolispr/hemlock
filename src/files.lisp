@@ -53,7 +53,7 @@
                           :if-exists if-exists-action)
       (close-line)
       (fast-write-file region file))
-    (hemlock-ext:set-file-permissions pathname access)))
+    (set-file-permissions pathname access)))
 
 (defun fast-write-file (region file)
   (let* ((start (region-start region))

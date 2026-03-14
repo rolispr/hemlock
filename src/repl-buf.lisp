@@ -61,7 +61,7 @@
    before the fill-mark and the current input."
   (when (hemlock.wire:remote-object-p ts)
     (setf ts (hemlock.wire:remote-object-value ts)))
-  (hemlock-ext:without-interrupts
+  (without-interrupts
     (let ((mark (ts-data-fill-mark ts)))
       (cond ((and gratuitous-p (not (start-line-p mark)))
              (with-mark ((m mark :left-inserting))
@@ -304,7 +304,7 @@
       (editor-error "The slave is no longer alive."))
     (error "SEND-OOB-TO-SLAVE seeks an implementation.")
     #+NIL
-    (hemlock-ext:send-character-out-of-band socket (schar string 0))))
+    (send-character-out-of-band socket (schar string 0))))
 
 (defcommand "Clear Typescript Buffer" (p)
   "" ""

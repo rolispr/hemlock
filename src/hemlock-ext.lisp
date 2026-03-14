@@ -1,17 +1,16 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
+;;;
+;;; Framework-level definitions that were historically in hemlock-ext.
+;;; Now lives in hemlock.command where it belongs — hemlock-ext re-exports.
+;;;
 
-(in-package :hemlock-ext)
-
-(defconstant hi::char-code-limit 256)
-(defconstant char-code-limit 256)
+(in-package :hemlock.command)
 
 (defun skip-whitespace (&optional (stream *standard-input*))
   (peek-char t stream))
 
 (defun quit ()
   (uiop:quit))
-
-(defvar hi::*command-line-switches* nil)
 
 (defun default-directory ()
   (let* ((p (hemlock::buffer-default-directory (current-buffer)))
@@ -21,7 +20,7 @@
         (sb-posix:getcwd))))
 
 (defun find-buffer (name)
-  (getstring name hi::*buffer-names*))
+  (getstring name *buffer-names*))
 
 (defun maybe-rename-buffer (buffer new-name)
   (unless (find-buffer new-name)
@@ -38,20 +37,7 @@
   "Evaluates body in a context where events are handled for the display
    by calling handler on the display.  This destroys any previously established
    handler for display."
-  `(call-with-clx-event-handling (lambda () ,@body) ,display ,handler))
-
-
-(defun delq (item list)
-  (delete item list))
-
-(defun memq (item list)
-  (member item list))
-
-(defun assq (item alist)
-  (assoc item alist))
-
-(defun concat (&rest args)
-  (apply #'concatenate 'string args))
+  `(hemlock-ext::call-with-clx-event-handling (lambda () ,@body) ,display ,handler))
 
 
 ;;;; complete-file

@@ -76,11 +76,11 @@
              (completion-char-p (char string 2)))
     (let ((index (mod (logxor (ash
                                (logxor
-                                (ash (hi::search-hash-code (schar string 0))
+                                (ash (search-hash-code (schar string 0))
                                      5)
-                                (hi::search-hash-code (schar string 1)))
+                                (search-hash-code (schar string 1)))
                                3)
-                              (hi::search-hash-code (schar string 2)))
+                              (search-hash-code (schar string 2)))
                       completion-table-size)))
       (declare (fixnum index))
       (if value-p
@@ -211,7 +211,7 @@
    argument insert the character that many times."
   "Implements \"Completion Self Insert\". Calling this function is not
    meaningful."
-  (let ((char (hemlock-ext:key-event-char *last-key-event-typed*)))
+  (let ((char (key-event-char *last-key-event-typed*)))
     (unless char (editor-error "Can't insert that character."))
     (cond ((completion-char-p char)
            ;; If start of word not already in *completion-prefix*, put it

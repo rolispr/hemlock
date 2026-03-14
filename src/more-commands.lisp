@@ -418,7 +418,7 @@
               (eq (current-window) *echo-area-window*)
               (member window *random-typeout-buffers*
                       :key #'(lambda (cons)
-                               (hi::random-typeout-stream-window (cdr cons)))))
+                               (random-typeout-stream-window (cdr cons)))))
       (supply-generic-pointer-up-function #'do-nothing)
       (editor-error "I'm afraid I can't let you do that Dave."))
     (setf (current-window) window)
@@ -860,7 +860,7 @@
   "Insert the last character typed, or the argument number of them.
    If the last character was an alphabetic character, then insert its
    capital form."
-  (let ((char (char-upcase (hemlock-ext:key-event-char *last-key-event-typed*))))
+  (let ((char (char-upcase (key-event-char *last-key-event-typed*))))
     (if (and p (> p 1))
         (insert-string (current-point) (make-string p :initial-element char))
         (insert-character (current-point) char))))

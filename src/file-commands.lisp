@@ -368,7 +368,7 @@
    recovery options."
   (let* ((pathname (pathname pathname))
          (trial-pathname (or (probe-file pathname)
-                             (merge-pathnames pathname (hemlock-ext:default-directory))))
+                             (merge-pathnames pathname (default-directory))))
          (found (find trial-pathname (the list *buffer-list*)
                       :key #'buffer-pathname :test #'equal)))
     (cond ((not found)
@@ -484,7 +484,7 @@
     (buffer-start (buffer-point buffer))
     (setf (buffer-modified buffer) nil)
     (let ((stored-pathname (or probed-pathname
-                               (merge-pathnames pathname (hemlock-ext:default-directory)))))
+                               (merge-pathnames pathname (default-directory)))))
       (setf (buffer-pathname buffer) stored-pathname)
       (setf (value pathname-defaults) stored-pathname)
       (process-file-options buffer stored-pathname)
@@ -1316,8 +1316,8 @@
              (unwind-protect
                   (progn
                     (setf (current-window) *echo-area-window*)
-                    (hi::display-prompt-nicely "Quickselect? [?hrCcSb]")
-                    (hi::key-event-case
+                    (display-prompt-nicely "Quickselect? [?hrCcSb]")
+                    (key-event-case
                      ((#k"r") 'quickselect-slave-repl)
                      ((#k"?" #k"h") 'quickselect-help)
                      ((#k"C") 'coned-command)

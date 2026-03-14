@@ -1,7 +1,7 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;; Lisp implementation dependent stuff.
 
-(in-package :hemlock-ext)
+(in-package :hemlock.text)
 
 (defun getenv (name)
   (sb-ext:posix-getenv name))

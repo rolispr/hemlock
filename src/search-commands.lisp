@@ -264,7 +264,7 @@
 ;;; of the search.
 ;;;
 (defun %i-search-printed-char (key-event string point trailer direction failure)
-  (let ((tchar (hemlock-ext:key-event-char key-event)))
+  (let ((tchar (key-event-char key-event)))
     (unless tchar (editor-error "Not a text character -- ~S" (key-event-char
                                                               key-event)))
     (when (interactive)

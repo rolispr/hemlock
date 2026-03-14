@@ -224,7 +224,7 @@
            #\K #\L #\M #\N #\O #\P #\Q #\R #\S #\T
            #\U #\V #\W #\X #\Y #\Z)
         "Choose the labeled word as the correct spelling."
-          (let* ((key (hemlock-ext:key-event-char *last-key-event-typed*))
+          (let* ((key (key-event-char *last-key-event-typed*))
                  (num (digit-char-p key 36))
                  (close-words (spell:spell-collect-close-words folded)))
             (cond ((> num (length close-words))
@@ -322,7 +322,7 @@
           (finish-output s)
           (let* ((key-event (prompt-for-key-event
                              :prompt "Correction choice: "))
-                 (num (digit-char-p (hemlock-ext:key-event-char key-event) 36)))
+                 (num (digit-char-p (key-event-char key-event) 36)))
             (cond ((not num) (return-from get-word-correction nil))
                   ((> num (length close-words))
                    (editor-error "Choice out of range."))
@@ -530,7 +530,7 @@
            (write-line "There are no possible corrections.")
            (reprompt))
          (let ((num (if (= close-words-len 1) 0
-                        (digit-char-p (hemlock-ext:key-event-char
+                        (digit-char-p (key-event-char
                                        (prompt-for-key-event
                                         :prompt "Correction choice: "))
                                       36))))
@@ -548,7 +548,7 @@
         #\K #\L #\M #\N #\O #\P #\Q #\R #\S #\T
         #\U #\V #\W #\X #\Y #\Z)
        "Choose this labeled word as the correct spelling."
-         (let* ((key (hemlock-ext:key-event-char *last-key-event-typed*))
+         (let* ((key (key-event-char *last-key-event-typed*))
                 (num (digit-char-p key 36)))
             (cond ((> num close-words-len)
                    (editor-error "Choice out of range."))
@@ -586,11 +586,11 @@
                       res))
                    (t
                     (string-upcase new)))))
-    (hi::close-line)        
+    (close-line)
     (with-mark ((m mark :left-inserting))
       (delete-characters m (length old))
       (insert-string m res))
-    (hi::close-line)))
+    (close-line)))
 
 
 ;;;; User Spelling Dictionaries.

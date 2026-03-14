@@ -500,6 +500,12 @@
    #:translate-mouse-key-event
    #:print-pretty-key
    #:print-pretty-key-event
+
+   ;; lispdep.lisp — SBCL portability primitives
+   #:getenv
+   #:without-interrupts
+   #:fixnump
+   #:file-writable
    ))
 
 
@@ -914,6 +920,25 @@
    #:setup-initial-buffer
    ;; eval-server.lisp — used by lispeval.lisp
    #:eval-server-ready-p
+
+   ;; backend-facing internals (used by tty, term, webui backends)
+   #:slave-fd
+   #:connection-environment
+   #:*free-font-changes*
+   #:alloc-font-change
+
+   ;; hemlock-ext.lisp — framework operations (formerly in hemlock-ext package)
+   #:skip-whitespace
+   #:quit
+   #:default-directory
+   #:find-buffer
+   #:maybe-rename-buffer
+   #:rename-buffer-uniquely
+   #:with-clx-event-handling
+   #:complete-file
+   #:complete-file-directory
+   #:ambiguous-files
+   #:set-file-permissions
    ))
 
 
@@ -1423,48 +1448,79 @@
    #:make-descriptor-connection
    #:listening-connection
    #:make-tcp-listener
-   #:make-connection-device)
+   #:make-connection-device
+
+   ;; From hemlock.text — portability primitives (lispdep.lisp)
+   #:without-interrupts
+   #:getenv
+   #:fixnump
+   #:file-writable
+
+   ;; From hemlock.text — key event API
+   #:define-keysym #:define-mouse-keysym #:name-keysym #:keysym-names
+   #:keysym-preferred-name #:define-key-event-modifier #:define-clx-modifier
+   #:make-key-event-bits #:key-event-modifier-mask #:key-event-bits-modifiers
+   #:*all-modifier-names* #:translate-mouse-key-event
+   #:make-key-event #:key-event #:key-event-p #:key-event-bits #:key-event-keysym
+   #:char-key-event #:key-event-char #:key-event-bit-p #:do-alpha-key-events
+   #:print-pretty-key #:print-pretty-key-event
+
+   ;; From hemlock.text — list utilities
+   #:delq #:memq #:assq
+
+   ;; From hemlock.command — framework operations (hemlock-ext.lisp)
+   #:concat
+   #:quit
+   #:skip-whitespace
+   #:default-directory
+   #:find-buffer
+   #:maybe-rename-buffer
+   #:rename-buffer-uniquely
+   #:with-clx-event-handling
+   #:complete-file
+   #:complete-file-directory
+   #:ambiguous-files
+   #:set-file-permissions)
   (:import-from :hemlock.wire #:dispatch-events #:dispatch-events-no-hang)
   (:export #:dispatch-events #:dispatch-events-no-hang #:dispatch-events-timeout))
 
 
 (defpackage :hemlock-ext
-  (:use :common-lisp
-        :hemlock-interface)
-  (:shadow #:char-code-limit)
-  ;; Import key-event symbols from hemlock.text for backward compat
-  (:import-from :hemlock.text
-                #:key-event #:key-event-p #:key-event-bits #:key-event-keysym
-                #:char-key-event #:key-event-char #:key-event-bit-p #:do-alpha-key-events
-                #:make-key-event #:make-key-event-bits #:key-event-modifier-mask
-                #:key-event-bits-modifiers #:define-key-event-modifier
-                #:*all-modifier-names* #:translate-mouse-key-event
-                #:define-keysym #:define-mouse-keysym #:name-keysym #:keysym-names
-                #:keysym-preferred-name #:print-pretty-key #:print-pretty-key-event)
-  ;;
+  (:use :common-lisp :hemlock-interface)
+  (:shadowing-import-from :hemlock-interface #:char-code-limit)
   (:export
+   ;; Re-exported from hemlock-interface — portability primitives
    #:without-interrupts
-   #:define-setf-method
    #:getenv
-
-   #:delq #:memq #:assq
-   #:concat
    #:fixnump
    #:file-writable
 
+   ;; Re-exported from hemlock-interface — key event API
    #:define-keysym #:define-mouse-keysym #:name-keysym #:keysym-names
    #:keysym-preferred-name #:define-key-event-modifier #:define-clx-modifier
    #:make-key-event-bits #:key-event-modifier-mask #:key-event-bits-modifiers
-   #:*all-modifier-names* #:translate-key-event #:translate-mouse-key-event
+   #:*all-modifier-names* #:translate-mouse-key-event
    #:make-key-event #:key-event #:key-event-p #:key-event-bits #:key-event-keysym
    #:char-key-event #:key-event-char #:key-event-bit-p #:do-alpha-key-events
    #:print-pretty-key #:print-pretty-key-event
 
-   ;; hemlock-ext.lisp
-   #:disable-clx-event-handling
+   ;; Re-exported from hemlock-interface — list utilities
+   #:delq #:memq #:assq
+
+   ;; Re-exported from hemlock-interface — framework operations
+   #:concat
    #:quit
-   #:serve-event
-   #:sap-ref-8
+   #:default-directory
+   #:find-buffer
+   #:maybe-rename-buffer
+   #:rename-buffer-uniquely
+   #:with-clx-event-handling
+   #:complete-file
+   #:ambiguous-files
+   #:set-file-permissions
+   #:skip-whitespace
+
+   ;; CLX object-set infrastructure (defined in clx/object-set.lisp, still in-package hemlock-ext)
    #:make-object-set
    #:default-clx-event-handler
    #:serve-exposure
@@ -1483,13 +1539,16 @@
    #:serve-button-release
    #:serve-enter-notify
    #:serve-leave-notify
+
+   ;; CLX event handling (defined via fdefinition in clx/events.lisp)
+   #:disable-clx-event-handling
    #:flush-display-events
    #:object-set-event-handler
-   #:with-clx-event-handling
-   #:complete-file
-   #:default-directory
-   #:set-file-permissions
-   #:ambiguous-files
+   #:translate-key-event
+
+   ;; System-level re-exports
+   #:serve-event
+   #:sap-ref-8
    #:print-directory
    ))
 
@@ -1498,7 +1557,8 @@
         :command-line-arguments
         :trivial-gray-streams)
   (:nicknames :hi)
-  (:shadow #:char-code-limit #:show-option-help)
+  (:shadowing-import-from :hemlock.text #:char-code-limit)
+  (:shadow #:show-option-help)
   (:shadowing-import-from :hemlock-ext #:concat)
   ;;
   (:export

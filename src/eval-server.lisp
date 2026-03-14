@@ -50,7 +50,7 @@
    server-info structures.")
 
 (defun list-server-infos ()
-  (hi::map-string-table 'list #'identity *server-names*))
+  (map-string-table 'list #'identity *server-names*))
 
 (defvar *abort-operations* nil
   "T iff we should ignore any operations sent to us.")
@@ -371,7 +371,7 @@
     (let ((server-info (make-buffers-for-typescript slave background)))
       (bt:make-thread
        (let ((editor-name (get-editor-name))
-             (backend-type hi::*default-backend*))
+             (backend-type *default-backend*))
          (lambda ()
            (macrolet ((rebinding ((&rest vars) &body body)
                         `(let ,(mapcar (lambda (var)
@@ -474,12 +474,12 @@
 (defun slave-command-with-arguments (&optional (prefix *slave-command*))
   (append prefix
           (list "--editor" (get-editor-name)
-                "--backend" (symbol-name hi::*default-backend*))))
+                "--backend" (symbol-name *default-backend*))))
 
 (defun prompt-for-slave-command ()
   (cl-ppcre:split
    " "
-   (hemlock-interface::prompt-for-string
+   (prompt-for-string
     :prompt "Command: "
     :default (format nil "~{~A~^ ~}"
                      (slave-command-with-arguments)))))
@@ -740,11 +740,11 @@
 
 (defun install-special-variables-for-background-threads ()
   (install-thread-variable-default
-   'hi::*connection-backend*
-   (constantly hi::*connection-backend*))
+   '*connection-backend*
+   (constantly *connection-backend*))
   (install-thread-variable-default
-   'hi::*default-backend*
-   (constantly hi::*default-backend*))
+   '*default-backend*
+   (constantly *default-backend*))
   (install-thread-variable-default
    '*original-terminal-io*
    (constantly *original-terminal-io*)))
@@ -758,9 +758,9 @@
              slave
              slave-buffer
              background-buffer
-             (backend-type hi::*default-backend*))
+             (backend-type *default-backend*))
   (assert slave)
-  (let ((hi::*connection-backend*
+  (let ((*connection-backend*
          (ecase backend-type
            (:qt :qt)
            ((:tty :clx :mini) :sb-sys)))
@@ -785,7 +785,7 @@
              (invoke-debugger c))))
       (setf *master-machine-and-port* (list machine port))
       (format t "Connecting to ~A:~D~%" machine port)
-      (hi::with-new-event-loop ()
+      (with-new-event-loop ()
         (let ((hemlock.wire::*current-wire* :wire-not-yet-known))
           (connect-to-editor machine port slave-buffer background-buffer)
           (dispatch-events-no-hang)
@@ -887,7 +887,7 @@
     (setf (server-info-implementation-version server-info) version)
     (let* ((buf (ts-data-buffer slave-info))
            (name (format nil "~A ~A" (buffer-name buf) type)))
-      (hemlock-ext::maybe-rename-buffer buf name))
+      (maybe-rename-buffer buf name))
     (values (hemlock.wire:make-remote-object slave-info)
             (hemlock.wire:make-remote-object background-info))))
 
@@ -1155,7 +1155,7 @@
 ;;;;
 
 (defcommand "Start Swank Server"
-    (p &optional (port (hemlock-interface::prompt-for-integer
+    (p &optional (port (prompt-for-integer
                         :prompt "Port: "
                         :default-string "4005")))
   "" ""

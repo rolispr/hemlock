@@ -124,7 +124,7 @@ Non-nil means we are inside master-agent-debugger.")
   "Invoke the numbered restart."
   (let ((n (or p
                (digit-char-p
-                (hemlock-ext:key-event-char *last-key-event-typed*)))))
+                (key-event-char *last-key-event-typed*)))))
     (when n
       (cond
         ;; Master-process error: invoke restart directly (non-local exit).
@@ -191,7 +191,7 @@ Returns the chosen restart index (integer) or NIL for abort."
         (progn
           (change-to-buffer buf)
           (restart-case
-              (hemlock.command::%command-loop)
+              (%command-loop)
             (debugger-chose (n)
               :report "Debugger restart chosen"
               n)))
@@ -222,6 +222,6 @@ Must be called from within a handler-bind that caught CONDITION so restarts rema
     (unwind-protect
         (progn
           (change-to-buffer buf)
-          (hemlock.command::%command-loop))
+          (%command-loop))
       (when (member prev-buffer *buffer-list*)
         (change-to-buffer prev-buffer)))))

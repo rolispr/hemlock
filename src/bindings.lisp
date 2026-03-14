@@ -27,7 +27,7 @@
 
 ;;; Self insert letters:
 ;;;
-(hemlock-ext:do-alpha-key-events (key-event :both)
+(do-alpha-key-events (key-event :both)
                                  (bind-key "Self Insert" key-event))
 
 (bind-key "Beginning of Line" #k"control-a")
@@ -487,7 +487,7 @@
 ;;; Do up the printing characters ...
 (do ((i 33 (1+ i)))
     ((= i 126))
-  (let ((key-event (hemlock-ext:char-key-event (code-char i))))
+  (let ((key-event (char-key-event (code-char i))))
     (bind-key "Self Overwrite" key-event :mode "Overwrite")))
 
 (bind-key "Self Overwrite" #k"space" :mode "Overwrite")
@@ -531,7 +531,7 @@
 ;;;
 #+port-user-mh
 (progn
-(hemlock-ext:do-alpha-key-events (key-event :both)
+(do-alpha-key-events (key-event :both)
                                  (bind-key "Illegal" key-event :mode "Headers")
                                  (bind-key "Illegal" key-event :mode "Message"))
 
@@ -623,7 +623,7 @@
 ;;;
 #+port-user-netnews
 (progn
-(hemlock-ext:do-alpha-key-events (key-event :both)
+(do-alpha-key-events (key-event :both)
                                  (bind-key "Illegal" key-event :mode "News-Headers")
                                  (bind-key "Illegal" key-event :mode "News-Message"))
 
@@ -890,7 +890,7 @@
 
 ;;;; Caps-Lock mode.
 
-(hemlock-ext:do-alpha-key-events (key-event :lower)
+(do-alpha-key-events (key-event :lower)
                                  (bind-key "Self Insert Caps Lock" key-event :mode "CAPS-LOCK"))
 
 

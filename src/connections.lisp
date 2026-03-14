@@ -63,7 +63,7 @@
               ;; note the space in the buffer name
               (format nil " *Connection ~A*" (connection-name instance))
               :delete-hook (list #'delete-hook))))
-      (hi::buffer
+      (buffer
        (push #'delete-hook (buffer-delete-hook buffer)))
       (null)
       (t

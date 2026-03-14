@@ -102,40 +102,40 @@
     :documentation "X gcontext for xwindow.")))
 
 (defun bitmap-hunk-height (hunk)
-  (hi::device-hunk-height hunk))
+  (device-hunk-height hunk))
 
 (defun (setf bitmap-hunk-height) (value hunk)
-  (setf (hi::device-hunk-height hunk) value))
+  (setf (device-hunk-height hunk) value))
 
 (defun bitmap-hunk-window (hunk)
-  (hi::device-hunk-window hunk))
+  (device-hunk-window hunk))
 
 (defun (setf bitmap-hunk-window) (value hunk)
-  (setf (hi::device-hunk-window hunk) value))
+  (setf (device-hunk-window hunk) value))
 
 (defun bitmap-hunk-previous (hunk)
-  (hi::device-hunk-previous hunk))
+  (device-hunk-previous hunk))
 
 (defun (setf bitmap-hunk-previous) (value hunk)
-  (setf (hi::device-hunk-previous hunk) value))
+  (setf (device-hunk-previous hunk) value))
 
 (defun bitmap-hunk-next (hunk)
-  (hi::device-hunk-next hunk))
+  (device-hunk-next hunk))
 
 (defun (setf bitmap-hunk-next) (value hunk)
-  (setf (hi::device-hunk-next hunk) value))
+  (setf (device-hunk-next hunk) value))
 
 (defun bitmap-hunk-device (hunk)
-  (hi::device-hunk-device hunk))
+  (device-hunk-device hunk))
 
 (defun (setf bitmap-hunk-device) (value hunk)
-  (setf (hi::device-hunk-device hunk) value))
+  (setf (device-hunk-device hunk) value))
 
 (defun bitmap-hunk-position (hunk)
-  (hi::device-hunk-position hunk))
+  (device-hunk-position hunk))
 
 (defun (setf bitmap-hunk-position) (value hunk)
-  (setf (hi::device-hunk-position hunk) value))
+  (setf (device-hunk-position hunk) value))
 
 (defun make-bitmap-hunk (&rest initargs)
   (apply #'make-instance 'x11-hunk initargs))

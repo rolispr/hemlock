@@ -29,7 +29,7 @@
   (un-event key-event stream))
 
 (defmethod clear-editor-input ((stream tty-editor-input))
-  (hemlock-ext:without-interrupts
+  (without-interrupts
    (let* ((head (editor-input-head stream))
           (next (input-event-next head)))
      (when next
@@ -209,7 +209,7 @@
   (let ((string (coerce data 'string)))
     (or (gethash string *tty-translations*)
         (when (= 1 (length string))
-          (hemlock-ext:char-key-event (char string 0))))))
+          (char-key-event (char string 0))))))
 
 ;;; Bracketed paste markers (xterm protocol).
 (defvar +paste-begin+ (coerce #(#\Esc #\[ #\2 #\0 #\0 #\~) 'string))
@@ -302,7 +302,7 @@
                  (if end-pos
                      (progn
                        (loop for i from content-start below end-pos
-                             for event = (hemlock-ext:char-key-event (char data i))
+                             for event = (char-key-event (char data i))
                              when event do (q-event *real-editor-input* event))
                        (setf start (+ end-pos +paste-end-length+)))
                      (incf start +paste-begin-length+))))

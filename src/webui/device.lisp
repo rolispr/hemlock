@@ -6,7 +6,7 @@
 (in-package :hemlock.webui)
 
 ;;; Register the backend.
-(pushnew :webui hemlock.command::*available-backends*)
+(pushnew :webui *available-backends*)
 
 ;;;; Device class
 

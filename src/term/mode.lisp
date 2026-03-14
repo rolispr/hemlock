@@ -191,11 +191,11 @@
                       ((null current)
                        (setf (dis-line-font-changes dis-line) nil)
                        (shiftf (font-change-next prev)
-                               hemlock.command::*free-font-changes* changes))
+                               *free-font-changes* changes))
                     (setf (font-change-mark current) nil))))
               (let ((head nil) (tail nil))
                 (dolist (fi font-info)
-                  (let ((node (hemlock.command::alloc-font-change
+                  (let ((node (alloc-font-change
                                (cadr fi) (car fi) nil)))
                     (if tail
                         (setf (font-change-next tail) node
@@ -296,7 +296,7 @@
   "Send the last typed key to the terminal process."
   "Send the last typed key to the terminal process."
   (declare (ignore p))
-  (let ((char (hemlock-ext:key-event-char *last-key-event-typed*)))
+  (let ((char (key-event-char *last-key-event-typed*)))
     (when char
       (terminal-send (string char)))))
 
@@ -353,7 +353,7 @@
   "Read the next key and send it literally to the terminal."
   (declare (ignore p))
   (let* ((ev (get-key-event *editor-input* t))
-         (char (hemlock-ext:key-event-char ev)))
+         (char (key-event-char ev)))
     (when char
       (terminal-send (string char)))))
 
@@ -419,7 +419,7 @@
                   #\= #\+ #\[ #\] #\{ #\} #\\ #\| #\; #\: #\' #\"
                   #\, #\. #\< #\> #\/ #\? #\` #\~
                   #\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9))
-  (let ((ke (hemlock-ext:char-key-event ch)))
+  (let ((ke (char-key-event ch)))
     (when ke (bind-key "Terminal Send Self" ke :mode "Terminal"))))
 
 (bind-key "Terminal Send Return" #k"return" :mode "Terminal")

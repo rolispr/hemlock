@@ -110,7 +110,7 @@
 (defun key-vector-to-string (key-vector)
   (let ((string (make-array (length key-vector) :element-type 'base-char)))
     (dotimes (i (length key-vector) string)
-      (setf (aref string i) (hemlock-ext:key-event-char (aref key-vector i))))))
+      (setf (aref string i) (key-event-char (aref key-vector i))))))
 
 (defun self-insert-kbdmac-transform (command key)
   (case key
@@ -126,7 +126,7 @@
          (kbdmac-emit `(insert-string-at-point
                         ,(key-vector-to-string *kbdmac-text*)))
          (kbdmac-emit `(insert-character-at-point
-                        ,(hemlock-ext:key-event-char (aref *kbdmac-text* 0))))))))
+                        ,(key-event-char (aref *kbdmac-text* 0))))))))
 ;;;
 (define-kbdmac-transform "Self Insert" #'self-insert-kbdmac-transform)
 (define-kbdmac-transform "Lisp Insert )" #'self-insert-kbdmac-transform)
@@ -342,7 +342,7 @@
                       (define-keyboard-macro))
         (bind-key name key kind where)
         (message "~A bound to ~A."
-                 (with-output-to-string (s) (hemlock-ext:print-pretty-key key s))
+                 (with-output-to-string (s) (print-pretty-key key s))
                  name)))))
 
 ;;; GET-KEYBOARD-MACRO-KEY gets a key from the user and confirms clobbering it
@@ -362,7 +362,7 @@
                (if (prompt-for-y-or-n
                     :prompt `("~A is bound to ~A.  Rebind it? "
                               ,(with-output-to-string (s)
-                                 (hemlock-ext:print-pretty-key key s))
+                                 (print-pretty-key key s))
                               ,(command-name cmd))
                     :default nil)
                    (values key kind where)
@@ -372,7 +372,7 @@
                     :prompt `("~A is a prefix for more than one command.  ~
                                Clobber it? "
                               ,(with-output-to-string (s)
-                                 (hemlock-ext:print-pretty-key key s)))
+                                 (print-pretty-key key s)))
                     :default nil)
                    (values key kind where)
                    nil)))))))

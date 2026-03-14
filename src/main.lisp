@@ -73,20 +73,20 @@ GB
 ;;; table.lisp which defines MAKE-STRING-TABLE.
 ;;;
 ;;; vars.lisp
-(defvar hemlock.command::*global-variable-names* (make-string-table)
+(defvar *global-variable-names* (make-string-table)
   "A String Table of global variable names, the values are the symbol names.")
 ;;;
 ;;; buffer.lisp
-(defvar hemlock.command::*mode-names* (make-string-table) "A String Table of Mode names.")
+(defvar *mode-names* (make-string-table) "A String Table of Mode names.")
 ;; *buffer-names* is declared in buffer.lisp (defvar nil); initialize it here
 ;; once make-string-table (from table.lisp) is available.
-(setf hemlock.command::*buffer-names* (make-string-table))
+(setf *buffer-names* (make-string-table))
 ;;;
 ;;; interp.lisp
-(defvar hemlock.command::*command-names* (make-string-table) "String table of command names.")
+(defvar *command-names* (make-string-table) "String table of command names.")
 ;;;
 ;;; syntax.lisp
-(defvar hemlock.command::*character-attribute-names* (make-string-table)
+(defvar *character-attribute-names* (make-string-table)
  "String Table of character attribute names and their corresponding keywords.")
 
 

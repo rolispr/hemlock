@@ -84,7 +84,7 @@
       (when (= try-pos key-len) (return))
       (let ((key-event (aref key try-pos)))
         (vector-push-extend
-         (hemlock-ext:make-key-event key-event (logior (hemlock-ext:key-event-bits key-event)
+         (make-key-event key-event (logior (key-event-bits key-event)
                                                prefix))
          temp)
         (setf prefix 0))
@@ -125,7 +125,7 @@
       (hash-table :prefix)
       ((or simple-vector null) entry)
       (integer
-       (cons :bits (hemlock-ext:key-event-bits-modifiers entry))))))
+       (cons :bits (key-event-bits-modifiers entry))))))
 
 ;;; (SETF KEY-TRANSLATION)  --  Internal
 ;;;
@@ -133,7 +133,7 @@
   "Set the key translation for a key.  If set to null, deletes any
    translation."
   (let ((entry (cond ((and (consp new-value) (eq (car new-value) :bits))
-                      (apply #'hemlock-ext:make-key-event-bits (cdr new-value)))
+                      (apply #'make-key-event-bits (cdr new-value)))
                      (new-value (crunch-key new-value))
                      (t new-value))))
     (set-table-entry *key-translations* (crunch-key key) entry)
@@ -173,11 +173,11 @@
 ;;;
 (defun crunch-key (key)
   (typecase key
-    (hemlock-ext:key-event (vector key))
+    (key-event (vector key))
     ((or list vector) ;List thrown in gratuitously.
      (when (zerop (length key))
        (error "A zero length key is illegal."))
-     (unless (every #'hemlock-ext:key-event-p key)
+     (unless (every #'key-event-p key)
        (error "A Key ~S must contain only key-events." key))
      (coerce key 'simple-vector))
     (t
@@ -433,7 +433,7 @@
             (unless (listen-editor-input *editor-input*)
               (clear-echo-area)
               (dotimes (i (length cmd))
-                (hemlock-ext:print-pretty-key (aref cmd i) *echo-area-stream*)
+                (print-pretty-key (aref cmd i) *echo-area-stream*)
                 (write-char #\space *echo-area-stream*)))))
         (vector-push-extend (get-key-event *editor-input*) cmd)
         (multiple-value-bind (trans-result prefix-p)

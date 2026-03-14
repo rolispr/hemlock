@@ -385,7 +385,7 @@
 
 (defun read-chord ()
   (let ((*linedit-redisplay-mode* :no-redisplay))
-    (hemlock-ext:key-event-char (get-key-event *editor-input* t))))
+    (key-event-char (get-key-event *editor-input* t))))
 
 (defmethod page ((backend linedit-device))
   (device-write-string "--more--")
@@ -1321,7 +1321,7 @@ to the appropriate home directory."
                                 trailer
                                 direction
                                 failure)
-  (cond ((let ((character (hemlock-ext:key-event-char key-event)))
+  (cond ((let ((character (key-event-char key-event)))
            (and character (standard-char-p character)))
          (%line-isearch-printed-char key-event
                                      string
@@ -1441,9 +1441,9 @@ to the appropriate home directory."
 ;;; of the search.
 ;;;
 (defun %line-isearch-printed-char (key-event string point trailer direction failure)
-  (let ((tchar (hemlock-ext:key-event-char key-event)))
+  (let ((tchar (key-event-char key-event)))
     (unless tchar (editor-error "Not a text character -- ~S"
-                                (hemlock-ext:key-event-char key-event)))
+                                (key-event-char key-event)))
     (when (interactive)
       (insert-character (buffer-point *echo-area-buffer*) tchar)
       (force-output *echo-area-stream*))

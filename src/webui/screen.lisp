@@ -92,8 +92,14 @@ function _getGridSize() {
   var ctx = canvas.getContext('2d');
   ctx.font = style.fontWeight + ' ' + fs + 'px ' + style.fontFamily;
   var cw = ctx.measureText('M').width || 8;
-  var cols = Math.max(20, Math.floor(window.innerWidth / cw));
-  var rows = Math.max(4,  Math.floor(window.innerHeight / lh));
+  var rect = el.getBoundingClientRect();
+  var cols = Math.max(20, Math.floor(rect.width / cw));
+  var mainRows = Math.floor(rect.height / lh);
+  var fixedPx = 0;
+  document.querySelectorAll('.hem-echo, .hem-ml').forEach(function(e) {
+    fixedPx += e.getBoundingClientRect().height;
+  });
+  var rows = Math.max(4, mainRows + Math.round(fixedPx / lh));
   return cols + ' ' + rows;
 }
 function _measureGrid() {
@@ -124,7 +130,7 @@ window.addEventListener('resize', _measureGrid);
 
 ;;;; backend-init-raw-io
 
-(defmethod hemlock.command::backend-init-raw-io ((backend (eql :webui)) display)
+(defmethod backend-init-raw-io ((backend (eql :webui)) display)
   (declare (ignore display))
   (setf *editor-windowed-input* nil)
   (multiple-value-bind (r w) (sb-posix:pipe)
@@ -136,7 +142,7 @@ window.addEventListener('resize', _measureGrid);
 
 ;;;; %init-screen-manager
 
-(defmethod hemlock.command::%init-screen-manager ((backend-type (eql :webui)) (display t))
+(defmethod %init-screen-manager ((backend-type (eql :webui)) (display t))
   (let ((device (make-instance 'webui-device :name "webui")))
     (setf (webui-device-pipe-read-fd  device) *webui-pipe-read-fd*)
     (setf (webui-device-pipe-write-fd device) *webui-pipe-write-fd*)
@@ -147,7 +153,7 @@ window.addEventListener('resize', _measureGrid);
 
 (defun init-webui-screen-manager (device)
   (setf *webui-device* device)
-  (setf hemlock.command::*line-wrap-char* #\!)
+  (setf *line-wrap-char* #\!)
   (setf *window-list* ())
   (let* ((width           (webui-device-columns device))
          (height          (webui-device-lines   device))
@@ -540,7 +546,7 @@ Nuke all active lines back to spare, reallocate if wider, and rebuild modeline."
       (dolist (w *window-list*)
         (when (fboundp 'hemlock::terminal-resize-to-window)
           (funcall 'hemlock::terminal-resize-to-window (window-buffer w) w))))
-    (setf hemlock.command::*screen-image-trashed* t)))
+    (setf *screen-image-trashed* t)))
 
 
 ;;;; Resize callback (called from webui thread)

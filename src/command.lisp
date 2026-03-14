@@ -42,7 +42,7 @@
   "Insert the last character typed.
   With prefix argument insert the character that many times."
   "Implements ``Self Insert'', calling this function is not meaningful."
-  (let ((char (hemlock-ext:key-event-char *last-key-event-typed*)))
+  (let ((char (key-event-char *last-key-event-typed*)))
     (unless char (editor-error "Can't insert that character."))
     (if (and p (> p 1))
         (insert-string
@@ -54,7 +54,7 @@
   "Read a character from the terminal and insert it.
   With prefix argument, insert the character that many times."
   "Reads a key-event from *editor-input* and inserts it at the point."
-  (let ((char (hemlock-ext:key-event-char (get-key-event *editor-input* t)))
+  (let ((char (key-event-char (get-key-event *editor-input* t)))
         (point (current-point)))
     (unless char (editor-error "Can't insert that character."))
     (if (and p (> p 1))
@@ -409,7 +409,7 @@
   (write-string "C-U " *echo-area-stream*)
   (finish-output *echo-area-stream*)
   (let* ((key-event (get-key-event *editor-input*))
-         (char (hemlock-ext:key-event-char key-event)))
+         (char (key-event-char key-event)))
     (if char
         (case char
           (#\-
@@ -454,8 +454,8 @@
               (if read-some-digit-p
                   result
                   (value universal-argument-default)))))
-    (let* ((stripped-key-event (if key-event (hemlock-ext:make-key-event key-event)))
-           (char (hemlock-ext:key-event-char stripped-key-event))
+    (let* ((stripped-key-event (if key-event (make-key-event key-event)))
+           (char (key-event-char stripped-key-event))
            (digit (if char (digit-char-p char)))
            (result 0)
            (read-some-digit-p nil))
@@ -467,8 +467,8 @@
                (setf result (+ digit (* 10 result)))
                (setf key-event (get-key-event *editor-input*))
                (setf stripped-key-event (if key-event
-                                            (hemlock-ext:make-key-event key-event)))
-               (setf char (hemlock-ext:key-event-char stripped-key-event))
+                                            (make-key-event key-event)))
+               (setf char (key-event-char stripped-key-event))
                (setf digit (if char (digit-char-p char))))
               ((or (eq key-event #k"C-u") (eq key-event #k"C-U"))
                (write-string " C-U " *echo-area-stream*)

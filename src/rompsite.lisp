@@ -276,7 +276,7 @@
 (defun hemlock-gc-notify-before (bytes-in-use)
   (let ((control "~%[GC threshold exceeded with ~:D bytes in use.  ~
                   Commencing GC.]~%"))
-    (cond ((not hi::*editor-windowed-input*)
+    (cond ((not *editor-windowed-input*)
            (beep)
            #|(message control bytes-in-use)|#)
           (t
@@ -289,7 +289,7 @@
   (let ((control
          "[GC completed with ~:D bytes retained and ~:D bytes freed.]~%~
           [GC will next occur when at least ~:D bytes are in use.]~%"))
-    (cond ((not hi::*editor-windowed-input*)
+    (cond ((not *editor-windowed-input*)
            (beep)
            #|(message control bytes-retained bytes-freed)|#)
           (t
@@ -327,7 +327,7 @@
          (cond ((not *editor-windowed-input*)
                 ,@body)
                (t
-                (hemlock-ext:with-clx-event-handling
+                (with-clx-event-handling
                     (*editor-windowed-input* #'hemlock-ext:object-set-event-handler)
                   ,@body)))))
      (when *current-window*
@@ -421,7 +421,7 @@
                  (funcall (tq-event-function event)
                           (round (- time (tq-event-last-time event))
                                  internal-time-units-per-second)))
-               (hemlock-ext:without-interrupts
+               (without-interrupts
                 (let ((interval (tq-event-interval event)))
                   (when interval
                     (setf (tq-event-time event) (+ time interval))
@@ -561,10 +561,10 @@
          (sym (gethash string *tty-translations*)))
     (if sym
         (etypecase sym
-          (hemlock-ext:key-event sym)
-          (t (hemlock-ext:make-key-event sym 0)))
+          (key-event sym)
+          (t (make-key-event sym 0)))
         (when (= 1 (length string))
-          (hemlock-ext:char-key-event (char string 0))))))
+          (char-key-event (char string 0))))))
 
 (defun tty-key-event (data)
   (loop with start = 0
@@ -581,19 +581,19 @@
              (let ((sym
                     (cond
                       ((eql char #\newline) ;### hmm
-                       (hemlock-ext:key-event-keysym #k"Return"))
+                       (key-event-keysym #k"Return"))
                       ((eql char #\tab) ;### hmm
-                       (hemlock-ext:key-event-keysym #k"Tab"))
+                       (key-event-keysym #k"Tab"))
                       ((eql char #\Backspace)
-                       (hemlock-ext:key-event-keysym #k"Backspace"))
+                       (key-event-keysym #k"Backspace"))
                       ((eql char #\Escape)
-                       (hemlock-ext:key-event-keysym #k"Escape"))
+                       (key-event-keysym #k"Escape"))
                       ((eql char #\rubout)
-                       (hemlock-ext:key-event-keysym #k"delete")))))
+                       (key-event-keysym #k"delete")))))
                (q-event *real-editor-input*
                         (if sym
-                            (hemlock-ext:make-key-event sym 0)
-                            (hemlock-ext:char-key-event char))))))
+                            (make-key-event sym 0)
+                            (char-key-event char))))))
 
 ;;; X11 clipboard stubs — overridden by the CLX backend when loaded.
 (defun store-cut-string (display string)

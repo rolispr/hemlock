@@ -138,8 +138,8 @@
       (xlib:display-force-output display)
       (when liftp (drop-cursor)))))
 ;;;
-(hemlock-ext:serve-exposure *hemlock-windows* #'hunk-exposed-region)
-(hemlock-ext:serve-graphics-exposure *hemlock-windows* #'hunk-exposed-region)
+(serve-exposure *hemlock-windows* #'hunk-exposed-region)
+(serve-graphics-exposure *hemlock-windows* #'hunk-exposed-region)
 
 
 ;;; HUNK-NO-EXPOSURE handles this bullshit event that gets sent without its
@@ -149,7 +149,7 @@
   (declare (ignore hunk event-key event-window major minor send-event-p))
   t)
 ;;;
-(hemlock-ext:serve-no-exposure *hemlock-windows* #'hunk-no-exposure)
+(serve-no-exposure *hemlock-windows* #'hunk-no-exposure)
 
 
 ;;; EXPOSED-REGION-PEEK-EVENT returns the position and height of an :exposure
@@ -495,7 +495,7 @@
        (when (or (/= width old-width) (/= height old-height))
          (window-group-changed object width height))))))
 ;;;
-(hemlock-ext:serve-configure-notify *hemlock-windows* #'hunk-reconfigured)
+(serve-configure-notify *hemlock-windows* #'hunk-reconfigured)
 
 
 ;;; HUNK-IGNORE-EVENT ignores the following unrequested events.  They all take
@@ -506,13 +506,13 @@
   (declare (ignore hunk event-key event-window window one two three four five))
   t)
 ;;;
-(hemlock-ext:serve-destroy-notify *hemlock-windows* #'hunk-ignore-event)
-(hemlock-ext:serve-unmap-notify *hemlock-windows* #'hunk-ignore-event)
-(hemlock-ext:serve-map-notify *hemlock-windows* #'hunk-ignore-event)
-(hemlock-ext:serve-reparent-notify *hemlock-windows* #'hunk-ignore-event)
-(hemlock-ext:serve-gravity-notify *hemlock-windows* #'hunk-ignore-event)
-(hemlock-ext:serve-circulate-notify *hemlock-windows* #'hunk-ignore-event)
-(hemlock-ext:serve-client-message *hemlock-windows* #'hunk-ignore-event)
+(serve-destroy-notify *hemlock-windows* #'hunk-ignore-event)
+(serve-unmap-notify *hemlock-windows* #'hunk-ignore-event)
+(serve-map-notify *hemlock-windows* #'hunk-ignore-event)
+(serve-reparent-notify *hemlock-windows* #'hunk-ignore-event)
+(serve-gravity-notify *hemlock-windows* #'hunk-ignore-event)
+(serve-circulate-notify *hemlock-windows* #'hunk-ignore-event)
+(serve-client-message *hemlock-windows* #'hunk-ignore-event)
 
 
 ;;;; Interface to X input events.
@@ -534,19 +534,19 @@
                        key-code modifiers)
                       x y))
 ;;;
-(hemlock-ext:serve-key-press *hemlock-windows* #'hunk-key-input)
+(serve-key-press *hemlock-windows* #'hunk-key-input)
 
 (defun hunk-mouse-input (hunk event-key event-window root child same-screen-p x y
                          root-x root-y modifiers time key-code send-event-p)
   (declare (ignore event-window root child same-screen-p root-x root-y
                    time send-event-p))
   (hunk-process-input hunk
-                      (hemlock-ext:translate-mouse-key-event key-code modifiers
-                                                     event-key)
+                      (translate-mouse-key-event key-code modifiers
+                                                event-key)
                       x y))
 ;;;
-(hemlock-ext:serve-button-press *hemlock-windows* #'hunk-mouse-input)
-(hemlock-ext:serve-button-release *hemlock-windows* #'hunk-mouse-input)
+(serve-button-press *hemlock-windows* #'hunk-mouse-input)
+(serve-button-release *hemlock-windows* #'hunk-mouse-input)
 
 (defun hunk-process-input (hunk char x y)
   (when char
@@ -614,7 +614,7 @@
   (let ((window (bitmap-hunk-window hunk)))
     (when window (invoke-hook hemlock::enter-window-hook window))))
 ;;;
-(hemlock-ext:serve-enter-notify *hemlock-windows* #'hunk-mouse-entered)
+(serve-enter-notify *hemlock-windows* #'hunk-mouse-entered)
 
 (defun hunk-mouse-left (hunk event-key event-window root child same-screen-p
                         x y root-x root-y state time mode kind send-event-p)
@@ -633,7 +633,7 @@
   (let ((window (bitmap-hunk-window hunk)))
     (when window (invoke-hook hemlock::exit-window-hook window))))
 ;;;
-(hemlock-ext:serve-leave-notify *hemlock-windows* #'hunk-mouse-left)
+(serve-leave-notify *hemlock-windows* #'hunk-mouse-left)
 
 
 

@@ -331,7 +331,7 @@
           (t
            ;; work to do, but first remove old font marks
            (dolist (fm font-marks)
-             (hi::delete-font-mark fm))
+             (delete-font-mark fm))
            (setf font-marks nil)
            ;; now do the highlighting
            (let ((state prev-to)
@@ -342,7 +342,7 @@
                     (setf state (step** state ch))
                     (let ((font (state-font state)))
                       (unless (eq font last-font)
-                        (push (hi::font-mark line p font) font-marks)
+                        (push (font-mark line p font) font-marks)
                         (setf last-font font)))))
              (setf state (step** state #\newline))
              ;; hack
@@ -350,8 +350,8 @@
                (when (and (eql 0 (search "(def" s))
                           (setf p1 (position #\space s))
                           (setf p2 (position #\space s :start (1+ p1))))
-                 (push (hi::font-mark line (1+ p1) 5) font-marks)
-                 (push (hi::font-mark line p2 0) font-marks)))
+                 (push (font-mark line (1+ p1) 5) font-marks)
+                 (push (font-mark line p2 0) font-marks)))
              (make-syntax-info (line-signature line)
                                prev-to
                                state

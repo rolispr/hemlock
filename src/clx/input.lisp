@@ -27,7 +27,7 @@
 
 (defmethod clear-editor-input ((stream windowed-editor-input))
   (dispatch-events-no-hang)
-  (hemlock-ext:without-interrupts
+  (without-interrupts
    (let* ((head (editor-input-head stream))
           (next (input-event-next head)))
      (when next
@@ -59,7 +59,7 @@
   ;; to the dead display around that will cause subsequent failures).
   ;; Maybe could switch to tty mode then (save-all-files-and-exit)?
   ;; For now, just assume user wanted an easy way to kill the session.
-  (hemlock-ext:quit))
+  (quit))
 
 (defmethod %editor-input-method
     :around

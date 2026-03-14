@@ -2540,9 +2540,9 @@
 
 (defun prompt-for-password (&optional (prompt "Password: "))
   "Prompts for password with prompt."
-  (let ((hi::*parse-verification-function* #'(lambda (string) (list string))))
-    (let ((hi::*parse-prompt* prompt))
-      (hi::display-prompt-nicely))
+  (let ((*parse-verification-function* #'(lambda (string) (list string))))
+    (let ((*parse-prompt* prompt))
+      (display-prompt-nicely))
     (let ((start-window (current-window)))
       (move-mark *parse-starting-mark* (buffer-point *echo-area-buffer*))
       (setf (current-window) *echo-area-window*)
@@ -2552,7 +2552,7 @@
               (declare (list result))
               (loop
                 (let ((key-event (get-key-event *editor-input*)))
-                  (ring-pop hi::*key-event-history*)
+                  (ring-pop *key-event-history*)
                   (cond ((eq key-event #k"return")
                          (return (prog1 (coerce (nreverse result)
                                                 'simple-string)
@@ -2904,7 +2904,7 @@
                                   input-dir)))
                          (unless (probe-file f) (return f)))))
          (found nil))
-    (cond ((not (hemlock-ext:file-writable output))
+    (cond ((not (file-writable output))
            (loud-message "Cannot write sequence temp file ~A.~%~
                           Aborting output of ~S sequence."
                          name (namestring output)))

@@ -121,7 +121,7 @@
 ;;; and return the character.  If there is none, return NIL.
 ;;;
 (defun dq-event (stream)
-  (hemlock-ext:without-interrupts
+  (without-interrupts
    (let* ((head (editor-input-head stream))
           (next (input-event-next head)))
      (if next
@@ -138,14 +138,14 @@
 ;;; editor stream.
 ;;;
 (defun q-event (stream key-event &optional x y hunk)
-  (hemlock-ext:without-interrupts
+  (without-interrupts
    (let ((new (new-event key-event x y hunk nil))
          (tail (editor-input-tail stream)))
      (setf (input-event-next tail) new)
      (setf (editor-input-tail stream) new))))
 
 (defun un-event (key-event stream)
-  (hemlock-ext:without-interrupts
+  (without-interrupts
    (let* ((head (editor-input-head stream))
           (next (input-event-next head))
           (new (new-event key-event (input-event-x head) (input-event-y head)
@@ -296,7 +296,7 @@
   (let* ((window (random-typeout-stream-window stream))
          (buffer (window-buffer window))
          (start (buffer-start-mark buffer)))
-    (when (typep (hi::device-hunk-device (hi::window-hunk window))
+    (when (typep (device-hunk-device (window-hunk window))
                  (the class (class-of 'hi::bitmap-device)))
       (let ((*more-prompt-action* :normal))
         (update-modeline-field buffer window :more-prompt)

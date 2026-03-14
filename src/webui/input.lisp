@@ -24,7 +24,7 @@
   (un-event key-event stream))
 
 (defmethod clear-editor-input ((stream webui-editor-input))
-  (hemlock-ext:without-interrupts
+  (without-interrupts
    (let* ((head (editor-input-head stream))
           (next (input-event-next head)))
      (when next
@@ -58,7 +58,7 @@
   ;; We set *screen-image-trashed* so the next redisplay pass does a full
   ;; refresh, and we update each window's image to match the new dimensions.
   (when (webui-device-resize-pending device)
-    (hemlock-ext:without-interrupts
+    (without-interrupts
       (setf (webui-device-resize-pending device) nil)
       (webui-apply-resize device))))
 

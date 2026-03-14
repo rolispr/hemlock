@@ -543,7 +543,7 @@
                 (when must-exist
                   (let ((res (get-command key :current)))
                     (cond ((commandp res)
-                           (hemlock-ext:print-pretty-key-event key-event
+                           (print-pretty-key-event key-event
                                                        *echo-area-stream*
                                                        t)
                            (write-char #\space *echo-area-stream*)
@@ -552,7 +552,7 @@
                           ((not (eq res :prefix))
                            (vector-pop key)
                            (go FLAME)))))
-                (hemlock-ext:print-pretty-key key-event *echo-area-stream* t)
+                (print-pretty-key key-event *echo-area-stream* t)
                 (write-char #\space *echo-area-stream*)
                 (force-output *echo-area-stream*)
                 (go TOP)
@@ -690,7 +690,7 @@
                 (logical-key-event-key-events char)
                 (cdr key-events)))
               ((null key-events))
-            (hemlock-ext:print-pretty-key (car key-events) s)
+            (print-pretty-key (car key-events) s)
             (unless (null (cdr key-events))
               (write-string ", " s))))
       (unless (null (cdr chars))

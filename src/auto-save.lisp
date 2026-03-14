@@ -82,7 +82,7 @@
   "Returns a pathname for a non-existing file in DEFAULT-DIRECTORY.  Uses
    GENSYM to for a file name: save-GENSYM.CKP."
   (declare (ignore buffer))
-  (let ((def-dir (hemlock-ext:default-directory)))
+  (let ((def-dir (default-directory)))
     (loop
       (let* ((sym (gensym))
              (f (merge-pathnames (format nil "save-~A.CKP" sym) def-dir)))
@@ -126,7 +126,7 @@
 ;;;
 (defun write-checkpoint-file (pathname buffer)
   (let ((ns (namestring pathname)))
-    (cond ((hemlock-ext:file-writable pathname)
+    (cond ((file-writable pathname)
            (message "Saving ~A" ns)
            (handler-case (progn
                            (write-file (buffer-region buffer) pathname

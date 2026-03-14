@@ -192,7 +192,7 @@
     (find-definitions
      (hemlock::parse-slave-symbol
       (if (or p (not default))
-          (hemlock-interface::prompt-for-string
+          (prompt-for-string
            :prompt "Name: "
            :default default)
           default)))))
@@ -208,7 +208,7 @@
               (,fun
                (hemlock::parse-slave-symbol
                 (if (or p (not default))
-                    (hemlock-interface::prompt-for-string
+                    (prompt-for-string
                      :prompt "Name: "
                      :default default)
                     default)))))

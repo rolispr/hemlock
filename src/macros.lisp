@@ -421,13 +421,13 @@
                       `(progn
                          (setf ,',bind
                                (prompt-for-key-event* ,',n-prompt ,',n-change))
-                         (setf ,',bind-char (hemlock-ext:key-event-char ,',bind))
+                         (setf ,',bind-char (key-event-char ,',bind))
                          (go ,',again))))
            (block ,bname
              (let* ((,n-prompt ,prompt)
                     (,n-change ,change-window)
                     (,bind (prompt-for-key-event* ,n-prompt ,n-change))
-                    (,bind-char (hemlock-ext:key-event-char ,bind)))
+                    (,bind-char (key-event-char ,bind)))
                (declare (ignorable ,bind-char))
                (tagbody
                 ,again

@@ -106,7 +106,7 @@
   (when (zerop (length typein)) (editor-error))
   (multiple-value-bind
         (result win)
-      (hemlock-ext:complete-file typein
+      (complete-file typein
                                  :defaults (directory-namestring *parse-default*)
                                  :ignore-types (value ignore-file-types))
     (when result
@@ -170,7 +170,7 @@
                ;; due to the use of spaces in command names, let's special
                ;; case on spaces here: The space key both completes and
                ;; self inserts, where other keys (like tab) only complete.
-               (eql (hemlock-ext:key-event-char *last-key-event-typed*)
+               (eql (key-event-char *last-key-event-typed*)
                     #\space)))
          (when spacep
            (let ((point (current-point)))

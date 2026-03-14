@@ -124,7 +124,7 @@
   (with-pop-up-display (f :height (* 2 (register-count)))
     (do-registers (name val :sorted)
       (write-string "Reg " f)
-      (hemlock-ext:print-pretty-key-event name f)
+      (print-pretty-key-event name f)
       (write-string ":  " f)
       (etypecase val
         (mark
