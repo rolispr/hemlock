@@ -77,6 +77,7 @@
 
 
 
+
 
 ;;;; MESSAGE and CLEAR-ECHO-AREA:
 
@@ -101,24 +102,28 @@
   Put the message on a fresh line and wait for \"Message Pause\" seconds
   to give the luser a chance to see it.  String and Args are a format
   control string and format arguments, respectively."
-  (cond ((eq *current-window* *echo-area-window*)
-         (let ((point (buffer-point *echo-area-buffer*)))
-           (with-mark ((m point :left-inserting))
-             (line-start m)
-             (with-output-to-mark (s m :full)
-               (apply #'format s string args)
-               (fresh-line s)))))
-        (t
-         (let ((mark (region-end *echo-area-region*)))
-           (cond ((buffer-modified *echo-area-buffer*)
-                  (clear-echo-area))
-                 ((not (zerop (mark-charpos mark)))
-                  (insert-character mark #\newline)
-                  (unless (displayed-p mark *echo-area-window*)
-                    (clear-echo-area))))
-           (apply #'format *echo-area-stream* string args)
-           (force-output *echo-area-stream*)
-           (setf (buffer-modified *echo-area-buffer*) nil))))
+  (cond
+    ;; When completion tree is active, show message in grid cell (R0,C2).
+    ((buffer-ui-tree *echo-area-buffer*)
+     (echo-set-message (apply #'format nil string args)))
+    ((eq *current-window* *echo-area-window*)
+     (let ((point (buffer-point *echo-area-buffer*)))
+       (with-mark ((m point :left-inserting))
+         (line-start m)
+         (with-output-to-mark (s m :full)
+           (apply #'format s string args)
+           (fresh-line s)))))
+    (t
+     (let ((mark (region-end *echo-area-region*)))
+       (cond ((buffer-modified *echo-area-buffer*)
+              (clear-echo-area))
+             ((not (zerop (mark-charpos mark)))
+              (insert-character mark #\newline)
+              (unless (displayed-p mark *echo-area-window*)
+                (clear-echo-area))))
+       (apply #'format *echo-area-stream* string args)
+       (force-output *echo-area-stream*)
+       (setf (buffer-modified *echo-area-buffer*) nil))))
   (force-output *echo-area-stream*)
   (setq *last-message-time* (get-internal-real-time))
   nil)
@@ -162,10 +167,15 @@
         (point (buffer-point *echo-area-buffer*)))
     (move-mark *parse-starting-mark* point)
     (insert-string point (or *parse-default-string* *parse-default*))
+    ;; create completion display if we have string tables or file prompt
+    (when (or *parse-string-tables* (eq *parse-type* :file))
+      (make-echo-completions))
     (setf (current-window) *echo-area-window*)
     (unwind-protect
-     (use-buffer *echo-area-buffer*
-       (recursive-edit nil))
+        (use-buffer *echo-area-buffer*
+          (recursive-edit nil))
+      (when (buffer-ui-tree *echo-area-buffer*)
+        (cleanup-echo-completions))
       (setf (current-window) start-window)
       (change-to-buffer start-buffer))))
 

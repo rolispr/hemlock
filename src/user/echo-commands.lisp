@@ -117,79 +117,125 @@
       (editor-error))))
 
 (defcommand "Complete Keyword" (p)
-  "Trys to complete the text being read in the echo area as a string in
-  *parse-string-tables*"
-  "Complete the keyword being parsed as far as possible.
-  If it is ambiguous and ``Beep On Ambiguity'' true beep."
+  "Complete the keyword being parsed as far as possible."
+  "Complete the keyword, using grid state if active."
   (declare (ignore p))
-  (let ((typein (region-to-string *parse-input-region*)))
-    (declare (simple-string typein))
-    (case *parse-type*
-      (:keyword
-       (multiple-value-bind
-             (prefix key value field ambig)
-           (complete-string typein *parse-string-tables*)
-         (declare (ignore value field))
-         (when prefix
-           (delete-region *parse-input-region*)
-           (insert-string (region-start *parse-input-region*) prefix)
-           (when (eq key :ambiguous)
-             (let ((point (current-point)))
-               (move-mark point (region-start *parse-input-region*))
-               (unless (character-offset point ambig)
-                 (buffer-end point)))))
+  (cond
+    ((buffer-ui-tree *echo-area-buffer*)
+     (let ((input (echo-confirm)))
+       (multiple-value-bind (prefix key value fld ambig)
+           (complete-string input *parse-string-tables*)
+         (declare (ignore value fld ambig))
+         (when prefix (echo-set-input prefix))
          (when (and (or (eq key :ambiguous) (eq key :none))
                     (value beep-on-ambiguity))
-           (editor-error))))
-      (:file
-       (file-completion-action typein))
-      (t
-       (editor-error "Cannot complete input for this prompt.")))))
+           (echo-set-message "Ambiguous")))))
+    (t
+     (let ((typein (region-to-string *parse-input-region*)))
+       (declare (simple-string typein))
+       (case *parse-type*
+         (:keyword
+          (multiple-value-bind (prefix key value field ambig)
+              (complete-string typein *parse-string-tables*)
+            (declare (ignore value field))
+            (when prefix
+              (delete-region *parse-input-region*)
+              (insert-string (region-start *parse-input-region*) prefix)
+              (when (eq key :ambiguous)
+                (let ((point (current-point)))
+                  (move-mark point (region-start *parse-input-region*))
+                  (unless (character-offset point ambig)
+                    (buffer-end point)))))
+            (when (and (or (eq key :ambiguous) (eq key :none))
+                       (value beep-on-ambiguity))
+              (editor-error))))
+         (:file (file-completion-action typein))
+         (t (editor-error "Cannot complete input for this prompt.")))))))
 
 (defun field-separator-p (x)
   (plusp (character-attribute :parse-field-separator x)))
 
 (defcommand "Complete Field" (p)
-  "Complete a field in a parse.
-  Fields are defined by the :field separator attribute,
-  the text being read in the echo area as a string in *parse-string-tables*"
-  "Complete a field in a keyword.
-  If it is ambiguous and ``Beep On Ambiguity'' true beep.  Fields are
-  separated by characters having a non-zero :parse-field-separator attribute,
-  and this command should only be bound to characters having that attribute."
-  (let ((typein (region-to-string *parse-input-region*)))
-    (declare (simple-string typein))
-    (case *parse-type*
-      (:string
-       (self-insert-command p))
-      (:file
-       (file-completion-action typein))
-      (:keyword
-       (setf *completion-candidates* nil)
-       (let ((spacep
-               ;; due to the use of spaces in command names, let's special
-               ;; case on spaces here: The space key both completes and
-               ;; self inserts, where other keys (like tab) only complete.
-               (eql (key-event-char *last-key-event-typed*)
-                    #\space)))
-         (when spacep
-           (let ((point (current-point)))
-             (unless (blank-after-p point)
-               (insert-character point #\space))))
-         (multiple-value-bind
-               (prefix key value field ambig)
-             (complete-string typein *parse-string-tables*)
-           (declare (ignore value ambig))
-           (when (eq key :none) (editor-error "No possible completion."))
-           (delete-region *parse-input-region*)
-           (let ((new-typein (if (and spacep (or field (not (eq key :unique))))
-                                 (concatenate 'string
-                                              (subseq prefix 0 field)
-                                              " ")
-                                 (subseq prefix 0 field))))
-             (insert-string (region-start *parse-input-region*) new-typein)))))
-      (t
-       (editor-error "Cannot complete input for this prompt.")))))
+  "Complete a field in a keyword parse."
+  "Complete a field, using grid state if active."
+  (cond
+    ((buffer-ui-tree *echo-area-buffer*)
+     (let* ((char (key-event-char *last-key-event-typed*))
+            (sel (getf (ui-tree-state (buffer-ui-tree *echo-area-buffer*)) :selection -1))
+            (filtered (getf (ui-tree-state (buffer-ui-tree *echo-area-buffer*)) :filtered))
+            (input (echo-confirm))
+            (spacep (eql char #\space)))
+       (cond
+         ;; space or tab with selection: fill in selected candidate
+         ((and (>= sel 0) (< sel (length filtered)))
+          (echo-set-input (nth sel filtered)))
+         ;; space/tab for keyword: field completion
+         ((eq *parse-type* :keyword)
+          (multiple-value-bind (prefix key value field ambig)
+              (complete-string input *parse-string-tables*)
+            (declare (ignore value ambig))
+            (cond
+              ((eq key :none)
+               (if spacep
+                   (echo-type-char #\space)
+                   (echo-set-message "No possible completion.")))
+              (prefix
+               (let ((text (if spacep
+                               (if (or field (not (eq key :unique)))
+                                   (concatenate 'string (subseq prefix 0 field) " ")
+                                   (subseq prefix 0 field))
+                               prefix)))
+                 (echo-set-input text)
+                 ;; tab didn't extend input — select first match so next tab confirms
+                 (when (and (not spacep)
+                            (string-equal text input)
+                            (eq key :ambiguous))
+                   (echo-select 1)))))))
+         ;; space/tab for file: file completion
+         ((eq *parse-type* :file)
+          (multiple-value-bind (result win)
+              (complete-file input
+                             :defaults (directory-namestring *parse-default*)
+                             :ignore-types (value ignore-file-types))
+            (cond
+              (result
+               (let ((name (namestring result)))
+                 ;; directory: append / so next tab completes into it
+                 (when (and win (uiop:directory-exists-p name))
+                   (setf name (concatenate 'string name "/")
+                         win nil))
+                 (echo-set-input name)
+                 ;; tab didn't extend input — select first match
+                 (when (and (not spacep) (not win)
+                            (string= name input))
+                   (echo-select 1))))
+              (spacep (echo-type-char #\space))
+              (t (echo-set-message "No possible completion.")))))
+         ;; non-keyword/file: just insert the character
+         (t (echo-type-char char)))))
+    (t
+     (let ((typein (region-to-string *parse-input-region*)))
+       (declare (simple-string typein))
+       (case *parse-type*
+         (:string (self-insert-command p))
+         (:file (file-completion-action typein))
+         (:keyword
+          (setf *completion-candidates* nil)
+          (let ((spacep (eql (key-event-char *last-key-event-typed*) #\space)))
+            (when spacep
+              (let ((point (current-point)))
+                (unless (blank-after-p point)
+                  (insert-character point #\space))))
+            (multiple-value-bind (prefix key value field ambig)
+                (complete-string typein *parse-string-tables*)
+              (declare (ignore value ambig))
+              (when (eq key :none) (editor-error "No possible completion."))
+              (delete-region *parse-input-region*)
+              (let ((new-typein (if (and spacep (or field (not (eq key :unique))))
+                                    (concatenate 'string (subseq prefix 0 field) " ")
+                                    (subseq prefix 0 field))))
+                (insert-string (region-start *parse-input-region*) new-typein)))))
+         (t (editor-error "Cannot complete input for this prompt.")))))))
 
 
 (defvar *echo-area-history* (make-ring 10)
@@ -219,35 +265,41 @@
 
 (defcommand "Next Completion" (p)
   "Cycle to the next completion candidate."
-  "Replace the echo area input with the next matching candidate."
+  "Move selection down in the completion list, or cycle old-style."
   (declare (ignore p))
-  (unless (eq *parse-type* :keyword)
-    (editor-error "Cannot cycle completions for this prompt."))
-  (let ((candidates (ensure-completion-candidates)))
-    (unless candidates
-      (editor-error "No completions."))
-    (setf *completion-index*
-          (mod (1+ *completion-index*) (length candidates)))
-    (let ((candidate (nth *completion-index* candidates)))
-      (delete-region *parse-input-region*)
-      (insert-string (region-start *parse-input-region*) candidate)
-      (setf *completion-base-input* candidate))))
+  (cond
+    ((buffer-ui-tree *echo-area-buffer*)
+     (echo-select 1))
+    (t
+     (unless (eq *parse-type* :keyword)
+       (editor-error "Cannot cycle completions for this prompt."))
+     (let ((candidates (ensure-completion-candidates)))
+       (unless candidates (editor-error "No completions."))
+       (setf *completion-index*
+             (mod (1+ *completion-index*) (length candidates)))
+       (let ((candidate (nth *completion-index* candidates)))
+         (delete-region *parse-input-region*)
+         (insert-string (region-start *parse-input-region*) candidate)
+         (setf *completion-base-input* candidate))))))
 
 (defcommand "Previous Completion" (p)
   "Cycle to the previous completion candidate."
-  "Replace the echo area input with the previous matching candidate."
+  "Move selection up in the completion list, or cycle old-style."
   (declare (ignore p))
-  (unless (eq *parse-type* :keyword)
-    (editor-error "Cannot cycle completions for this prompt."))
-  (let ((candidates (ensure-completion-candidates)))
-    (unless candidates
-      (editor-error "No completions."))
-    (setf *completion-index*
-          (mod (1- *completion-index*) (length candidates)))
-    (let ((candidate (nth *completion-index* candidates)))
-      (delete-region *parse-input-region*)
-      (insert-string (region-start *parse-input-region*) candidate)
-      (setf *completion-base-input* candidate))))
+  (cond
+    ((buffer-ui-tree *echo-area-buffer*)
+     (echo-select -1))
+    (t
+     (unless (eq *parse-type* :keyword)
+       (editor-error "Cannot cycle completions for this prompt."))
+     (let ((candidates (ensure-completion-candidates)))
+       (unless candidates (editor-error "No completions."))
+       (setf *completion-index*
+             (mod (1- *completion-index*) (length candidates)))
+       (let ((candidate (nth *completion-index* candidates)))
+         (delete-region *parse-input-region*)
+         (insert-string (region-start *parse-input-region*) candidate)
+         (setf *completion-base-input* candidate))))))
 
 (defcommand "Confirm Parse" (p)
   "Terminate echo-area input.
@@ -255,9 +307,17 @@
   "If no input has been given, exits the recursive edit with the default,
   otherwise calls the verification function."
   (declare (ignore p))
-  (let* ((string (region-to-string *parse-input-region*))
+  (let* ((string (if (buffer-ui-tree *echo-area-buffer*)
+                     (echo-confirm)
+                     (region-to-string *parse-input-region*)))
          (empty (zerop (length string))))
     (declare (simple-string string))
+    ;; when using the grid, clean up and put confirmed text into parse region
+    (when (buffer-ui-tree *echo-area-buffer*)
+      (cleanup-echo-completions)
+      (let ((*tree-rendering* t))
+        (delete-region *parse-input-region*)
+        (insert-string (region-start *parse-input-region*) string)))
     (if empty
         (when *parse-default* (setq string *parse-default*))
         (when (or (zerop (ring-length *echo-area-history*))
@@ -318,66 +378,101 @@
 
 (defcommand "Beginning Of Parse" (p)
   "Moves to immediately after the prompt when in the echo area."
-  "Move the point of the echo area buffer to *parse-starting-mark*."
+  "Move point to start of editable input."
   (declare (ignore p))
-  (move-mark (buffer-point *echo-area-buffer*) *parse-starting-mark*))
+  (if (buffer-ui-tree *echo-area-buffer*)
+      (echo-cursor-start)
+      (move-mark (buffer-point *echo-area-buffer*) *parse-starting-mark*)))
+
+(defcommand "End Of Parse" (p)
+  "Moves to end of input in the echo area."
+  "Move point to end of editable input."
+  (declare (ignore p))
+  (if (buffer-ui-tree *echo-area-buffer*)
+      (echo-cursor-end)
+      (move-mark (buffer-point *echo-area-buffer*)
+                 (region-end *parse-input-region*))))
+
+(defcommand "Echo Area Self Insert" (p)
+  "Insert a character and update completion display."
+  "Self-insert for echo area with inline completion refresh."
+  (declare (ignore p))
+  (if (buffer-ui-tree *echo-area-buffer*)
+      (echo-type-char (key-event-char *last-key-event-typed*))
+      (self-insert-command p)))
 
 (defcommand "Echo Area Delete Previous Character" (p)
-  "Delete the previous character.
-  Don't let the luser rub out the prompt."
-  "Signal an editor-error if we would nuke the prompt,
-  otherwise do a normal delete."
-  (with-mark ((tem (buffer-point *echo-area-buffer*)))
-    (unless (character-offset tem (- (or p 1))) (editor-error))
-    (when (mark< tem *parse-starting-mark*) (editor-error))
-    (delete-previous-character-command p)))
+  "Delete the previous character."
+  "Delete previous char."
+  (declare (ignore p))
+  (if (buffer-ui-tree *echo-area-buffer*)
+      (echo-delete-char)
+      (with-mark ((tem (buffer-point *echo-area-buffer*)))
+        (unless (character-offset tem (- (or p 1))) (editor-error))
+        (when (mark< tem *parse-starting-mark*) (editor-error))
+        (delete-previous-character-command p))))
 
 (defcommand "Echo Area Kill Previous Word" (p)
-  "Kill the previous word.
-  Don't let the luser rub out the prompt."
-  "Signal an editor-error if we would mangle the prompt, otherwise
-  do a normal kill-previous-word."
-  (with-mark ((tem (buffer-point *echo-area-buffer*)))
-    (unless (word-offset tem (- (or p 1))) (editor-error))
-    (when (mark< tem *parse-starting-mark*) (editor-error))
-    (kill-previous-word-command p)))
+  "Kill the previous word."
+  "Kill previous word."
+  (declare (ignore p))
+  (if (buffer-ui-tree *echo-area-buffer*)
+      (echo-kill-word)
+      (with-mark ((tem (buffer-point *echo-area-buffer*)))
+        (unless (word-offset tem (- (or p 1))) (editor-error))
+        (when (mark< tem *parse-starting-mark*) (editor-error))
+        (kill-previous-word-command p))))
 
 (declaim (special *kill-ring*))
 
 (defcommand "Kill Parse" (p)
   "Kills any input so far."
-  "Kills *parse-input-region*."
+  "Kills input region."
   (declare (ignore p))
-  (if (end-line-p (current-point))
-      (kill-region *parse-input-region* :kill-backward)
-      (ring-push (delete-and-save-region *parse-input-region*)
-                 *kill-ring*)))
+  (if (buffer-ui-tree *echo-area-buffer*)
+      (echo-kill-end)
+      (if (end-line-p (current-point))
+          (kill-region *parse-input-region* :kill-backward)
+          (ring-push (delete-and-save-region *parse-input-region*)
+                     *kill-ring*))))
 
 (defcommand "Insert Parse Default" (p)
-  "Inserts the default for the parse in progress.
-  The text is inserted at the point."
-  "Inserts *parse-default* at the point of the *echo-area-buffer*.
-  If there is no default an editor-error is signalled."
+  "Inserts the default for the parse in progress."
+  "Inserts *parse-default* into the input."
   (declare (ignore p))
   (unless *parse-default* (editor-error))
-  (insert-string (buffer-point *echo-area-buffer*) *parse-default*))
+  (if (buffer-ui-tree *echo-area-buffer*)
+      (echo-set-input *parse-default*)
+      (insert-string (buffer-point *echo-area-buffer*) *parse-default*)))
+
+(defcommand "Echo Area Forward Character" (p)
+  "Go forward one character."
+  "Move cursor forward in input."
+  (declare (ignore p))
+  (if (buffer-ui-tree *echo-area-buffer*)
+      (echo-move-cursor 1)
+      (forward-character-command p)))
 
 (defcommand "Echo Area Backward Character" (p)
-  "Go back one character.
-  Don't let the luser move into the prompt."
-  "Signal an editor-error if we try to go into the prompt, otherwise
-  do a backward-character command."
-  (backward-character-command p)
-  (when (mark< (buffer-point *echo-area-buffer*) *parse-starting-mark*)
-    (beginning-of-parse-command ())
-    (editor-error)))
+  "Go back one character."
+  "Move cursor back in input."
+  (declare (ignore p))
+  (if (buffer-ui-tree *echo-area-buffer*)
+      (echo-move-cursor -1)
+      (progn
+        (backward-character-command p)
+        (when (mark< (buffer-point *echo-area-buffer*) *parse-starting-mark*)
+          (beginning-of-parse-command ())
+          (editor-error)))))
 
 (defcommand "Echo Area Backward Word" (p)
-  "Go back one word.
-  Don't let the luser move into the prompt."
-  "Signal an editor-error if we try to go into the prompt, otherwise
-  do a backward-word command."
-  (backward-word-command p)
-  (when (mark< (buffer-point *echo-area-buffer*) *parse-starting-mark*)
-    (beginning-of-parse-command ())
-    (editor-error)))
+  "Go back one word."
+  "Move cursor back one word in input."
+  (declare (ignore p))
+  (if (buffer-ui-tree *echo-area-buffer*)
+      (echo-backward-word)
+      (progn
+        (backward-word-command p)
+        (when (mark< (buffer-point *echo-area-buffer*) *parse-starting-mark*)
+          (beginning-of-parse-command ())
+          (editor-error)))))

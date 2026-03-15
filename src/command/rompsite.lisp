@@ -314,6 +314,14 @@
 (declaim (special *gc-notify-before*
                   *gc-notify-after*))
 
+;; CLX integration: define this macro unconditionally.  The function
+;; called by its expansion is defined by the hemlock.clx system only.
+(defmacro with-clx-event-handling ((display handler) &rest body)
+  "Evaluates body in a context where events are handled for the display
+   by calling handler on the display.  This destroys any previously established
+   handler for display."
+  `(hemlock-ext::call-with-clx-event-handling (lambda () ,@body) ,display ,handler))
+
 ;; fixme: this is neither site-specific nor should it be a macro.
 (defmacro site-wrapper-macro (&body body)
   `(unwind-protect

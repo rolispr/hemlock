@@ -45,15 +45,20 @@ Each function takes (pattern candidates) and returns a filtered, possibly
 reordered subset of candidates, or nil to fall through to the next style.")
 
 (defun filter-completions (pattern candidates)
-  "Apply *completion-styles* in order, returning the first non-nil result.
-Falls back to returning all candidates unchanged when PATTERN is empty
-or no style produces a match."
+  "Apply all *completion-styles* and merge results, preserving order and
+removing duplicates.  Returns all candidates when PATTERN is empty.
+Returns nil when no style matches."
   (if (zerop (length pattern))
       candidates
-      (loop for style in *completion-styles*
-            for result = (funcall style pattern candidates)
-            when result return result
-            finally (return candidates))))
+      (let ((seen (make-hash-table :test #'equal))
+            (result nil))
+        (dolist (style *completion-styles*)
+          (let ((matches (funcall style pattern candidates)))
+            (dolist (m matches)
+              (unless (gethash m seen)
+                (setf (gethash m seen) t)
+                (push m result)))))
+        (nreverse result))))
 
 
 ;;;; Built-in styles
@@ -127,6 +132,15 @@ nil otherwise.  Higher scores mean tighter matches."
        candidates))))
 
 
+;;;; String table adapter
+
+(defun string-table-candidates (tables)
+  "Extract all entry strings from a list of string-tables."
+  (find-all-completions "" tables))
+
+
 (setf *completion-styles*
       (list #'completion-style-prefix
+            #'completion-style-substring
+            #'completion-style-fuzzy-chars
             #'completion-style-orderless))

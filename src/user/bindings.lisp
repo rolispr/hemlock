@@ -255,6 +255,11 @@
 
 ;;;; Echo Area.
 
+;;; Rebind self-insert to update completion display.
+;;;
+(dolist (info (command-bindings (getstring "Self Insert" *command-names*)))
+  (bind-key "Echo Area Self Insert" (car info) :mode "Echo Area"))
+
 ;;; Basic echo-area commands.
 ;;;
 (bind-key "Help on Parse" #k"control-h" :mode "Echo Area")
@@ -279,15 +284,23 @@
 (bind-key "Beginning of Parse" #k"control-a" :mode "Echo Area")
 (bind-key "Beginning of Parse" #k"home" :mode "Echo Area")
 (bind-key "Beginning of Parse" #k"meta-\<" :mode "Echo Area")
+(bind-key "End Of Parse" #k"control-e" :mode "Echo Area")
+(bind-key "End Of Parse" #k"end" :mode "Echo Area")
+(bind-key "Echo Area Forward Character" #k"control-f" :mode "Echo Area")
+(bind-key "Echo Area Forward Character" #k"rightarrow" :mode "Echo Area")
 (bind-key "Echo Area Backward Character" #k"control-b" :mode "Echo Area")
+(bind-key "Echo Area Backward Character" #k"leftarrow" :mode "Echo Area")
 (bind-key "Echo Area Backward Word" #k"meta-b" :mode "Echo Area")
 (bind-key "Next Parse" #k"meta-n" :mode "Echo Area")
 (bind-key "Previous Parse" #k"meta-p" :mode "Echo Area")
 (bind-key "Next Completion" #k"downarrow" :mode "Echo Area")
+(bind-key "Next Completion" #k"control-n" :mode "Echo Area")
 (bind-key "Previous Completion" #k"uparrow" :mode "Echo Area")
+(bind-key "Previous Completion" #k"control-p" :mode "Echo Area")
 
 ;;; Remove some dangerous standard bindings.
 ;;;
+(bind-key "Kill Parse" #k"control-k" :mode "Echo Area")
 (bind-key "Illegal" #k"control-x" :mode "Echo Area")
 (bind-key "Illegal" #k"control-meta-c" :mode "Echo Area")
 (bind-key "Illegal" #k"control-meta-s" :mode "Echo Area")
