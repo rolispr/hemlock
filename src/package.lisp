@@ -969,9 +969,11 @@
    #:ui-grid #:make-ui-grid #:ui-grid-cells #:ui-grid-col-widths
 
    ;; echo area completion (src/user/echo-completion.lisp)
-   #:make-echo-completion-tree
-   #:cleanup-echo-completion-tree
-   #:build-echo-grid
+   #:completion-candidates #:completion-display-name
+   #:file-completion-candidates #:file-completion-filter
+   #:make-echo-completions
+   #:cleanup-echo-completions
+   #:build-completion-grid
    #:echo-render #:echo-refilter
    #:echo-type-char #:echo-delete-char
    #:echo-kill #:echo-kill-end #:echo-kill-word

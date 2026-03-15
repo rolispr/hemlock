@@ -167,15 +167,15 @@
         (point (buffer-point *echo-area-buffer*)))
     (move-mark *parse-starting-mark* point)
     (insert-string point (or *parse-default-string* *parse-default*))
-    ;; create ui-tree if we have string tables
-    (when *parse-string-tables*
-      (make-echo-completion-tree))
+    ;; create completion display if we have string tables or file prompt
+    (when (or *parse-string-tables* (eq *parse-type* :file))
+      (make-echo-completions))
     (setf (current-window) *echo-area-window*)
     (unwind-protect
         (use-buffer *echo-area-buffer*
           (recursive-edit nil))
       (when (buffer-ui-tree *echo-area-buffer*)
-        (cleanup-echo-completion-tree))
+        (cleanup-echo-completions))
       (setf (current-window) start-window)
       (change-to-buffer start-buffer))))
 

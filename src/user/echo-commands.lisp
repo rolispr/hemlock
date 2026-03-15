@@ -191,7 +191,22 @@
                             (string-equal text input)
                             (eq key :ambiguous))
                    (echo-select 1)))))))
-         ;; non-keyword: just insert the character
+         ;; space/tab for file: file completion
+         ((eq *parse-type* :file)
+          (multiple-value-bind (result win)
+              (complete-file input
+                             :defaults (directory-namestring *parse-default*)
+                             :ignore-types (value ignore-file-types))
+            (cond
+              (result
+               (echo-set-input (namestring result))
+               ;; tab didn't extend input — select first match
+               (when (and (not spacep) (not win)
+                          (string= (namestring result) input))
+                 (echo-select 1)))
+              (spacep (echo-type-char #\space))
+              (t (echo-set-message "No possible completion.")))))
+         ;; non-keyword/file: just insert the character
          (t (echo-type-char char)))))
     (t
      (let ((typein (region-to-string *parse-input-region*)))
@@ -294,7 +309,7 @@
     (declare (simple-string string))
     ;; when using the grid, clean up and put confirmed text into parse region
     (when (buffer-ui-tree *echo-area-buffer*)
-      (cleanup-echo-completion-tree)
+      (cleanup-echo-completions)
       (let ((*tree-rendering* t))
         (delete-region *parse-input-region*)
         (insert-string (region-start *parse-input-region*) string)))
