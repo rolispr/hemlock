@@ -960,7 +960,7 @@
    ;; input state operations (src/ui/input.lisp)
    #:input-string #:cursor-offset
    #:type-char-at-cursor #:delete-char-before-cursor
-   #:kill-input #:kill-to-end #:kill-word-before-cursor
+   #:kill-input #:kill-to-end #:kill-word-before-cursor #:find-word-start
    #:move-cursor #:cursor-to-start #:cursor-to-end
    #:move-cursor-backward-word #:backward-word-offset
    #:set-input #:confirm-input
@@ -970,7 +970,7 @@
 
    ;; echo area completion (src/user/echo-completion.lisp)
    #:completion-candidates #:completion-display-name
-   #:file-completion-candidates #:file-completion-filter
+   #:file-list-directory #:file-display-name #:file-completion-filter
    #:make-echo-completions
    #:cleanup-echo-completions
    #:build-completion-grid

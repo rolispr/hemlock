@@ -10,6 +10,21 @@
                   ))
 
 
+;;;; Buffer lookup and rename
+
+(defun find-buffer (name)
+  (getstring name *buffer-names*))
+
+(defun maybe-rename-buffer (buffer new-name)
+  (unless (find-buffer new-name)
+    (setf (buffer-name buffer) new-name)))
+
+(defun rename-buffer-uniquely (buffer new-name)
+  (or (maybe-rename-buffer buffer new-name)
+      (loop for i from 2
+            until (maybe-rename-buffer buffer (format nil "~A<~D>" new-name i)))))
+
+
 ;;;; Some buffer structure support.
 
 (defun buffer-writable (buffer)

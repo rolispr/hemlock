@@ -199,11 +199,16 @@
                              :ignore-types (value ignore-file-types))
             (cond
               (result
-               (echo-set-input (namestring result))
-               ;; tab didn't extend input — select first match
-               (when (and (not spacep) (not win)
-                          (string= (namestring result) input))
-                 (echo-select 1)))
+               (let ((name (namestring result)))
+                 ;; directory: append / so next tab completes into it
+                 (when (and win (uiop:directory-exists-p name))
+                   (setf name (concatenate 'string name "/")
+                         win nil))
+                 (echo-set-input name)
+                 ;; tab didn't extend input — select first match
+                 (when (and (not spacep) (not win)
+                            (string= name input))
+                   (echo-select 1))))
               (spacep (echo-type-char #\space))
               (t (echo-set-message "No possible completion.")))))
          ;; non-keyword/file: just insert the character

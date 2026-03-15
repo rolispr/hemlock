@@ -42,7 +42,6 @@
               :components
               ((:file "package")
                (:file "lispdep" :pathname "text/lispdep" :depends-on ("package"))
-               (:file "hemlock-ext" :pathname "command/hemlock-ext" :depends-on ("package"))
                (:file "decls" :pathname "text/decls" :depends-on ("package"))
                (:file "struct" :pathname "text/struct" :depends-on ("package"))
                (:file "char-attrs" :pathname "text/char-attrs" :depends-on ("package"))

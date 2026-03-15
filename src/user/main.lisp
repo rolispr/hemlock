@@ -16,6 +16,10 @@ GB
 
 
 
+(defun quit ()
+  (uiop:quit))
+
+
 ;;;; Definition of *hemlock-version*.
 
 (defparameter *hemlock-version*

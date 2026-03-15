@@ -84,34 +84,30 @@
   (let ((off (cursor-offset tree)))
     (setf (input-string tree) (subseq (input-string tree) 0 off))))
 
-(defun kill-word-before-cursor (tree)
-  "Kill the word before cursor."
+(defun find-word-start (input offset &optional (separator #\space))
+  "Find the start of the word before OFFSET in INPUT, using SEPARATOR as boundary."
+  (let* ((pos (loop for i from (1- offset) downto 0
+                    while (eql (char input i) separator)
+                    finally (return (1+ i)))))
+    (loop for i from (1- pos) downto 0
+          while (not (eql (char input i) separator))
+          finally (return (1+ i)))))
+
+(defun kill-word-before-cursor (tree &optional (separator #\space))
+  "Kill the word before cursor, using SEPARATOR as word boundary."
   (let* ((input (input-string tree))
          (off (cursor-offset tree))
-         (pos (loop for i from (1- off) downto 0
-                    while (eql (char input i) #\space)
-                    finally (return (1+ i))))
-         (word-start (loop for i from (1- pos) downto 0
-                           while (not (eql (char input i) #\space))
-                           finally (return (1+ i)))))
+         (word-start (find-word-start input off separator)))
     (setf (input-string tree)
           (concatenate 'string (subseq input 0 word-start) (subseq input off)))
     (setf (cursor-offset tree) word-start)))
 
-(defun backward-word-offset (tree)
+(defun backward-word-offset (tree &optional (separator #\space))
   "Return the cursor offset after moving back one word."
-  (let* ((input (input-string tree))
-         (off (cursor-offset tree))
-         (pos (loop for i from (1- off) downto 0
-                    while (eql (char input i) #\space)
-                    finally (return (1+ i))))
-         (word-start (loop for i from (1- pos) downto 0
-                           while (not (eql (char input i) #\space))
-                           finally (return (1+ i)))))
-    word-start))
+  (find-word-start (input-string tree) (cursor-offset tree) separator))
 
-(defun move-cursor-backward-word (tree)
-  (setf (cursor-offset tree) (backward-word-offset tree)))
+(defun move-cursor-backward-word (tree &optional (separator #\space))
+  (setf (cursor-offset tree) (backward-word-offset tree separator)))
 
 (defun set-input (tree text)
   "Replace input with TEXT, cursor at end."
