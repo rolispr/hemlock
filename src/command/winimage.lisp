@@ -54,7 +54,10 @@
 ;;; Width - (window-width window)
 (defun move-lines (window changed string underhang line offset trail current
                           width)
-
+  "Handle line insertions and deletions in Window's dis-line list.
+  Called by Maybe-Change-Window when it detects that lines have moved.
+  Finishes the image update for the rest of the window from the point
+  of divergence.  Trail and Current are pointers into the dis-line list."
   (do* ((delta 0)
         (cc (car current))
         (old-line (dis-line-line cc))
@@ -212,6 +215,10 @@
 ;;;
 (eval-when (:compile-toplevel :execute)
 (defmacro maybe-change-window (window changed line offset trail current width)
+  "Handle a mismatch between a line and its dis-line during window image
+  update.  Determines whether the line is a continuation, a change in
+  place, or a move/insertion, and dispatches accordingly.  Returns T if
+  update-window-image should terminate, NIL to continue."
   `(let* ((cc (car ,current))
           (old-line (dis-line-line cc)))
      (cond
@@ -267,6 +274,10 @@
 ;;; something interesting happens.
 ;;;
 (defun update-window-image (window)
+  "Ensure Window's dis-line list is up-to-date with the buffer contents.
+  Walks the buffer lines and dis-lines in parallel, calling
+  Maybe-Change-Window when a difference is found and updating the
+  display-end mark when finished."
   (let* ((trail (window-first-line window))
          (current (cdr trail))
          (display-start (window-display-start window))

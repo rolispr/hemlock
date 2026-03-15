@@ -50,7 +50,7 @@
 ;;;
 (defun %init-line-image ()
   (defattribute "Print Representation"
-    "The value of this attribute determines how a character is displayed
+                "The value of this attribute determines how a character is displayed
     on the screen.  If the value is a string this string is literally
     displayed.  If it is a function, then that function is called with
     the current X position to get the string to display.")
@@ -66,11 +66,11 @@
             #'redis-set-char-attribute-hook-fun)
   (do ((i (1- (char-code #\space)) (1- i)) str)
       ((minusp i))
-    (setq str (make-string 2))
-    (setf (elt (the simple-string str) 0) #\^)
-    (setf (elt (the simple-string str) 1)
-          (code-char (+ i (char-code #\@))))
-    (setf (character-attribute :print-representation (code-char i)) str))
+      (setq str (make-string 2))
+      (setf (elt (the simple-string str) 0) #\^)
+      (setf (elt (the simple-string str) 1)
+            (code-char (+ i (char-code #\@))))
+      (setf (character-attribute :print-representation (code-char i)) str))
   (setf (character-attribute :print-representation (code-char #o177)) "^?")
   (setf (character-attribute :print-representation #\tab)
         #'redis-tab-display-fun))
@@ -86,8 +86,8 @@
       (if (and (= (length (the simple-string new-value)) 1)
                (char= char (elt (the simple-string new-value) 0)))
           (setf (char-set-ref *losing-character-mask* (char-code char)) winning-char)
-          (setf (char-set-ref *losing-character-mask* (char-code char))
-                losing-char)))
+        (setf (char-set-ref *losing-character-mask* (char-code char))
+              losing-char)))
      ((functionp new-value)
       (setf (char-set-ref *losing-character-mask* (char-code char)) losing-char))
      (t (error "Bad print representation: ~S" new-value)))))
@@ -124,62 +124,62 @@
 ;;; window.  src-start, dst, dst-start, line and dis-line are updated.
 ;;; Done-P indicates whether there are more characters after this sequence.
 ;;;
-(defmacro display-some-chars (src src-start src-end dst dst-start width done-p)
-  `(let ((dst-end (+ ,dst-start (- ,src-end ,src-start))))
-     (declare (fixnum dst-end))
-     (cond
-      ((>= dst-end ,width)
-       (cond
-        ((and ,done-p (= dst-end ,width))
-         (%sp-byte-blt ,src ,src-start ,dst ,dst-start dst-end)
-         (setq ,dst-start dst-end  ,src-start ,src-end))
-        (t
-         (let ((1-width (1- ,width)))
-           (%sp-byte-blt ,src ,src-start ,dst ,dst-start 1-width)
-           (setf (elt (the simple-string ,dst) 1-width) *line-wrap-char*)
-           (setq ,src-start (+ ,src-start (- 1-width ,dst-start)))
-           (setq ,dst-start nil)))))
-      (t (%sp-byte-blt ,src ,src-start ,dst ,dst-start dst-end)
-         (setq ,dst-start dst-end  ,src-start ,src-end)))))
+           (defmacro display-some-chars (src src-start src-end dst dst-start width done-p)
+             `(let ((dst-end (+ ,dst-start (- ,src-end ,src-start))))
+                (declare (fixnum dst-end))
+                (cond
+                 ((>= dst-end ,width)
+                  (cond
+                   ((and ,done-p (= dst-end ,width))
+                    (%sp-byte-blt ,src ,src-start ,dst ,dst-start dst-end)
+                    (setq ,dst-start dst-end  ,src-start ,src-end))
+                   (t
+                    (let ((1-width (1- ,width)))
+                      (%sp-byte-blt ,src ,src-start ,dst ,dst-start 1-width)
+                      (setf (elt (the simple-string ,dst) 1-width) *line-wrap-char*)
+                      (setq ,src-start (+ ,src-start (- 1-width ,dst-start)))
+                      (setq ,dst-start nil)))))
+                 (t (%sp-byte-blt ,src ,src-start ,dst ,dst-start dst-end)
+                    (setq ,dst-start dst-end  ,src-start ,src-end)))))
 
 ;;; These macros are given as args to display-losing-chars to get the
 ;;; print representation of whatever is in the data vector.
-(defmacro string-get-rep (string index)
-  `(get-rep (schar ,string ,index)))
+           (defmacro string-get-rep (string index)
+             `(get-rep (schar ,string ,index)))
 
 ;;; display-losing-chars  --  Internal
 ;;;
 ;;;    This macro is called by the compute-line-image functions to
 ;;; display a group of losing characters.
 ;;;
-(defmacro display-losing-chars (line-chars index end dest xpos width
-                                           string underhang access-fun
-                                           &optional (done-p `(= ,index ,end)))
-  `(do ((last (or (%fcwa ,line-chars ,index ,end winning-char) ,end))
-        (len 0)
-        (zero 0)
-        str)
-       (())
-     (declare (fixnum last len zero))
-     (setq str (,access-fun ,line-chars ,index))
-     (unless (simple-string-p str) (setq str (funcall str ,xpos)))
-     (setq len (strlen str)  zero 0)
-     (incf ,index)
-     (display-some-chars str zero len ,dest ,xpos ,width ,done-p)
-     (cond ((not ,xpos)
-            ;; We wrapped in the middle of a losing char.
-            (setq ,underhang zero  ,string str)
-            (return nil))
-           ((= ,index last)
-            ;; No more losing chars in this bunch.
-            (return nil)))))
+           (defmacro display-losing-chars (line-chars index end dest xpos width
+                                                      string underhang access-fun
+                                                      &optional (done-p `(= ,index ,end)))
+             `(do ((last (or (%fcwa ,line-chars ,index ,end winning-char) ,end))
+                   (len 0)
+                   (zero 0)
+                   str)
+                  (())
+                  (declare (fixnum last len zero))
+                  (setq str (,access-fun ,line-chars ,index))
+                  (unless (simple-string-p str) (setq str (funcall str ,xpos)))
+                  (setq len (strlen str)  zero 0)
+                  (incf ,index)
+                  (display-some-chars str zero len ,dest ,xpos ,width ,done-p)
+                  (cond ((not ,xpos)
+                         ;; We wrapped in the middle of a losing char.
+                         (setq ,underhang zero  ,string str)
+                         (return nil))
+                        ((= ,index last)
+                         ;; No more losing chars in this bunch.
+                         (return nil)))))
 
-(defmacro update-and-punt (dis-line length string underhang end)
-  `(progn (setf (dis-line-length ,dis-line) ,length)
-          (return (values ,string ,underhang
-                          (setf (dis-line-end ,dis-line) ,end)))))
+           (defmacro update-and-punt (dis-line length string underhang end)
+             `(progn (setf (dis-line-length ,dis-line) ,length)
+                     (return (values ,string ,underhang
+                                     (setf (dis-line-end ,dis-line) ,end)))))
 
-); eval-when
+           ); eval-when
 
 ;;; compute-normal-line-image  --  Internal
 ;;;
@@ -203,35 +203,35 @@
         (losing 0)
         underhang string)
        (())
-    (declare (fixnum index end)
-             (type (or fixnum null) losing)
-             (simple-string line-chars dest))
-    (cond
-     (underhang
-      (update-and-punt dis-line width string underhang index))
-     ((null xpos)
-      (update-and-punt dis-line width nil 0 index))
-     ((= index end)
-      (update-and-punt dis-line xpos nil nil index)))
-    (setq losing (%fcwa line-chars index end losing-char))
-    (when (null losing)
-      (display-some-chars line-chars index end dest xpos width t)
-      (if (or xpos (= index end))
-          (update-and-punt dis-line xpos nil nil index)
-          (update-and-punt dis-line width nil 0 index)))
-    (display-some-chars line-chars index losing dest xpos width nil)
-    (cond
-     ;; Did we wrap?
-     ((null xpos)
-      (update-and-punt dis-line width nil 0 index))
-     ;; Are we about to cause the line to wrap? If so, wrap before
-     ;; it's too late.
-     ((= xpos width)
-      (setf (char dest (1- width)) *line-wrap-char*)
-      (update-and-punt dis-line width nil 0 index))
-     (t
-      (display-losing-chars line-chars index end dest xpos width string
-                            underhang string-get-rep)))))
+       (declare (fixnum index end)
+                (type (or fixnum null) losing)
+                (simple-string line-chars dest))
+       (cond
+        (underhang
+         (update-and-punt dis-line width string underhang index))
+        ((null xpos)
+         (update-and-punt dis-line width nil 0 index))
+        ((= index end)
+         (update-and-punt dis-line xpos nil nil index)))
+       (setq losing (%fcwa line-chars index end losing-char))
+       (when (null losing)
+         (display-some-chars line-chars index end dest xpos width t)
+         (if (or xpos (= index end))
+             (update-and-punt dis-line xpos nil nil index)
+           (update-and-punt dis-line width nil 0 index)))
+       (display-some-chars line-chars index losing dest xpos width nil)
+       (cond
+        ;; Did we wrap?
+        ((null xpos)
+         (update-and-punt dis-line width nil 0 index))
+        ;; Are we about to cause the line to wrap? If so, wrap before
+        ;; it's too late.
+        ((= xpos width)
+         (setf (char dest (1- width)) *line-wrap-char*)
+         (update-and-punt dis-line width nil 0 index))
+        (t
+         (display-losing-chars line-chars index end dest xpos width string
+                               underhang string-get-rep)))))
 
 
 ;;; compute-cached-line-image  --  Internal
@@ -245,54 +245,54 @@
          (done-p (= right-open-pos line-cache-length))
          (losing 0)
          string underhang)
-    (declare (fixnum gap) (simple-string dest)
-             (type (or fixnum null) losing))
-   LEFT-LOOP
-    (cond
-     (underhang
-      (update-and-punt dis-line width string underhang index))
-     ((null xpos)
-      (update-and-punt dis-line width nil 0 index))
-     ((>= index left-open-pos)
-      (go RIGHT-START)))
-    (setq losing (%fcwa open-chars index left-open-pos losing-char))
-    (cond
-     (losing
-      (display-some-chars open-chars index losing dest xpos width nil)
-      ;; If we we didn't wrap then display some losers...
-      (if xpos
-          (display-losing-chars open-chars index left-open-pos dest xpos
-                                width string underhang string-get-rep
-                                (and done-p (= index left-open-pos)))
-          (update-and-punt dis-line width nil 0 index)))
-     (t
-      (display-some-chars open-chars index left-open-pos dest xpos width done-p)))
-    (go LEFT-LOOP)
+        (declare (fixnum gap) (simple-string dest)
+                 (type (or fixnum null) losing))
+        LEFT-LOOP
+        (cond
+         (underhang
+          (update-and-punt dis-line width string underhang index))
+         ((null xpos)
+          (update-and-punt dis-line width nil 0 index))
+         ((>= index left-open-pos)
+          (go RIGHT-START)))
+        (setq losing (%fcwa open-chars index left-open-pos losing-char))
+        (cond
+         (losing
+          (display-some-chars open-chars index losing dest xpos width nil)
+          ;; If we we didn't wrap then display some losers...
+          (if xpos
+              (display-losing-chars open-chars index left-open-pos dest xpos
+                                    width string underhang string-get-rep
+                                    (and done-p (= index left-open-pos)))
+            (update-and-punt dis-line width nil 0 index)))
+         (t
+          (display-some-chars open-chars index left-open-pos dest xpos width done-p)))
+        (go LEFT-LOOP)
 
-   RIGHT-START
-    (setq index (+ index gap))
-   RIGHT-LOOP
-    (cond
-     (underhang
-      (update-and-punt dis-line width string underhang (- index gap)))
-     ((null xpos)
-      (update-and-punt dis-line width nil 0 (- index gap)))
-     ((= index line-cache-length)
-      (update-and-punt dis-line xpos nil nil (- index gap))))
-    (setq losing (%fcwa open-chars index line-cache-length losing-char))
-    (cond
-     (losing
-      (display-some-chars open-chars index losing dest xpos width nil)
-      (cond
-       ;; Did we wrap?
-       ((null xpos)
-        (update-and-punt dis-line width nil 0 (- index gap)))
-       (t
-        (display-losing-chars open-chars index line-cache-length dest xpos
-                              width string underhang string-get-rep))))
-     (t
-      (display-some-chars open-chars index line-cache-length dest xpos width t)))
-    (go RIGHT-LOOP)))
+        RIGHT-START
+        (setq index (+ index gap))
+        RIGHT-LOOP
+        (cond
+         (underhang
+          (update-and-punt dis-line width string underhang (- index gap)))
+         ((null xpos)
+          (update-and-punt dis-line width nil 0 (- index gap)))
+         ((= index line-cache-length)
+          (update-and-punt dis-line xpos nil nil (- index gap))))
+        (setq losing (%fcwa open-chars index line-cache-length losing-char))
+        (cond
+         (losing
+          (display-some-chars open-chars index losing dest xpos width nil)
+          (cond
+           ;; Did we wrap?
+           ((null xpos)
+            (update-and-punt dis-line width nil 0 (- index gap)))
+           (t
+            (display-losing-chars open-chars index line-cache-length dest xpos
+                                  width string underhang string-get-rep))))
+         (t
+          (display-some-chars open-chars index line-cache-length dest xpos width t)))
+        (go RIGHT-LOOP)))
 
 (defun make-some-font-changes ()
   (do ((res nil (make-font-change res))
@@ -303,18 +303,22 @@
   "Font-Change structures that nobody's using at the moment.")
 
 (defmacro alloc-font-change (x font mark)
+  "Allocate a font-change structure from the free pool, initializing its
+  position to X, font to Font, and associated mark to Mark."
   `(progn
-    (unless *free-font-changes*
-      (setq *free-font-changes* (make-some-font-changes)))
-    (let ((new-fc *free-font-changes*))
-      (setq *free-font-changes* (font-change-next new-fc))
-      (setf (font-change-x new-fc) ,x
-            (font-change-font new-fc) ,font
-            (font-change-next new-fc) nil
-            (font-change-mark new-fc) ,mark)
-      new-fc)))
+     (unless *free-font-changes*
+       (setq *free-font-changes* (make-some-font-changes)))
+     (let ((new-fc *free-font-changes*))
+       (setq *free-font-changes* (font-change-next new-fc))
+       (setf (font-change-x new-fc) ,x
+             (font-change-font new-fc) ,font
+             (font-change-next new-fc) nil
+             (font-change-mark new-fc) ,mark)
+       new-fc)))
 
 (defun sync-dis-line-tag (line dis-line)
+  "Synchronize the dis-line's tag with the line's current tag.  Sets the
+  retag flag if the tag has changed since the last sync."
   (let ((tag (line-tag line)))
     (unless (and (eq (dis-line-tag dis-line) tag)
                  (eql (dis-line-tag-ticks dis-line) (tag-ticks tag)))
@@ -349,90 +353,127 @@
 ;;;    3) The index in line after the last character displayed.
 ;;;
 (defun compute-line-image (string underhang line offset dis-line width)
-  ;;
-  ;; Check the tag.
-  ;;
-  ;; FIXME This isn't sufficient, because we don't get called in cases
-  ;; where line contents are unchanged.  For now, the backend papers
-  ;; over that, but this should get moved elsewhere.
-  ;;
-  (sync-dis-line-tag line dis-line)
-  ;;
-  ;; Release any old font-changes.
-  (let ((changes (dis-line-font-changes dis-line)))
-    (when changes
-      (do ((prev changes current)
-           (current (font-change-next changes)
-                    (font-change-next current)))
-          ((null current)
-           (setf (dis-line-font-changes dis-line) nil)
-           (shiftf (font-change-next prev) *free-font-changes* changes))
-        (setf (font-change-mark current) nil))))
-  ;;
-  ;; If the line has any Font-Marks, add Font-Changes for them.
-  (let ((marks (line-marks line)))
-    (when (dolist (m marks nil)
-            (when (fast-font-mark-p m) (return t)))
-      (let ((prev nil))
-        ;;
-        ;; Find the last Font-Mark with charpos less than Offset.  If there is
-        ;; such a Font-Mark, then there is a font-change to this font at X = 0.
-        (let ((max -1)
-              (max-mark nil))
-          (dolist (m marks)
-            (when (fast-font-mark-p m)
-              (let ((charpos (mark-charpos m)))
-                (when (and (< charpos offset) (> charpos max))
-                  (setq max charpos  max-mark m)))))
-          (when max-mark
-            (setq prev (alloc-font-change 0 (font-mark-font max-mark) max-mark))
-            (setf (dis-line-font-changes dis-line) prev)))
-        ;;
-        ;; Repeatedly scan through marks, adding a font-change for the
-        ;; smallest Font-Mark with a charpos greater than Bound, until
-        ;; we find no such mark.
-        (do ((bound (1- offset) min)
-             (min most-positive-fixnum most-positive-fixnum)
-             (min-mark nil nil))
-            (())
-          (dolist (m marks)
-            (when (fast-font-mark-p m)
-              (let ((charpos (mark-charpos m)))
-                (when (and (> charpos bound) (< charpos min))
-                  (setq min charpos  min-mark m)))))
-          (unless min-mark (return nil))
-          (let ((len (if (eq line open-line)
-                         (cached-real-line-length line 10000 offset min)
-                         (real-line-length line 10000 offset min))))
-            (when (< len width)
-              (let ((new (alloc-font-change
-                          (+ len
-                             (if string
-                                 (- (length (the simple-string string)) underhang)
-                                 0))
-                          (font-mark-font min-mark)
-                          min-mark)))
-                (if prev
-                    (setf (font-change-next prev) new)
-                    (setf (dis-line-font-changes dis-line) new))
-                (setq prev new))))))))
-  ;;
-  ;; Recompute the line image.
+  "Build a dis-line image from Line starting at Offset.  String and
+  Underhang carry over characters from a previous wrapped line.  Width
+  is the display field width.  Returns three values: a new overhang
+  string or NIL, a new underhang or NIL, and the index after the last
+  character displayed.  When syntax-colors are present on the line's
+  plist, font-change structures are built from those ranges; otherwise
+  font-marks on the line are used."
+  (let ((syntax-colors (getf (line-plist line) 'syntax-colors)))
+    (cond
+      (syntax-colors
+       (let ((changes (dis-line-font-changes dis-line)))
+         (when changes
+           (loop with prev = changes
+                 for current = (font-change-next changes)
+                   then (font-change-next current)
+                 while current
+                 do (setf (font-change-mark current) nil)
+                    (setf prev current)
+                 finally
+                    (setf (dis-line-font-changes dis-line) nil)
+                    (shiftf (font-change-next prev) *free-font-changes* changes))))
+       (let ((prev nil))
+         (dolist (range syntax-colors)
+           (let ((start-charpos (first range))
+                 (font (third range)))
+             (when (>= start-charpos offset)
+               (let ((len (if (eq line open-line)
+                              (cached-real-line-length line 10000 offset start-charpos)
+                              (real-line-length line 10000 offset start-charpos))))
+                 (when (and len (< len width))
+                   (let ((x (+ len (if string
+                                       (- (length (the simple-string string)) underhang)
+                                       0))))
+                     (when (< x width)
+                       (let ((new (alloc-font-change x font nil)))
+                         (if prev
+                             (setf (font-change-next prev) new)
+                             (setf (dis-line-font-changes dis-line) new))
+                         (setq prev new)))))))))
+         (when prev
+           (let ((last-range (car (last syntax-colors))))
+             (when last-range
+               (let ((end-charpos (second last-range)))
+                 (when (>= end-charpos offset)
+                   (let ((end-len (if (eq line open-line)
+                                      (cached-real-line-length line 10000 offset end-charpos)
+                                      (real-line-length line 10000 offset end-charpos))))
+                     (when (and end-len (< end-len width))
+                       (let ((x (+ end-len (if string
+                                               (- (length (the simple-string string)) underhang)
+                                               0))))
+                         (when (< x width)
+                           (let ((reset (alloc-font-change x 0 nil)))
+                             (setf (font-change-next prev) reset)))))))))))))
+      (t
+       (sync-dis-line-tag line dis-line)
+       (let ((changes (dis-line-font-changes dis-line)))
+         (when changes
+           (loop with prev = changes
+                 for current = (font-change-next changes)
+                   then (font-change-next current)
+                 while current
+                 do (setf (font-change-mark current) nil)
+                    (setf prev current)
+                 finally
+                    (setf (dis-line-font-changes dis-line) nil)
+                    (shiftf (font-change-next prev) *free-font-changes* changes))))
+       (let ((marks (line-marks line)))
+         (when (loop for m in marks
+                     thereis (fast-font-mark-p m))
+           (let ((prev nil))
+             (let ((max -1)
+                   (max-mark nil))
+               (dolist (m marks)
+                 (when (fast-font-mark-p m)
+                   (let ((charpos (mark-charpos m)))
+                     (when (and (< charpos offset) (> charpos max))
+                       (setq max charpos  max-mark m)))))
+               (when max-mark
+                 (setq prev (alloc-font-change 0 (font-mark-font max-mark) max-mark))
+                 (setf (dis-line-font-changes dis-line) prev)))
+             (loop with bound = (1- offset)
+                   do (let ((min most-positive-fixnum)
+                            (min-mark nil))
+                        (dolist (m marks)
+                          (when (fast-font-mark-p m)
+                            (let ((charpos (mark-charpos m)))
+                              (when (and (> charpos bound) (< charpos min))
+                                (setq min charpos  min-mark m)))))
+                        (unless min-mark (loop-finish))
+                        (let ((len (if (eq line open-line)
+                                       (cached-real-line-length line 10000 offset min)
+                                       (real-line-length line 10000 offset min))))
+                          (when (< len width)
+                            (let ((new (alloc-font-change
+                                        (+ len
+                                           (if string
+                                               (- (length (the simple-string string)) underhang)
+                                               0))
+                                        (font-mark-font min-mark)
+                                        min-mark)))
+                              (if prev
+                                  (setf (font-change-next prev) new)
+                                  (setf (dis-line-font-changes dis-line) new))
+                              (setq prev new))))
+                        (setf bound min)))))))))
   (cond
-   (string
-    (let ((len (strlen string))
-          (chars (dis-line-chars dis-line))
-          (xpos 0))
-      (declare (type (or fixnum null) xpos) (simple-string chars))
-      (display-some-chars string underhang len chars xpos width nil)
-      (cond
-       ((null xpos)
-        (values string underhang offset))
-       ((eq line open-line)
-        (compute-cached-line-image offset dis-line xpos width))
-       (t
-        (compute-normal-line-image line offset dis-line xpos width)))))
-   ((eq line open-line)
-    (compute-cached-line-image offset dis-line 0 width))
-   (t
-    (compute-normal-line-image line offset dis-line 0 width))))
+    (string
+     (let ((len (strlen string))
+           (chars (dis-line-chars dis-line))
+           (xpos 0))
+       (declare (type (or fixnum null) xpos) (simple-string chars))
+       (display-some-chars string underhang len chars xpos width nil)
+       (cond
+         ((null xpos)
+          (values string underhang offset))
+         ((eq line open-line)
+          (compute-cached-line-image offset dis-line xpos width))
+         (t
+          (compute-normal-line-image line offset dis-line xpos width)))))
+    ((eq line open-line)
+     (compute-cached-line-image offset dis-line 0 width))
+    (t
+     (compute-normal-line-image line offset dis-line 0 width))))

@@ -80,6 +80,8 @@
    "A Hemlock line object.  See Hemlock design document for details."))
 
 (defun make-line (&rest initargs)
+  "Create a new Hemlock line object.  Accepts initargs :chars, :previous,
+  :next, :number, and :%buffer."
   (apply #'make-instance 'line initargs))
 
 (defmethod linep ((line line))
@@ -119,6 +121,8 @@
 
 
 (defun %copy-line (line &key previous number %buffer)
+  "Return a new line with the same characters as Line but with the
+  specified Previous, Number, and %Buffer."
   (make-line :chars (line-chars line)
              :previous previous
              :number number

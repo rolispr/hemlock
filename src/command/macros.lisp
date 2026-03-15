@@ -16,13 +16,48 @@
 
 ;;;; Macros used for manipulating Hemlock variables.
 
+(declaim (special hemlock::*pending-error*))
+(declaim (special hemlock::*showing-error*))
+
+(defvar *inhibit-hooks* nil
+  "When T, invoke-hook is a no-op.  Set during error display to prevent
+hook → error → display → hook recursion.")
+
 (defmacro invoke-hook (place &rest args)
   "Call the functions in place with args.  If place is a symbol, then this
    interprets it as a Hemlock variable rather than a Lisp variable, using its
-   current value as the list of functions."
-  (let ((f (gensym)))
-    `(dolist (,f ,(if (symbolp place) `(%value ',place) place))
-       (funcall ,f ,@args))))
+   current value as the list of functions.  No-op when *inhibit-hooks* is T.
+   Broken hook functions are removed and the error is deferred to
+   *pending-error* for display by the command loop."
+  (let ((f (gensym))
+        (c (gensym))
+        (hooks (gensym)))
+    (if (symbolp place)
+        ;; Hemlock variable path.
+        ;; editor-error propagates (intentional control flow).
+        ;; Non-editor errors: remove broken hook, defer error for display.
+        `(unless *inhibit-hooks*
+           (dolist (,f (%value ',place))
+             (handler-case (funcall ,f ,@args)
+               (error (,c)
+                 (if (typep ,c 'editor-error)
+                     (error ,c)  ; re-signal editor-error to propagate
+                     (progn
+                       (let ((*inhibit-hooks* t))
+                         (setf (value ,place) (remove ,f (value ,place))))
+                       (setf hemlock::*pending-error* ,c)))))))
+        ;; List expression path.
+        `(unless *inhibit-hooks*
+           (let ((,hooks ,place))
+             (dolist (,f ,hooks)
+               (handler-case (funcall ,f ,@args)
+                 (error (,c)
+                   (if (typep ,c 'editor-error)
+                       (error ,c)
+                       (progn
+                         (let ((*inhibit-hooks* t))
+                           (setf ,place (remove ,f ,hooks)))
+                         (setf hemlock::*pending-error* ,c)))))))))))
 
 (defmacro value (name)
   "Return the current value of the Hemlock variable name."
@@ -637,38 +672,17 @@
   "Reentrancy guard for lisp-error-error-handler.")
 
 (defun lisp-error-error-handler (condition &optional internalp)
+  "Last-resort error handler.  Commands have their own handler-case;
+this catches errors that escape that (e.g. from hooks or init code).
+Just logs to stderr and bails to the command loop."
   (declare (ignore internalp))
-  ;; Prevent recursive errors (e.g. from backtrace printing) from causing
-  ;; infinite recursion and heap exhaustion.
   (when *in-lisp-error-handler*
-    (ignore-errors (beep))
     (throw 'command-loop-catcher nil))
-  (let ((*in-lisp-error-handler* t)
-        (message-only-p (typep condition 'editor-error)))
-    (cond
-     (*debug-on-error*
-      (invoke-debugger condition))
-     ((and *stack-trace-on-error* (not message-only-p))
-      (handler-case
-          (with-pop-up-display (s :height 100)
-            (format s "Error: ~A~%~%" condition)
-            (hemlock::simple-backtrace s))
-        (error ()))
-      (throw 'command-loop-catcher nil))
-     (message-only-p
-      (format *error-output* "~&[hemlock editor-error] ~A~%" condition)
-      (ignore-errors (message "~A" condition))
-      (throw 'command-loop-catcher nil))
-     (t
-      (let ((restarts (compute-restarts condition)))
-        (if restarts
-            (hemlock::enter-master-debugger condition)
-            (progn
-              (format *error-output* "~&[hemlock error] ~A~%" condition)
-              (ignore-errors (message "Error: ~A" condition))
-              (throw 'command-loop-catcher nil))))))))
+  (let ((*in-lisp-error-handler* t))
+    (setf hemlock::*pending-error* condition)
+    (throw 'command-loop-catcher nil)))
 
-(declaim (ftype (function (condition) nil) hemlock::enter-master-debugger))
+(declaim (ftype (function (condition) t) hemlock::show-error-in-buffer))
 
 (defmacro handle-lisp-errors (&body body)
   "Handle-Lisp-Errors {Form}*

@@ -65,6 +65,8 @@
     (catch 'redisplay-catcher
       (when (listen-editor-input *real-editor-input*)
         (throw 'redisplay-catcher :editor-input))
+      (when (fboundp 'ts-ensure-colors-for-windows)
+        (funcall 'ts-ensure-colors-for-windows))
       (let ((win *current-window*))
         (when (funcall special-fun win)
           (setf n-res t)))
@@ -186,6 +188,8 @@
            t))
         (t
          (let ((*in-redisplay* t))
+           (when (fboundp 'ts-ensure-colors-for-windows)
+             (funcall 'ts-ensure-colors-for-windows))
            (catch 'redisplay-catcher
              (let ((buffer (line-buffer (mark-line mark))))
                (when buffer
@@ -271,6 +275,9 @@
 ;;; display start.
 ;;;
 (defun maybe-update-window-image (window)
+  "Update Window's image only if the buffer text has changed or the
+  display start has moved.  Returns T if the image was updated, NIL
+  otherwise."
   (when (or (> (buffer-modified-tick (window-buffer window))
                (window-tick window))
             (mark/= (window-display-start window)
@@ -286,4 +293,5 @@
 ;;; a new window.
 ;;;
 (defun prepare-window-for-redisplay (window)
+  "Initialize a new Window's redisplay state.  Called by Make-Window."
   (setf (window-old-lines window) 0))

@@ -27,6 +27,8 @@
 ;;; our purposes it is presently used to look up commands and key-translations.
 ;;;
 (defun get-table-entry (table key)
+  "Return the value at the end of a series of hashings in Table for the
+  key-event sequence Key.  Returns NIL if no entry exists."
   (let ((foo nil))
     (dotimes (i (length key) foo)
       (let ((key-event (aref key i)))
@@ -39,6 +41,8 @@
 ;;; from the hash-table.
 ;;;
 (defun set-table-entry (table key val)
+  "Set the entry for the key-event sequence Key in Table to Val, creating
+  intermediate tables as needed.  If Val is NIL, remove the entry."
   (dotimes (i (1- (length key)))
     (let* ((key-event (aref key i))
            (foo (gethash key-event table)))
@@ -73,6 +77,10 @@
 (defun translate-key (key &optional (result (make-array (length key)
                                                         :fill-pointer 0
                                                         :adjustable t)))
+  "Translate Key through the key translation table, returning the
+  canonical representation.  Result, if supplied, is an adjustable vector
+  with a fill pointer used to accumulate output.  Returns a second value
+  of T if the key ends in the prefix of a translation."
   (let ((key-len (length key))
         (temp *translate-key-temp*)
         (start 0)
@@ -150,6 +158,8 @@
 ;;;    Return a hash-table depending on "kind" and checking for errors.
 ;;;
 (defun get-right-table (kind where)
+  "Return the key binding hash-table for Kind and Where.  Kind is one of
+  :global, :mode, or :buffer."
   (case kind
      (:global
       (when where
@@ -172,6 +182,8 @@
 ;;; standard one: a simple-vector of characters.
 ;;;
 (defun crunch-key (key)
+  "Coerce Key into the canonical representation: a simple-vector of
+  key-events.  Key may be a single key-event, a list, or a vector."
   (typecase key
     (key-event (vector key))
     ((or list vector) ;List thrown in gratuitously.
@@ -232,6 +244,9 @@
 ;;;    Look up a key in the current environment.
 ;;;
 (defun get-current-binding (key)
+  "Look up Key in the current environment: buffer bindings first, then
+  mode bindings in precedence order, then global bindings.  Returns the
+  command and a list of transparent bindings as two values."
   (let ((res (get-table-entry (buffer-bindings *current-buffer*) key)))
     (cond
      (res (values res nil))
@@ -407,6 +422,9 @@
 ;;;    Read commands from the terminal and execute them, forever.
 ;;;
 (defun %command-loop ()
+  "The main command interpreter loop.  Reads key events, translates them,
+  looks up the binding, and invokes the command.  Handles prefix arguments,
+  command types, transparent bindings, and error display."
   (let  ((cmd *current-command*)
          (trans *current-translation*)
          (*last-command-type* nil)
@@ -416,16 +434,14 @@
     (declare (special *last-command-type* *command-type-set*
                       *prefix-argument* *prefix-argument-supplied*))
     (setf (fill-pointer cmd) 0)
-    (handler-bind
-        ;; Bind this outside the invocation loop to save consing.
-        ((editor-error #'(lambda (condx)
-                           (beep)
-                           (let ((string (editor-error-format-string condx)))
-                             (when string
-                               (apply #'message string
-                                      (editor-error-format-arguments condx)))
-                             (throw 'command-loop-catcher nil)))))
+    (progn
       (loop
+        ;; Display any deferred error from the previous iteration
+        (when (and hemlock::*pending-error* (not hemlock::*showing-error*))
+          (let ((c hemlock::*pending-error*))
+            (setf hemlock::*pending-error* nil)
+            (handler-case (hemlock::show-error-in-buffer c)
+              (error () nil))))
         (unless (eq *current-buffer* *echo-area-buffer*)
           (when (buffer-modified *echo-area-buffer*) (clear-echo-area))
           (unless (or (zerop (length cmd))
@@ -442,13 +458,29 @@
                                (get-current-binding trans-result)
             (etypecase res
               (command
-               (let ((punt t))
+               (let ((punt t)
+                     (saved-error nil))
                  (with-simple-restart (abort
                                        "Abort to Hemlock command loop")
                    (catch 'command-loop-catcher
-                     (dolist (c t-bindings)
-                       (funcall *invoke-hook* c *prefix-argument*))
-                     (funcall *invoke-hook* res *prefix-argument*)
+                     (handler-case
+                         (progn
+                           (dolist (c t-bindings)
+                             (funcall *invoke-hook* c *prefix-argument*))
+                           (funcall *invoke-hook* res *prefix-argument*))
+                       (editor-error (c)
+                         (beep)
+                         (let ((string (editor-error-format-string c)))
+                           (when string
+                             (apply #'message string
+                                    (editor-error-format-arguments c)))))
+                       (error (c)
+                         (setf saved-error c)))
+                     ;; Stack fully unwound — safe to write to buffers
+                     (let ((err (or saved-error hemlock::*pending-error*)))
+                       (when (and err (not hemlock::*showing-error*))
+                         (setf hemlock::*pending-error* nil)
+                         (hemlock::show-error-in-buffer err)))
                      (setf punt nil)))
                  (when punt (invoke-hook hemlock::command-abort-hook)))
                (update-modelines-for-buffer *current-buffer*)

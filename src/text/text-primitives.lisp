@@ -158,10 +158,12 @@
         (editor-error "Buffer ~S is read only." (buffer-name buffer)))
       (when (< (buffer-modified-tick buffer)
                (buffer-unmodified-tick buffer))
+        ;; Update tick FIRST so a hook error doesn't leave the buffer in a
+        ;; state where every subsequent modification retriggers the hook.
+        (setf (buffer-modified-tick buffer) (tick))
         (when *buffer-modified-notifier*
           (funcall *buffer-modified-notifier* buffer t)))
       (setf (buffer-modified-tick buffer) (tick)))
-    ;; FIXME: what is without-interrupts for?
     (without-interrupts (funcall fun))))
 
 (defmacro modifying-buffer (buffer &body forms)

@@ -201,7 +201,8 @@
               (result
                (let ((name (namestring result)))
                  ;; directory: append / so next tab completes into it
-                 (when (and win (uiop:directory-exists-p name))
+                 (when (and win (uiop:directory-exists-p name)
+                            (not (eql (char name (1- (length name))) #\/)))
                    (setf name (concatenate 'string name "/")
                          win nil))
                  (echo-set-input name)
@@ -312,20 +313,24 @@
                      (region-to-string *parse-input-region*)))
          (empty (zerop (length string))))
     (declare (simple-string string))
-    ;; when using the grid, clean up and put confirmed text into parse region
-    (when (buffer-ui-tree *echo-area-buffer*)
-      (cleanup-echo-completions)
-      (let ((*tree-rendering* t))
-        (delete-region *parse-input-region*)
-        (insert-string (region-start *parse-input-region*) string)))
     (if empty
         (when *parse-default* (setq string *parse-default*))
         (when (or (zerop (ring-length *echo-area-history*))
                   (string/= string (ring-ref *echo-area-history* 0)))
           (ring-push string *echo-area-history*)))
+    ;; Verify FIRST — if it fails, the grid stays intact for retry
     (multiple-value-bind (res flag)
         (funcall *parse-verification-function* string)
-      (unless (or res flag) (editor-error))
+      (unless (or res flag)
+        (beep)
+        (return-from confirm-parse-command nil))
+
+      ;; Verification passed — now clean up the grid
+      (when (buffer-ui-tree *echo-area-buffer*)
+        (cleanup-echo-completions)
+        (let ((*tree-rendering* t))
+          (delete-region *parse-input-region*)
+          (insert-string (region-start *parse-input-region*) string)))
       (exit-recursive-edit res))))
 
 (defcommand "Previous Parse" (p)

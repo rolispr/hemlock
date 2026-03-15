@@ -23,6 +23,7 @@
                   :sb-bsd-sockets
                   :cffi
                   :babel
+                  :trivial-garbage
                   :cl-ppcre
                   :command-line-arguments)
     :components
@@ -52,9 +53,21 @@
               :depends-on (core-1)
               :components
               ((:file "keysym-defs")))
+     (:module tree-sitter
+              :pathname "src/tree-sitter-cl/"
+              :depends-on (core-1)
+              :serial t
+              :components
+              ((:file "package")
+               (:file "ffi")
+               (:file "types")
+               (:file "parser")
+               (:file "node")
+               (:file "query")
+               (:file "language")))
      (:module core-2
               :pathname "src/command/"
-              :depends-on (bitmap-1 core-1)
+              :depends-on (bitmap-1 core-1 tree-sitter)
               :serial t
               :components
               ((:file "rompsite")
@@ -81,6 +94,7 @@
                (:file "cursor")
                (:file "display")
                (:file "syntax-highlight")
+               (:file "ts-highlight")
                (:file "connections")
                (:file "repl" :pathname "../user/repl" :depends-on ("macros" "rompsite" "connections"))))
      (:module io

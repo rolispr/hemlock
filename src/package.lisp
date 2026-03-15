@@ -690,6 +690,7 @@
    #:add-hook
    #:remove-hook
    #:invoke-hook
+   #:*inhibit-hooks*
    #:defcommand
    #:use-buffer
    #:command-case
@@ -1273,6 +1274,7 @@
    #:add-hook
    #:remove-hook
    #:invoke-hook
+   #:*inhibit-hooks*
    #:defcommand
    #:use-buffer
    #:command-case

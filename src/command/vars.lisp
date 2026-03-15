@@ -21,12 +21,16 @@
 ;;;    Complain about an undefined Hemlock variable in a helpful fashion.
 ;;;
 (defun undefined-variable-error (name)
+  "Signal an error for an undefined Hemlock variable Name."
   (if (and (symbolp name)
            (eq (symbol-package name) (find-package :hemlock)))
       (error "Undefined Hemlock variable ~A." name)
       (error "Undefined Hemlock variable ~S." name)))
 
 (defun resolve-variable-symbol (name)
+  "Return the canonical symbol for Hemlock variable Name.  Name may be a
+  symbol or a string.  Searches the :hemlock package when the symbol is not
+  directly bound as a Hemlock variable."
   (etypecase name
     (symbol
      (or (and (get name 'hemlock-variable-value) name)
@@ -42,6 +46,8 @@
 ;;;    Get the mode-object corresponding to name or die trying.
 ;;;
 (defun get-mode-object (name)
+  "Return the mode-object for the mode named by the string Name.  Signals
+  an error if Name is not a defined mode."
   (unless (stringp name) (error "Mode name ~S is not a string." name))
   (let ((res (getstring name *mode-names*)))
     (unless res (error "~S is not a defined mode." name))
@@ -53,6 +59,8 @@
 ;;; of binding Binding, or NIL if none.
 ;;;
 (defun find-binding (name binding)
+  "Return the Binding object for the variable Name in the binding chain
+  Binding, or NIL if no such binding exists."
   (do ((b binding (binding-across b)))
       ((null b) nil)
     (when (eq (binding-symbol b) name) (return b))))
@@ -63,6 +71,10 @@
 ;;; or die trying.
 ;;;
 (defun get-variable-object (name kind where)
+  "Return the variable-object for the Hemlock variable Name.  Kind is one
+  of :current, :buffer, :global, or :mode.  Where is the buffer or mode
+  name for :buffer and :mode kinds.  Signals an error if the variable is
+  not defined in the specified place."
   (let ((name (resolve-variable-symbol name)))
   (case kind
     (:current
@@ -106,6 +118,8 @@
 ;;; current buffer is returned.
 ;;;
 (defun %value (name)
+  "Return the current value of the Hemlock variable Name.  Called by the
+  expansion of the Value macro."
   (let* ((sym (resolve-variable-symbol name))
          (obj (get sym 'hemlock-variable-value)))
     (unless obj (undefined-variable-error name))
@@ -116,6 +130,8 @@
 ;;;    The setf-inverse of Value, set the current value.
 ;;;
 (defun %set-value (var new-value)
+  "Set the current value of the Hemlock variable Var to New-Value, invoking
+  any hook functions.  The setf-inverse of the Value macro."
   (let* ((sym (resolve-variable-symbol var))
          (obj (get sym 'hemlock-variable-value)))
     (unless obj (undefined-variable-error var))
@@ -127,6 +143,8 @@
 ;;;   Set the Hemlock variable with the symbol name "name".
 ;;;
 (defun %set-variable-value (name kind where new-value)
+  "Set the value of the Hemlock variable Name in the specified place,
+  invoking any hook functions."
   (let ((obj (get-variable-object name kind where)))
     (invoke-hook (variable-object-hooks obj) name kind where new-value)
     (setf (variable-object-value obj) new-value)))
@@ -144,6 +162,8 @@
 ;;;    Set the hook-list for Hemlock variable Name.
 ;;;
 (defun %set-variable-hooks (name kind where new-value)
+  "Set the hook function list for the Hemlock variable Name in the
+  specified place."
   (setf (variable-object-hooks (get-variable-object name kind where)) new-value))
 
 ;;; VARIABLE-DOCUMENTATION  --  Public
@@ -159,6 +179,8 @@
 ;;;    Set a variables documentation.
 ;;;
 (defun %set-variable-documentation (name kind where new-value)
+  "Set the documentation string for the Hemlock variable Name in the
+  specified place."
   (setf (variable-object-documentation (get-variable-object name kind where))
         new-value))
 
@@ -221,6 +243,10 @@
 ;;;
 (defun defhvar (name documentation &key mode buffer (hooks nil hook-p)
                      (value nil value-p))
+  "Define a Hemlock variable with the string Name and Documentation.  If
+  Mode is supplied, the variable is mode-local.  If Buffer is supplied, it
+  is buffer-local.  Otherwise it is global.  Hooks is a list of hook
+  functions called when the value changes.  Value is the initial value."
   (let* ((symbol-name (string-to-variable name))
          (new-binding (make-variable-object documentation name))
          (plist (symbol-plist symbol-name))
@@ -271,6 +297,8 @@
 ;;;    Delete a binding from a list of bindings.
 ;;;
 (defun delete-binding (binding bindings)
+  "Remove Binding from the chain of Bindings.  Returns the new head of
+  the chain."
   (do ((b bindings (binding-across b))
        (prev nil b))
       ((eq b binding)

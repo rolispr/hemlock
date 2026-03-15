@@ -19,6 +19,10 @@ GB
 (defun quit ()
   (uiop:quit))
 
+(defvar *pending-error* nil
+  "Condition object deferred for display by the command loop.
+Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
+
 
 ;;;; Definition of *hemlock-version*.
 
@@ -430,10 +434,12 @@ GB
                    :backend-type backend-type
                    :display display)
        (process-command-line-argument x)
-       (invoke-hook hemlock::entry-hook)
+       (handler-case (invoke-hook hemlock::entry-hook)
+         (error (c) (setf *pending-error* c)))
        (unwind-protect
             (command-loop)
-         (invoke-hook hemlock::exit-hook)))
+         (handler-case (invoke-hook hemlock::exit-hook)
+           (error ()))))
      (uiop:quit 0))))
 
 (defun command-loop ()
@@ -444,9 +450,9 @@ GB
          (catch 'editor-top-level-catcher
            (handler-bind
                ((error #'(lambda (condition)
-                           (format *error-output* "~&[hemlock error] ~A~%" condition)
                            (lisp-error-error-handler condition :internal))))
-             (invoke-hook hemlock::abort-hook)
+             (handler-case (invoke-hook hemlock::abort-hook)
+               (error (c) (setf *pending-error* c)))
              (%command-loop)))))))
 
 (defvar *main-event-base* nil)
@@ -489,7 +495,9 @@ GB
               (%init-redisplay backend-type display)
               (setq *editor-has-been-entered* t)
               ;; Pick up user initializations to be done after initialization.
-              (invoke-hook (reverse *after-editor-initializations-funs*)))
+              (handler-case
+                  (invoke-hook (reverse *after-editor-initializations-funs*))
+                (error (c) (setf *pending-error* c))))
             (if (eq backend-type :webui)
                 (hemlock.webui::run-with-webui-event-loop fun)
                 (catch 'hemlock-exit

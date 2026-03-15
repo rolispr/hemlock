@@ -326,17 +326,13 @@
          (font-marks (sy-font-marks sy)))
     (cond ((and (eq (sy-signature sy) (line-signature line))
                 (equal (sy-from-state sy) prev-to))
-           ;; no work
            sy)
           (t
-           ;; work to do, but first remove old font marks
            (dolist (fm font-marks)
              (delete-font-mark fm))
            (setf font-marks nil)
-           ;; now do the highlighting
            (let ((state prev-to)
                  (last-font 0))
-             ;;(print `(:begin ,state) *trace-output*)
              (loop for p from 0 below (line-length line) do
                   (let ((ch (line-character line p)))
                     (setf state (step** state ch))
@@ -345,7 +341,6 @@
                         (push (font-mark line p font) font-marks)
                         (setf last-font font)))))
              (setf state (step** state #\newline))
-             ;; hack
              (let ((s (line-string line)) p1 p2)
                (when (and (eql 0 (search "(def" s))
                           (setf p1 (position #\space s))

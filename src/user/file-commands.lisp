@@ -726,7 +726,10 @@
    The buffer to go to is prompted for."
   (declare (ignore p))
   (let ((buf (prompt-for-buffer :prompt "Select Buffer: "
+                                :must-exist nil
                                 :default (previous-buffer))))
+    (when (stringp buf)
+      (setf buf (make-buffer buf)))
     (when (eq buf *echo-area-buffer*)
       (editor-error "Cannot select Echo Area buffer."))
     (change-to-buffer buf)))

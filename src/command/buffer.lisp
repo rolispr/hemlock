@@ -13,13 +13,18 @@
 ;;;; Buffer lookup and rename
 
 (defun find-buffer (name)
+  "Return the buffer named Name, or NIL if no such buffer exists."
   (getstring name *buffer-names*))
 
 (defun maybe-rename-buffer (buffer new-name)
+  "Rename Buffer to New-Name if no buffer with that name already exists.
+  Returns the new name on success, NIL if the name is taken."
   (unless (find-buffer new-name)
     (setf (buffer-name buffer) new-name)))
 
 (defun rename-buffer-uniquely (buffer new-name)
+  "Rename Buffer to New-Name, appending <N> if necessary to make the name
+  unique among existing buffers."
   (or (maybe-rename-buffer buffer new-name)
       (loop for i from 2
             until (maybe-rename-buffer buffer (format nil "~A<~D>" new-name i)))))
@@ -115,6 +120,8 @@
     (update-modeline-fields buffer w)))
 
 (defun sub-set-buffer-modeline-fields (buffer modeline-fields)
+  "Store the list of modeline-field objects into Buffer's internal
+  modeline-field-info list."
   (unless (every #'modeline-field-p modeline-fields)
     (error "Fields must be a list of modeline-field objects."))
   (setf (buffer-%modeline-fields buffer)
@@ -144,12 +151,16 @@
 (eval-when (:compile-toplevel :execute)
 
 (defmacro unbind-variable-bindings (bindings)
+  "Walk the binding chain Bindings and restore each variable's previous
+  value from the down link."
   `(do ((binding ,bindings (binding-across binding)))
        ((null binding))
      (setf (car (binding-cons binding))
            (variable-object-down (binding-object binding)))))
 
 (defmacro bind-variable-bindings (bindings)
+  "Walk the binding chain Bindings and make each variable's object the
+  current value, saving the previous value in the down link."
   `(do ((binding ,bindings (binding-across binding)))
        ((null binding))
      (let ((cons (binding-cons binding))
@@ -167,6 +178,9 @@
 ;;; unwind all bindings.
 ;;;
 (defun unwind-bindings (mode)
+  "Unbind buffer variable bindings and all mode bindings up to and
+  including Mode in the current buffer.  Returns a list of the mode
+  objects unwound in reverse order.  If Mode is NIL, unwind all bindings."
   (unbind-variable-bindings (buffer-var-values *current-buffer*))
   (do ((curmode (buffer-mode-objects *current-buffer*))
        (unwound ()) cw)
@@ -182,6 +196,8 @@
 ;;;    Add "modes" to the mode bindings currently in effect.
 ;;;
 (defun wind-bindings (modes)
+  "Add Modes to the mode bindings currently in effect for the current
+  buffer, making their variable bindings active."
   (do ((curmode (buffer-mode-objects *current-buffer*)) cw)
       ((null modes) (setf (buffer-mode-objects *current-buffer*) curmode))
     (bind-variable-bindings (mode-object-var-values (car modes)))
@@ -358,6 +374,8 @@
 ;;; new buffer's variable and key bindings and character attributes.
 ;;;
 (defun use-buffer-set-up (old-buffer)
+  "Wind on variable bindings and character attributes for the current
+  buffer.  Called by the Use-Buffer macro on entry."
   (unless (eq old-buffer *current-buffer*)
     ;; Let new char attributes overlay old ones.
     (swap-char-attributes (car (buffer-mode-objects *current-buffer*)))
@@ -369,6 +387,8 @@
 ;;;    This function is called by use-buffer to clean up after it is done.
 ;;;
 (defun use-buffer-clean-up (old-buffer)
+  "Unwind variable bindings and restore character attributes when leaving
+  the current buffer.  Called by the Use-Buffer macro on exit."
   (unless (eq old-buffer *current-buffer*)
     ;; When we leave, unwind the bindings,
     (setf (buffer-mode-objects *current-buffer*) (unwind-bindings nil))
@@ -402,8 +422,13 @@
                        (let ((*in-a-recursive-edit* t))
                          (catch 'leave-recursive-edit
                            (if handle-abort
-                               (loop (catch 'editor-top-level-catcher
-                                       (%command-loop)))
+                               (loop
+                                 (handler-case
+                                     (catch 'editor-top-level-catcher
+                                       (%command-loop))
+                                   (error (c)
+                                     (format *error-output*
+                                             "~&[recursive-edit error] ~A~%" c))))
                                (%command-loop))))
     (case flag
       (:abort (apply #'editor-error args))
@@ -618,6 +643,9 @@
 ;;; fundamental mode and bash it into the buffer.
 ;;;
 (defun setup-initial-buffer ()
+  "Create the Main buffer and the Fundamental mode.  A dummy Fundamental
+  mode object is installed first so that Make-Buffer can succeed, then
+  replaced with the real one after Defmode runs."
   ;; Make it look like the mode is there so make-buffer doesn't die.
   (setf (getstring "Fundamental" *mode-names*)
         (make-mode-object :major-p t))

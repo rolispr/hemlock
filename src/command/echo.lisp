@@ -6,7 +6,10 @@
 (in-package :hemlock.command)
 
 (defmode "Echo Area" :major-p t)
-(defvar *echo-area-buffer* (make-buffer "Echo Area" :modes '("Echo Area"))
+(defvar *echo-area-buffer*
+  (let ((b (make-buffer "Echo Area" :modes '("Echo Area"))))
+    (setf (buffer-undo-p b) nil)
+    b)
   "Buffer used to hack text for the echo area.")
 (defvar *echo-area-region* (buffer-region *echo-area-buffer*)
   "Internal thing that's the *echo-area-buffer*'s region.")

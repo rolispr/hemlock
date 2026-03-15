@@ -920,9 +920,10 @@
 (bind-key "Dabbrev Expand"     #k"meta-/")
 (bind-key "Just One Space"     #k"meta-space")
 (bind-key "Mark Form"          #k"control-meta-space")
-(bind-key "New Undo"           #k"control-_")
-(bind-key "New Undo"           #k"control-Delete")
-(bind-key "New Undo"           #k"control-x u")
+(bind-key "Undo"           #k"control-_")
+(bind-key "Undo"           #k"control-Delete")
+(bind-key "Undo"           #k"control-x u")
+(bind-key "Undo In Region"     #k"control-c control-_")
 
 (bind-key "Quickselect"           #k"control-c space")
 

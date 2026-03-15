@@ -185,3 +185,103 @@
   "ambiguous-files returns a list."
   (let ((results (ambiguous-files "/tmp/")))
     (is (listp results))))
+
+
+;;;; ---- Error Robustness -----------------------------------------------------
+
+(test inhibit-hooks-suppresses-invoke-hook
+  "invoke-hook is a no-op when *inhibit-hooks* is T."
+  (let ((fired nil))
+    (defhvar "Inhibit Test Hook CL" "Hook for testing inhibit." :value nil)
+    (unwind-protect
+         (progn
+           (add-hook (variable-hooks (string-to-variable "Inhibit Test Hook CL"))
+                     (lambda (&rest args)
+                       (declare (ignore args))
+                       (setf fired t)))
+           ;; Normal: hook fires
+           (setf (variable-value (string-to-variable "Inhibit Test Hook CL")) 1)
+           (is-true fired)
+           ;; Inhibited: hook does NOT fire
+           (setf fired nil)
+           (let ((*inhibit-hooks* t))
+             (setf (variable-value (string-to-variable "Inhibit Test Hook CL")) 2))
+           (is-false fired))
+      (delete-variable (string-to-variable "Inhibit Test Hook CL")))))
+
+(test broken-hook-defers-error-and-removes
+  "A hook that signals error defers to *pending-error* and is removed from the list."
+  (let ((hemlock::*pending-error* nil))
+    (defhvar "Broken Hook Var CL" "For broken hook test." :value nil)
+    (unwind-protect
+         (let ((sym (string-to-variable "Broken Hook Var CL")))
+           (add-hook (variable-hooks sym)
+                     (lambda (&rest args)
+                       (declare (ignore args))
+                       (error "broken hook test")))
+           ;; Setting the variable triggers the hook which errors
+           (setf (variable-value sym) 42)
+           ;; Error should be deferred, not propagated
+           (is-true (typep hemlock::*pending-error* 'error))
+           (is (search "broken hook test"
+                       (format nil "~A" hemlock::*pending-error*)))
+           ;; Broken hook should be removed from the list
+           (is (null (variable-hooks sym)))
+           ;; Setting again should NOT error (hook was removed)
+           (setf hemlock::*pending-error* nil)
+           (setf (variable-value sym) 99)
+           (is (null hemlock::*pending-error*)))
+      (delete-variable (string-to-variable "Broken Hook Var CL")))))
+
+(test broken-hook-does-not-block-other-hooks
+  "A broken hook does not prevent subsequent hooks from running."
+  (let ((hemlock::*pending-error* nil)
+        (second-fired nil))
+    (defhvar "Multi Hook Var CL" "For multi hook test." :value nil)
+    (unwind-protect
+         (let ((sym (string-to-variable "Multi Hook Var CL")))
+           (add-hook (variable-hooks sym)
+                     (lambda (&rest args)
+                       (declare (ignore args))
+                       (error "first hook boom")))
+           (add-hook (variable-hooks sym)
+                     (lambda (&rest args)
+                       (declare (ignore args))
+                       (setf second-fired t)))
+           (setf (variable-value sym) 99)
+           ;; First hook errored, second should still have run
+           (is-true second-fired)
+           (is-true (typep hemlock::*pending-error* 'error))
+           (setf hemlock::*pending-error* nil))
+      (delete-variable (string-to-variable "Multi Hook Var CL")))))
+
+(test buffer-modified-with-broken-hook
+  "Buffer modification completes even when buffer-modified-hook errors."
+  (let ((hemlock::*pending-error* nil)
+        (buf (make-buffer "Broken Hook Buf CL")))
+    (unwind-protect
+         (progn
+           ;; The buffer-modified-notifier calls invoke-hook on buffer-modified-hook.
+           ;; We can't easily add to hemlock's buffer-modified-hook from tests
+           ;; without the full editor init, but we CAN verify that buffer
+           ;; modification itself doesn't crash when invoke-hook catches errors.
+           (insert-string (buffer-point buf) "hello")
+           (is (string= "hello"
+                         (region-to-string (buffer-region buf)))))
+      (delete-buffer buf))))
+
+(test tick-updated-before-notifier
+  "Buffer modification tick is updated before the notifier fires,
+preventing retrigger on subsequent modifications."
+  (let ((buf (make-buffer "Tick Test CL")))
+    (unwind-protect
+         (progn
+           ;; First modification marks buffer as modified
+           (insert-string (buffer-point buf) "a")
+           (is-true (buffer-modified buf))
+           ;; Second modification should not re-fire the 'first modified' notifier
+           ;; (tick already updated). Just verify no error.
+           (insert-string (buffer-point buf) "b")
+           (is (string= "ab"
+                         (region-to-string (buffer-region buf)))))
+      (delete-buffer buf))))

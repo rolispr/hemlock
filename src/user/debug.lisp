@@ -110,9 +110,11 @@
 (defmode "Debugger" :major-p t
   :documentation "Presents condition info and restart choices for selection.")
 
+(defvar *showing-error* nil
+  "T while show-error-in-buffer is active.  Prevents nested error display.")
+
 (defvar *debugger-restarts* nil
-  "Live restart objects for a master-process error being debugged.
-Non-nil means we are inside enter-master-debugger.")
+  "Live restart objects for a master-process error being debugged.")
 
 (defvar *debugger-restart-count* nil
   "Number of restarts in an agent debugger session.
@@ -143,9 +145,11 @@ Non-nil means we are inside master-agent-debugger.")
      (let ((abort (find 'abort *debugger-restarts* :key #'restart-name)))
        (if abort
            (invoke-restart abort)
-           (throw 'command-loop-catcher nil))))
+           (throw 'leave-recursive-edit (values :abort nil)))))
     (*debugger-restart-count*
-     (invoke-restart 'debugger-chose nil))))
+     (invoke-restart 'debugger-chose nil))
+    (t
+     (throw 'leave-recursive-edit (values :abort nil)))))
 
 ;;; Bind keys here (not in bindings.lisp) so they're always set up
 ;;; together with the mode and commands when debug.lisp is loaded.
@@ -169,13 +173,18 @@ Non-nil means we are inside master-agent-debugger.")
     (with-output-to-mark (s (buffer-point buf))
       (format s "--- Debugger [~A] ---~%~%  ~A~%~%Restarts:~%"
               condition-type condition-msg)
-      (loop for r in restart-strings for i from 0
-            do (format s "  ~D: ~A~%" i r))
+      (if restart-strings
+          (loop for r in restart-strings for i from 0
+                do (format s "  ~D: ~A~%" i r))
+          (format s "  (none)~%"))
       (when frame-strings
         (format s "~%Backtrace:~%")
         (loop for f in frame-strings for i from 0
               do (format s "  ~D: ~A~%" i f)))
-      (format s "~%Press 0-9 to invoke a restart, q to abort.~%")))
+      (format s "~%~A~%"
+              (if restart-strings
+                  "Press 0-9 to invoke a restart, q to abort."
+                  "Press q to dismiss."))))
   (buffer-start (buffer-point buf)))
 
 
@@ -199,21 +208,24 @@ Returns the chosen restart index (integer) or NIL for abort."
         (change-to-buffer prev-buffer)))))
 
 
-(defun enter-master-debugger (condition)
-  "Show an interactive restart menu for a condition signalled in the master process.
-Must be called from within a handler-bind that caught CONDITION so restarts remain live."
-  (let* ((restarts (compute-restarts condition))
-         (frames   (ignore-errors
-                     (hemlock.introspect:compute-backtrace 0 20)))
-         (buf (or (getstring "*Debugger*" *buffer-names*)
-                  (make-buffer "*Debugger*" :modes '("Debugger"))))
-         (*debugger-restarts* restarts)
+(defun show-error-in-buffer (condition)
+  "Display error info in a buffer and enter a command loop so the user
+can inspect and press q to dismiss.  Hooks are inhibited during rendering.
+Does not nest — if already showing an error, returns immediately."
+  (when *showing-error*
+    (return-from show-error-in-buffer nil))
+  (let* ((*showing-error* t)
+         (*inhibit-hooks* t)
+         (buf (or (getstring "*Editor Errors*" *buffer-names*)
+                  (make-buffer "*Editor Errors*" :modes '("Debugger"))))
+         (frames (ignore-errors
+                   (hemlock.introspect:compute-backtrace 0 20)))
          (prev-buffer (current-buffer)))
     (render-debugger-buffer
      buf
      (type-of condition)
      (format nil "~A" condition)
-     (mapcar (lambda (r) (format nil "~A" r)) restarts)
+     nil
      (when frames
        (mapcar (lambda (f)
                  (with-output-to-string (s)
@@ -221,7 +233,13 @@ Must be called from within a handler-bind that caught CONDITION so restarts rema
                frames)))
     (unwind-protect
         (progn
+          (setf *inhibit-hooks* nil)
+          ;; If we're in the echo area, switch to a real window first
+          (when (eq (current-window) *echo-area-window*)
+            (let ((win (car (remove *echo-area-window* *window-list*))))
+              (when win (setf (current-window) win))))
           (change-to-buffer buf)
-          (%command-loop))
+          (catch 'leave-recursive-edit
+            (%command-loop)))
       (when (member prev-buffer *buffer-list*)
         (change-to-buffer prev-buffer)))))
