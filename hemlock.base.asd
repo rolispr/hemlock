@@ -89,9 +89,17 @@
               :depends-on (core-2)
               :components
               ((:file "ioconnections")))
+     (:module ui
+              :pathname "src/ui/"
+              :depends-on (core-2 io)
+              :serial t
+              :components
+              ((:file "nodes")
+               (:file "render")
+               (:file "input")))
      (:module root-1
               :pathname "src/command/"
-              :depends-on (core-2 core-1 io)
+              :depends-on (core-2 core-1 io ui)
               :components
               ((:file "font")
                (:file "streams")
@@ -109,7 +117,8 @@
               :depends-on (root-1 core-1 wire)
               :components
               ((:file "completion-source")
-               (:file "echo-commands")
+               (:file "echo-completion")
+               (:file "echo-commands" :depends-on ("echo-completion"))
                (:file "command")
                (:file "kbd-macro")
                (:file "undo")

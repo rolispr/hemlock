@@ -2,10 +2,6 @@
 ;;;
 ;;; Render pass: walk a ui-node tree and write it into a hemlock buffer.
 ;;;
-;;; Full re-render on every call (sufficient for small UI buffers like
-;;; the echo area).  Reconciliation can be added later using node keys
-;;; and marks to diff.
-;;;
 
 (in-package :hemlock.command)
 
@@ -13,29 +9,21 @@
 ;;;; Top-level entry
 
 (defun render-tree (tree)
-  "Render the ui-tree's root node into its buffer.
-Clears the buffer and writes fresh content.  Sets marks on each node."
-  (let* ((buffer (ui-tree-buffer tree))
-         (region (buffer-region buffer))
-         (width  (ui-tree-width tree)))
-    ;; clear everything
-    (delete-region region)
-    ;; render from the start
-    (let ((point (buffer-point buffer)))
-      (move-mark point (region-start region))
-      (render-node (ui-tree-root tree) point width)
-      ;; remove trailing newline if we left one
-      (let ((end (region-end region)))
-        (when (and (plusp (line-length (mark-line end)))
-                   (not (zerop (mark-charpos end))))
-          nil)))))  ; leave as-is
+  "Clear the buffer and render the tree's root node into it."
+  (let ((*tree-rendering* t))
+    (let* ((buffer (ui-tree-buffer tree))
+           (region (buffer-region buffer))
+           (width  (ui-tree-width tree)))
+      (delete-region region)
+      (let ((point (buffer-point buffer)))
+        (move-mark point (region-start region))
+        (render-node (ui-tree-root tree) point width)))))
 
 
 ;;;; Generic render dispatch
 
 (defgeneric render-node (node point width)
-  (:documentation "Render NODE into the buffer at POINT, with WIDTH columns available.
-POINT is advanced past the rendered content."))
+  (:documentation "Render NODE into the buffer at POINT, with WIDTH columns available."))
 
 
 ;;;; Text
@@ -62,15 +50,15 @@ POINT is advanced past the rendered content."))
 (defmethod render-node ((node ui-field) point width)
   (declare (ignore width))
   (setf (ui-node-start-mark node) (copy-mark point :right-inserting))
-  ;; input-start: right-inserting so text typed goes after the mark
-  (setf (ui-field-input-start node) (copy-mark point :right-inserting))
-  (let ((content (ui-field-content node)))
-    (when (plusp (length content))
-      (insert-string point content)))
-  ;; input-end: left-inserting so text typed goes before the mark
-  (setf (ui-field-input-end node) (copy-mark point :left-inserting))
-  (setf (ui-node-end-mark node) (copy-mark point :left-inserting))
-  ;; tag the line so input handling can find the field
+  (let* ((content (ui-field-content node))
+         (plen (ui-field-prefix-length node)))
+    (when (plusp plen)
+      (insert-string point (subseq content 0 (min plen (length content)))))
+    (setf (ui-field-input-start node) (copy-mark point :left-inserting))
+    (when (< plen (length content))
+      (insert-string point (subseq content plen)))
+    (setf (ui-field-input-end node) (copy-mark point :right-inserting)))
+  (setf (ui-node-end-mark node) (copy-mark point :right-inserting))
   (setf (getf (line-plist (mark-line point)) :ui-field) node))
 
 
@@ -101,8 +89,7 @@ POINT is advanced past the rendered content."))
           do (setf (ui-node-parent child) node)
              (let ((before (mark-charpos point)))
                (render-node child point (- width col))
-               (let ((after (mark-charpos point)))
-                 (incf col (- after before))))
+               (incf col (- (mark-charpos point) before)))
              (when rest
                (dotimes (_ spacing)
                  (insert-character point #\space)
@@ -120,7 +107,6 @@ POINT is advanced past the rendered content."))
          (align     (ui-box-align node))
          (pad-char  (ui-box-pad node)))
     (if child
-        ;; render child to a string, then pad/align into box
         (let* ((content (render-node-to-string child box-width))
                (len     (length content))
                (padded  (if (>= len box-width)
@@ -129,12 +115,10 @@ POINT is advanced past the rendered content."))
                               (ecase align
                                 (:left
                                  (concatenate 'string content
-                                              (make-string pad-total
-                                                           :initial-element pad-char)))
+                                              (make-string pad-total :initial-element pad-char)))
                                 (:right
                                  (concatenate 'string
-                                              (make-string pad-total
-                                                           :initial-element pad-char)
+                                              (make-string pad-total :initial-element pad-char)
                                               content))
                                 (:center
                                  (let ((left (floor pad-total 2))
@@ -142,10 +126,8 @@ POINT is advanced past the rendered content."))
                                    (concatenate 'string
                                                 (make-string left :initial-element pad-char)
                                                 content
-                                                (make-string right
-                                                             :initial-element pad-char)))))))))
+                                                (make-string right :initial-element pad-char)))))))))
           (insert-string point padded))
-        ;; no child: just pad
         (insert-string point (make-string box-width :initial-element pad-char))))
   (setf (ui-node-end-mark node) (copy-mark point :left-inserting)))
 
@@ -163,7 +145,6 @@ POINT is advanced past the rendered content."))
     (when child
       (setf (ui-node-parent child) node)
       (render-node child point (- width (length prefix))))
-    ;; tag line with selection state
     (setf (getf (line-plist (mark-line (ui-node-start-mark node))) :ui-selectable) node))
   (setf (ui-node-end-mark node) (copy-mark point :left-inserting)))
 
@@ -196,7 +177,30 @@ POINT is advanced past the rendered content."))
   (setf (ui-node-end-mark node) (copy-mark point :left-inserting)))
 
 
-;;;; Utility: render a node to a string (for box alignment)
+;;;; Grid
+
+(defmethod render-node ((node ui-grid) point width)
+  (declare (ignore width))
+  (setf (ui-node-start-mark node) (copy-mark point :right-inserting))
+  (let ((col-widths (ui-grid-col-widths node))
+        (rows (ui-grid-cells node)))
+    (loop for (row . more-rows) on rows
+          do (loop for cell in row
+                   for w in col-widths
+                   do (setf (ui-node-parent cell) node)
+                      (let ((content (render-node-to-string cell w)))
+                        (insert-string point
+                          (if (> (length content) w)
+                              (subseq content 0 w)
+                              (concatenate 'string content
+                                (make-string (- w (length content))
+                                             :initial-element #\space))))))
+             (when more-rows
+               (insert-character point #\newline))))
+  (setf (ui-node-end-mark node) (copy-mark point :left-inserting)))
+
+
+;;;; Utility
 
 (defun render-node-to-string (node width)
   "Render NODE into a temporary buffer and return the first line as a string."

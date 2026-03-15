@@ -35,10 +35,11 @@
   "Editable text input zone.  Content is tracked by marks; edits
 within the field update the model."
   (content  "" :type string)
+  (prefix-length 0 :type fixnum)  ; chars of content that are non-editable prefix
   (face     nil)
   ;; populated during render:
-  (input-start nil)   ; right-inserting mark at start of editable region
-  (input-end   nil))  ; left-inserting mark at end of editable region
+  (input-start nil)   ; left-inserting mark at start of editable region
+  (input-end   nil))  ; right-inserting mark at end of editable region
 
 
 ;;;; Layout nodes
@@ -84,6 +85,16 @@ within the field update the model."
   (items     nil :type list)       ; data items
   (item-fn   nil)                  ; (lambda (item index)) -> ui-node
   (max-visible nil))               ; limit visible items (nil = all)
+
+
+;;;; Grid node — rows x cols with fixed column widths
+
+(defstruct (ui-grid (:include ui-node) (:copier nil))
+  "A rows x cols grid.  Each cell is a ui-node.
+CELLS is a 2D list: ((r0c0 r0c1 r0c2) (r1c0 r1c1 r1c2) ...).
+COL-WIDTHS is a list of integers, one per column."
+  (cells      nil :type list)    ; list of rows, each row a list of nodes
+  (col-widths nil :type list))   ; list of integers
 
 
 ;;;; Tree container

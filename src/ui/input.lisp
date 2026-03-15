@@ -1,100 +1,182 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; Input handling for ui-tree buffers.
-;;;
-;;; - Field nodes: editable zones tracked by marks
-;;; - Selectable nodes: navigation with selection index
-;;; - Action nodes: callback on confirm
+;;; Tree state management, input operations, and selection navigation.
 ;;;
 
 (in-package :hemlock.command)
 
 
-;;;; Tree state accessors
+;;;; Rendering flag
+
+(defvar *tree-rendering* nil
+  "Bound to T while a ui-tree is rendering into its buffer.")
+
+
+;;;; Tree ownership
+
+(defvar *buffer-tree-table* (make-hash-table :test #'eq))
+
+(defun install-tree (tree)
+  (setf (gethash (ui-tree-buffer tree) *buffer-tree-table*) tree))
+
+(defun uninstall-tree (tree)
+  (remhash (ui-tree-buffer tree) *buffer-tree-table*))
+
+(defun buffer-ui-tree (buffer)
+  (gethash buffer *buffer-tree-table*))
+
+
+;;;; State accessors
 
 (defun ui-tree-get (tree key &optional default)
-  "Get a value from the tree's state plist."
   (getf (ui-tree-state tree) key default))
 
 (defun (setf ui-tree-get) (value tree key)
-  "Set a value in the tree's state plist."
   (setf (getf (ui-tree-state tree) key) value)
   value)
 
 
-;;;; Finding the active field
+;;;; Input state operations
+;;;
+;;; These operate on :input (string) and :cursor-offset (fixnum) in
+;;; the tree's state plist.  They modify state only — the caller is
+;;; responsible for re-rendering.
 
-(defun find-field-at-point (point)
-  "Return the ui-field node at POINT, or nil."
-  (getf (line-plist (mark-line point)) :ui-field))
+(defun input-string (tree)
+  (getf (ui-tree-state tree) :input ""))
 
-(defun point-in-field-p (point field)
-  "True if POINT is within the editable region of FIELD."
-  (and field
-       (ui-field-input-start field)
-       (ui-field-input-end field)
-       (mark>= point (ui-field-input-start field))
-       (mark<= point (ui-field-input-end field))))
+(defun (setf input-string) (val tree)
+  (setf (getf (ui-tree-state tree) :input) val))
 
-(defun field-content (field)
-  "Return the current text content of a rendered field node."
-  (when (and (ui-field-input-start field)
-             (ui-field-input-end field))
-    (region-to-string
-     (region (ui-field-input-start field)
-             (ui-field-input-end field)))))
+(defun cursor-offset (tree)
+  (let ((input (input-string tree)))
+    (min (getf (ui-tree-state tree) :cursor-offset (length input))
+         (length input))))
+
+(defun (setf cursor-offset) (val tree)
+  (setf (getf (ui-tree-state tree) :cursor-offset) val))
+
+(defun type-char-at-cursor (tree char)
+  "Insert CHAR at cursor position in input."
+  (let* ((input (input-string tree))
+         (off (cursor-offset tree)))
+    (setf (input-string tree)
+          (concatenate 'string (subseq input 0 off) (string char) (subseq input off)))
+    (setf (cursor-offset tree) (1+ off))))
+
+(defun delete-char-before-cursor (tree)
+  "Delete one char before cursor. Returns T if deleted, NIL if at start."
+  (let* ((input (input-string tree))
+         (off (cursor-offset tree)))
+    (when (plusp off)
+      (setf (input-string tree)
+            (concatenate 'string (subseq input 0 (1- off)) (subseq input off)))
+      (setf (cursor-offset tree) (1- off))
+      t)))
+
+(defun kill-input (tree)
+  "Clear all input."
+  (setf (input-string tree) ""
+        (cursor-offset tree) 0))
+
+(defun kill-to-end (tree)
+  "Kill from cursor to end of input."
+  (let ((off (cursor-offset tree)))
+    (setf (input-string tree) (subseq (input-string tree) 0 off))))
+
+(defun kill-word-before-cursor (tree)
+  "Kill the word before cursor."
+  (let* ((input (input-string tree))
+         (off (cursor-offset tree))
+         (pos (loop for i from (1- off) downto 0
+                    while (eql (char input i) #\space)
+                    finally (return (1+ i))))
+         (word-start (loop for i from (1- pos) downto 0
+                           while (not (eql (char input i) #\space))
+                           finally (return (1+ i)))))
+    (setf (input-string tree)
+          (concatenate 'string (subseq input 0 word-start) (subseq input off)))
+    (setf (cursor-offset tree) word-start)))
+
+(defun backward-word-offset (tree)
+  "Return the cursor offset after moving back one word."
+  (let* ((input (input-string tree))
+         (off (cursor-offset tree))
+         (pos (loop for i from (1- off) downto 0
+                    while (eql (char input i) #\space)
+                    finally (return (1+ i))))
+         (word-start (loop for i from (1- pos) downto 0
+                           while (not (eql (char input i) #\space))
+                           finally (return (1+ i)))))
+    word-start))
+
+(defun move-cursor-backward-word (tree)
+  (setf (cursor-offset tree) (backward-word-offset tree)))
+
+(defun set-input (tree text)
+  "Replace input with TEXT, cursor at end."
+  (setf (input-string tree) (or text "")
+        (cursor-offset tree) (length (or text ""))))
+
+(defun move-cursor (tree delta)
+  "Move cursor by DELTA, clamped to [0, input-length]."
+  (let* ((input (input-string tree))
+         (off (cursor-offset tree))
+         (new (max 0 (min (length input) (+ off delta)))))
+    (setf (cursor-offset tree) new)))
+
+(defun cursor-to-start (tree)
+  (setf (cursor-offset tree) 0))
+
+(defun cursor-to-end (tree)
+  (setf (cursor-offset tree) (length (input-string tree))))
+
+(defun confirm-input (tree)
+  "Return the string to confirm: selected candidate or typed input."
+  (let ((sel (getf (ui-tree-state tree) :selection -1))
+        (filtered (getf (ui-tree-state tree) :filtered)))
+    (if (and (>= sel 0) (< sel (length filtered)))
+        (nth sel filtered)
+        (input-string tree))))
 
 
 ;;;; Selection navigation
 
 (defun collect-selectables (node)
-  "Walk the node tree and collect all ui-selectable nodes in render order."
+  "Walk the node tree and collect all ui-selectable nodes."
   (let ((result nil))
     (labels ((walk (n)
-               (typecase n
-                 (ui-selectable (push n result))
-                 (ui-vstack (mapc #'walk (ui-vstack-children n)))
-                 (ui-hstack (mapc #'walk (ui-hstack-children n)))
-                 (ui-box    (when (ui-box-child n) (walk (ui-box-child n))))
-                 (ui-list   ;; list children are generated; walk items if rendered
-                  (when (ui-list-item-fn n)
-                    (let ((items (ui-list-items n))
-                          (max-v (ui-list-max-visible n)))
-                      (loop for item in (if max-v
-                                             (subseq items 0 (min max-v (length items)))
-                                             items)
-                            for idx from 0
-                            for child = (funcall (ui-list-item-fn n) item idx)
-                            do (walk child)))))
-                 (ui-action (when (ui-action-child n) (walk (ui-action-child n))))
-                 (t nil))))
+               (when n
+                 (typecase n
+                   (ui-selectable (push n result))
+                   (ui-vstack (mapc #'walk (ui-vstack-children n)))
+                   (ui-hstack (mapc #'walk (ui-hstack-children n)))
+                   (ui-box (walk (ui-box-child n)))
+                   (ui-grid (dolist (row (ui-grid-cells n))
+                              (mapc #'walk row)))
+                   (ui-action (walk (ui-action-child n)))
+                   (t nil)))))
       (walk node))
     (nreverse result)))
 
 (defun update-selection (tree index)
-  "Set the selection index in TREE's state and mark the appropriate
-selectable nodes.  Returns the selected node or nil."
   (let* ((root (ui-tree-root tree))
          (selectables (collect-selectables root))
          (n (length selectables)))
     (when (zerop n) (return-from update-selection nil))
-    ;; clamp index
     (setf index (mod index n))
     (setf (ui-tree-get tree :selection-index) index)
-    ;; update selectedp flags
     (loop for s in selectables
           for i from 0
           do (setf (ui-selectable-selectedp s) (= i index)))
     (nth index selectables)))
 
 (defun selected-node (tree)
-  "Return the currently selected ui-selectable, or nil."
   (let ((idx (ui-tree-get tree :selection-index 0)))
     (let ((selectables (collect-selectables (ui-tree-root tree))))
       (when selectables
         (nth (mod idx (length selectables)) selectables)))))
 
 (defun selection-move (tree delta)
-  "Move selection by DELTA (+1 = down, -1 = up).  Returns the new selected node."
   (let ((idx (ui-tree-get tree :selection-index 0)))
     (update-selection tree (+ idx delta))))

@@ -162,13 +162,14 @@
                       ((found-entry-p loc-contents entry entry-len hash-and-len)
                        (setf (dictionary-ref loc) spell-deleted-entry))
                       (t
-                       (hash2-loop (loop-loc loc-contents) loc hash
-                                   nil
-                                   (when (found-entry-p loc-contents entry
-                                                        entry-len hash-and-len)
-                                     (setf (dictionary-ref loop-loc)
-                                           spell-deleted-entry)
-                                     (return spell-deleted-entry))))))))))))
+                       (block nil
+                         (hash2-loop (loop-loc loc-contents) loc hash
+                                     nil
+                                     (when (found-entry-p loc-contents entry
+                                                          entry-len hash-and-len)
+                                       (setf (dictionary-ref loop-loc)
+                                             spell-deleted-entry)
+                                       (return spell-deleted-entry)))))))))))))
 
 (defun spell-root-flags (index)
   "Return the flags associated with the root word corresponding to a

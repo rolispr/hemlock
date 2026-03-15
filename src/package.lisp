@@ -939,6 +939,45 @@
    #:complete-file-directory
    #:ambiguous-files
    #:set-file-permissions
+
+   ;; ui node tree (src/ui/)
+   #:ui-node #:ui-text #:ui-field #:ui-vstack #:ui-hstack #:ui-box
+   #:ui-selectable #:ui-action #:ui-list #:ui-separator #:ui-tree
+   #:make-ui-text #:make-ui-field #:make-ui-vstack #:make-ui-hstack
+   #:make-ui-box #:make-ui-selectable #:make-ui-action #:make-ui-list
+   #:make-ui-separator #:make-ui-tree
+   #:ui-tree-root #:ui-tree-buffer #:ui-tree-state #:ui-tree-width
+   #:ui-selectable-data #:ui-selectable-selectedp
+   #:ui-node-start-mark #:ui-node-end-mark
+   #:render-node #:render-tree
+   #:ui-tree-get #:selected-node #:selection-move
+   #:collect-selectables #:update-selection
+
+   ;; ui-tree buffer ownership and edit protection
+   #:*tree-rendering*
+   #:install-tree #:uninstall-tree #:buffer-ui-tree
+
+   ;; input state operations (src/ui/input.lisp)
+   #:input-string #:cursor-offset
+   #:type-char-at-cursor #:delete-char-before-cursor
+   #:kill-input #:kill-to-end #:kill-word-before-cursor
+   #:move-cursor #:cursor-to-start #:cursor-to-end
+   #:move-cursor-backward-word #:backward-word-offset
+   #:set-input #:confirm-input
+
+   ;; grid node
+   #:ui-grid #:make-ui-grid #:ui-grid-cells #:ui-grid-col-widths
+
+   ;; echo area completion (src/user/echo-completion.lisp)
+   #:make-echo-completion-tree
+   #:cleanup-echo-completion-tree
+   #:build-echo-grid
+   #:echo-render #:echo-refilter
+   #:echo-type-char #:echo-delete-char
+   #:echo-kill #:echo-kill-end #:echo-kill-word
+   #:echo-set-input #:echo-select
+   #:echo-move-cursor #:echo-cursor-start #:echo-cursor-end
+   #:echo-confirm #:echo-backward-word #:echo-set-message
    ))
 
 

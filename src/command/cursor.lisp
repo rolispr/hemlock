@@ -254,6 +254,9 @@
 ;;; the screen.
 ;;;
 (defun maybe-recenter-window (window)
+  ;; The echo area is a fixed grid — never recenter it.
+  (when (eq window *echo-area-window*)
+    (return-from maybe-recenter-window nil))
   (unless (%displayed-p (buffer-point (window-buffer window)) window)
     (center-window window (buffer-point (window-buffer window)))
     t))
