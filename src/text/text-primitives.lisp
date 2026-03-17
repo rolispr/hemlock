@@ -40,6 +40,10 @@
 (defvar line-cache-length 200
   "Length of Open-Chars.")
 
+(defvar *ts-text-change-hook* nil
+  "If non-nil, a function (buffer) called after every buffer text modification,
+  on the command thread, with the text fully applied.")
+
 (defvar open-line ()
   "Line open for hacking on.")
 
@@ -152,19 +156,20 @@
 ;;;
 (defun invoke-modifying-buffer (fun buffer)
   "Does groovy stuff for modifying buffers."
-  (progn
-    (when (bufferp buffer)
-      (unless (buffer-writable buffer)
-        (editor-error "Buffer ~S is read only." (buffer-name buffer)))
-      (when (< (buffer-modified-tick buffer)
-               (buffer-unmodified-tick buffer))
-        ;; Update tick FIRST so a hook error doesn't leave the buffer in a
-        ;; state where every subsequent modification retriggers the hook.
-        (setf (buffer-modified-tick buffer) (tick))
-        (when *buffer-modified-notifier*
-          (funcall *buffer-modified-notifier* buffer t)))
-      (setf (buffer-modified-tick buffer) (tick)))
-    (without-interrupts (funcall fun))))
+  (when (bufferp buffer)
+    (unless (buffer-writable buffer)
+      (editor-error "Buffer ~S is read only." (buffer-name buffer)))
+    (when (< (buffer-modified-tick buffer)
+             (buffer-unmodified-tick buffer))
+      ;; Update tick FIRST so a hook error doesn't leave the buffer in a
+      ;; state where every subsequent modification retriggers the hook.
+      (setf (buffer-modified-tick buffer) (tick))
+      (when *buffer-modified-notifier*
+        (funcall *buffer-modified-notifier* buffer t)))
+    (setf (buffer-modified-tick buffer) (tick)))
+  (prog1 (without-interrupts (funcall fun))
+    (when (and *ts-text-change-hook* (bufferp buffer))
+      (ignore-errors (funcall *ts-text-change-hook* buffer)))))
 
 (defmacro modifying-buffer (buffer &body forms)
   "Does groovy stuff for modifying buffers."

@@ -40,6 +40,8 @@
   "
     (generate-palette-css)
     "
+  .fg-1{color:#6a9955} .fg-2{color:#ce9178} .fg-3{color:#b5cea8}
+  .fg-4{color:#4ec9b0} .fg-5{color:#569cd6} .fg-6{color:#dcdcaa}
   .bold{font-weight:bold} .underline{text-decoration:underline}
   .reverse{filter:invert(100%)} .italic{font-style:italic}
 </style></head>

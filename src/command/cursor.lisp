@@ -257,9 +257,10 @@
   ;; The echo area is a fixed grid — never recenter it.
   (when (eq window *echo-area-window*)
     (return-from maybe-recenter-window nil))
-  (unless (%displayed-p (buffer-point (window-buffer window)) window)
-    (center-window window (buffer-point (window-buffer window)))
-    t))
+  (let ((point (buffer-point (window-buffer window))))
+    (unless (%displayed-p point window)
+      (center-window window point)
+      t)))
 
 ;;; center-window  --  Public
 ;;;

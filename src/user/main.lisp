@@ -439,7 +439,11 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
        (unwind-protect
             (command-loop)
          (handler-case (invoke-hook hemlock::exit-hook)
-           (error ()))))
+           (error ()))
+         (when hemlock.command::*ts-actor-system*
+           (ac:shutdown hemlock.command::*ts-actor-system* :wait nil)
+           (setf hemlock.command::*ts-actor-system* nil
+                 hemlock.command::*ts-actor* nil))))
      (uiop:quit 0))))
 
 (defun command-loop ()
@@ -497,7 +501,11 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
               ;; Pick up user initializations to be done after initialization.
               (handler-case
                   (invoke-hook (reverse *after-editor-initializations-funs*))
-                (error (c) (setf *pending-error* c))))
+                (error (c) (setf *pending-error* c)))
+              (when hemlock.command::*ts-init-failed*
+                (message "tree-sitter unavailable~@[: ~A~]"
+                         hemlock.command::*ts-last-error*)
+                (setf hemlock.command::*ts-last-error* nil)))
             (if (eq backend-type :webui)
                 (hemlock.webui::run-with-webui-event-loop fun)
                 (catch 'hemlock-exit

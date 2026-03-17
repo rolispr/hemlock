@@ -25,7 +25,8 @@
                   :babel
                   :trivial-garbage
                   :cl-ppcre
-                  :command-line-arguments)
+                  :command-line-arguments
+                  :sento)
     :components
     ((:module wire
               :pathname "src/wire/"

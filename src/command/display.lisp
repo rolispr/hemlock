@@ -198,7 +198,7 @@
                                           (window-hunk win))))
                             (device-force-output device)
                             (device-after-redisplay device))))
-                   (let ((windows (buffer-windows buffer)))
+                          (let ((windows (buffer-windows buffer)))
                      (when (member *current-window* windows :test #'eq)
                        (redisplay-window-recentering *current-window*)
                        (frob *current-window*))
@@ -251,7 +251,9 @@
 ;;;
 (defun redisplay-window-recentering (window)
   (setup-for-recentering-redisplay window)
-  (invoke-hook hemlock::redisplay-hook window)
+  (handler-case (invoke-hook hemlock::redisplay-hook window)
+    (error (e)
+      (format *error-output* "~&[redisplay-hook error] ~A~%" e)))
   (setup-for-recentering-redisplay window)
   (prog1
       (not (eq (window-first-changed window) the-sentinel))
@@ -278,13 +280,14 @@
   "Update Window's image only if the buffer text has changed or the
   display start has moved.  Returns T if the image was updated, NIL
   otherwise."
-  (when (or (> (buffer-modified-tick (window-buffer window))
-               (window-tick window))
-            (mark/= (window-display-start window)
-                    (window-old-start window)))
-    (setf (window-tick window) (tick))
-    (update-window-image window)
-    t))
+  (let ((bmt (buffer-modified-tick (window-buffer window)))
+        (wt  (window-tick window)))
+    (when (or (> bmt wt)
+              (mark/= (window-display-start window)
+                      (window-old-start window)))
+      (setf (window-tick window) (tick))
+      (update-window-image window)
+      t)))
 
 
 ;;; prepare-window-for-redisplay  --  Internal

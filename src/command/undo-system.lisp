@@ -197,6 +197,10 @@
 
 
 (defmethod delete-region :around (region)
+  ;; Defensive: if a non-region is passed (e.g. due to a bug elsewhere),
+  ;; skip silently rather than crashing the editor.
+  (unless (regionp region)
+    (return-from delete-region nil))
   (let* ((mark (region-start region))
          (buffer (line-buffer (mark-line mark))))
     (cond ((and buffer (buffer-undo-p buffer))
@@ -207,6 +211,8 @@
            (call-next-method)))))
 
 (defmethod delete-and-save-region :around (region)
+  (unless (regionp region)
+    (return-from delete-and-save-region nil))
   (let* ((mark (region-start region))
          (buffer (line-buffer (mark-line mark))))
     (cond ((and buffer (buffer-undo-p buffer))

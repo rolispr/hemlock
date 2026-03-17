@@ -112,7 +112,9 @@ For files, returns the filename."
     (setf (buffer-writable *echo-area-buffer*) t)
     (uninstall-tree (buffer-ui-tree *echo-area-buffer*))
     (let ((*tree-rendering* t))
-      (delete-region (buffer-region *echo-area-buffer*)))))
+      (let ((r (buffer-region *echo-area-buffer*)))
+        (when (regionp r)
+          (delete-region r))))))
 
 
 ;;;; Grid building

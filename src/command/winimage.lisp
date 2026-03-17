@@ -15,6 +15,11 @@
 (setf (dis-line-old-chars (car the-sentinel)) :unique-thing)
 
 
+(defvar *updating-window-image* nil
+  "True when update-window-image is executing.  Suppresses window-tick
+  manipulation in new-font-mark to prevent an infinite redisplay cycle
+  caused by recompute-syntax-marks creating font-marks during redisplay.")
+
 (defconstant unaltered-bits #b000
   "This is the value of the dis-line-flags when a line is neither moved nor
   changed nor new.")
@@ -278,6 +283,7 @@
   Walks the buffer lines and dis-lines in parallel, calling
   Maybe-Change-Window when a difference is found and updating the
   display-end mark when finished."
+  (let ((*updating-window-image* t))
   (let* ((trail (window-first-line window))
          (current (cdr trail))
          (display-start (window-display-start window))
@@ -332,4 +338,4 @@
     ;; Update the display-end mark.
     (let ((dl (car (window-last-line window))))
       (move-to-position (window-display-end window) (dis-line-end dl)
-                        (dis-line-line dl)))))
+                        (dis-line-line dl))))))

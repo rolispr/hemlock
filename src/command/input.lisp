@@ -221,11 +221,26 @@
      (invoke-scheduled-events)
      (unless (handler-case (internal-redisplay)
                (error (c)
-                 (format *error-output* "~&[redisplay error] ~A~%" c)
+                 (ignore-errors
+                  (format *terminal-io* "~&[redisplay error] ~A~%" c)
+                  (with-open-file (f "/tmp/hemlock-redisplay-bt.txt"
+                                     :direction :output
+                                     :if-exists :append
+                                     :if-does-not-exist :create)
+                    (format f "~%=== redisplay error: ~A ===~%" c)
+                    (sb-debug:print-backtrace :stream f :count 30)))
+                 (dispatch-events-no-hang)
                  t))
        (handler-case (internal-redisplay)
          (error (c)
-           (format *error-output* "~&[redisplay error] ~A~%" c)))
+           (ignore-errors
+            (format *terminal-io* "~&[redisplay error] ~A~%" c)
+            (with-open-file (f "/tmp/hemlock-redisplay-bt.txt"
+                               :direction :output
+                               :if-exists :append
+                               :if-does-not-exist :create)
+              (format f "~%=== redisplay error: ~A ===~%" c)
+              (sb-debug:print-backtrace :stream f :count 30)))))
        (device-note-read-wait device t)
        (unless (listen-editor-input editor-input)
          ;; Block until an fd event arrives (tty byte, webui pipe, etc.)

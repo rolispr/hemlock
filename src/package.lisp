@@ -474,6 +474,7 @@
    #:with-mark
    #:parse-forms
    #:*buffer-modified-notifier*
+   #:*ts-text-change-hook*
 
    ;; key-event.lisp — key event type and accessors
    #:key-event
@@ -517,6 +518,9 @@
   (:use :common-lisp :trivial-gray-streams :hemlock.text)
   (:shadowing-import-from :hemlock.text #:char-code-limit)
   (:import-from :hemlock.wire #:dispatch-events #:dispatch-events-no-hang)
+  (:import-from :act  #:! #:*self* #:*state*)
+  (:import-from :ac   #:actor-of #:shutdown)
+  (:import-from :asys #:make-actor-system)
   (:export
    #:dispatch-events #:dispatch-events-no-hang #:dispatch-events-timeout
 

@@ -682,6 +682,15 @@ dimensions are correct before update-window-image runs."
           (last-changed (window-last-changed window)))
       ;; Is there anything to do?
       (unless (eq first-changed the-sentinel)
+        ;; Safety: if changed-markers are inverted (last-changed is before
+        ;; first-changed in the dis-line chain), compute-tty-changes would
+        ;; walk off the end of the chain and crash.  Force a full repaint.
+        (when (< (dis-line-position (car last-changed))
+                 (dis-line-position (car first-changed)))
+          (setf *screen-image-trashed* t)
+          (setf (window-first-changed window) the-sentinel
+                (window-last-changed window) (window-first-line window))
+          (return-from device-smart-redisplay nil))
         (if (and (eq first-changed last-changed)
                  (zerop (dis-line-delta (car first-changed))))
             ;; One line-changed.
@@ -1427,15 +1436,15 @@ dimensions are correct before update-window-image runs."
          (end-string (tty-device-insert-end-string device))
          (cost 0))
     (when init-string
-      (incf cost (tty-cmd-length (the simple-string init-string))))
+      (incf cost (tty-cmd-length init-string)))
     (when char-init-string
       (incf cost (* insert-char-num
-                    (+ (tty-cmd-length (the simple-string char-init-string))
+                    (+ (tty-cmd-length char-init-string)
                        (if char-end-string
-                           (tty-cmd-length (the simple-string char-end-string))
+                           (tty-cmd-length char-end-string)
                            0)))))
     (when end-string
-      (incf cost (tty-cmd-length (the simple-string end-string))))
+      (incf cost (tty-cmd-length end-string)))
     (< cost chars-saved)))
 
 (defun delete-char (hunk x y &optional (n 1))

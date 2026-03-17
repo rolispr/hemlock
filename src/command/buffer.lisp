@@ -1,4 +1,4 @@
-;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
+xyz;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
 ;;; This file contains functions for changing modes and buffers.
 ;;;
@@ -608,6 +608,8 @@
            buffer (length (buffer-windows buffer))))
   (invoke-hook (buffer-delete-hook buffer) buffer)
   (invoke-hook hemlock::delete-buffer-hook buffer)
+  (when (fboundp 'ts-cleanup-buffer)
+    (funcall 'ts-cleanup-buffer buffer))
   (setq *buffer-list* (delq buffer *buffer-list*))
   (delete-string (buffer-name buffer) *buffer-names*)
   nil)

@@ -14,6 +14,7 @@
     (let* ((buffer (ui-tree-buffer tree))
            (region (buffer-region buffer))
            (width  (ui-tree-width tree)))
+      (unless (regionp region) (return-from render-tree nil))
       (delete-region region)
       (let ((point (buffer-point buffer)))
         (move-mark point (region-start region))
@@ -203,10 +204,27 @@
 ;;;; Utility
 
 (defun render-node-to-string (node width)
-  "Render NODE into a temporary buffer and return the first line as a string."
-  (let ((buf (make-buffer " *ui-temp*" :delete-hook nil)))
-    (unwind-protect
-        (let ((point (buffer-point buf)))
-          (render-node node point width)
-          (line-string (mark-line (region-start (buffer-region buf)))))
-      (delete-buffer buf))))
+  "Render NODE into a string of WIDTH columns.
+For ui-text nodes (the common case in grid cells) returns the content
+directly without allocating a hemlock buffer."
+  (typecase node
+    (ui-text
+     (let ((s (ui-text-content node)))
+       (if (<= (length s) width)
+           s
+           (subseq s 0 width))))
+    (t
+     ;; Fall back to rendering into a temp buffer for complex nodes.
+     (let ((buf (or (make-buffer " *ui-temp*" :delete-hook nil)
+                    ;; Buffer already exists (e.g. from an interrupted render).
+                    ;; Delete the stale one and create a fresh one.
+                    (progn
+                      (let ((old (getstring " *ui-temp*" *buffer-names*)))
+                        (when old (delete-buffer old)))
+                      (make-buffer " *ui-temp*" :delete-hook nil)))))
+       (when buf
+         (unwind-protect
+             (let ((point (buffer-point buf)))
+               (render-node node point width)
+               (line-string (mark-line (region-start (buffer-region buf)))))
+           (delete-buffer buf)))))))

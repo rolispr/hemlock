@@ -273,6 +273,7 @@
 (bind-key "Complete Field" #k"tab" :mode "Echo Area")
 (bind-key "Complete Field" #k"space" :mode "Echo Area")
 (bind-key "Confirm Parse" #k"return" :mode "Echo Area")
+(bind-key "Confirm Parse" #k"linefeed" :mode "Echo Area")
 
 ;;; Rebind some standard commands to behave better.
 ;;;
