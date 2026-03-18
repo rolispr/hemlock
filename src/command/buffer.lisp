@@ -1,4 +1,4 @@
-xyz;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
+;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
 ;;; This file contains functions for changing modes and buffers.
 ;;;

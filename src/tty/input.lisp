@@ -98,6 +98,20 @@
     (reg hemlock.terminfo:key-f10 #k"F10")
     (reg hemlock.terminfo:key-f11 #k"F11")
     (reg hemlock.terminfo:key-f12 #k"F12")
+    ;; Terminfo definitions for extended function keys F13-F25
+    (reg hemlock.terminfo:key-f13 #k"F13")
+    (reg hemlock.terminfo:key-f14 #k"F14")
+    (reg hemlock.terminfo:key-f15 #k"F15")
+    (reg hemlock.terminfo:key-f16 #k"F16")
+    (reg hemlock.terminfo:key-f17 #k"F17")
+    (reg hemlock.terminfo:key-f18 #k"F18")
+    (reg hemlock.terminfo:key-f19 #k"F19")
+    (reg hemlock.terminfo:key-f20 #k"F20")
+    (reg hemlock.terminfo:key-f21 #k"F21")
+    (reg hemlock.terminfo:key-f22 #k"F22")
+    (reg hemlock.terminfo:key-f23 #k"F23")
+    (reg hemlock.terminfo:key-f24 #k"F24")
+    (reg hemlock.terminfo:key-f25 #k"F25")
     ;; Terminfo definitions for movement keys
     (reg hemlock.terminfo:key-up #k"Uparrow")
     (reg hemlock.terminfo:key-down #k"Downarrow")
@@ -203,7 +217,23 @@
     (reg #\tab #k"Tab")
     (reg #\escape #k"Escape")
     ;; Kludge: This shouldn't be needed, but otherwise C-c M-i doesn't work.
-    (reg '(#\Esc #\i) #k"meta-i")))
+    (reg '(#\Esc #\i) #k"meta-i")
+
+    ;; Xterm Shift+F1-F12 sequences (modifier code 2).
+    ;; Modern terminals send these for Shift+Fn; not in terminfo.
+    ;; F1-F4 base on ESC-O-letter; F5-F12 use CSI-number-tilde form.
+    (reg '(#\Esc #\[ #\1 #\; #\2 #\P) #k"Shift-F1")
+    (reg '(#\Esc #\[ #\1 #\; #\2 #\Q) #k"Shift-F2")
+    (reg '(#\Esc #\[ #\1 #\; #\2 #\R) #k"Shift-F3")
+    (reg '(#\Esc #\[ #\1 #\; #\2 #\S) #k"Shift-F4")
+    (reg '(#\Esc #\[ #\1 #\5 #\; #\2 #\~) #k"Shift-F5")
+    (reg '(#\Esc #\[ #\1 #\7 #\; #\2 #\~) #k"Shift-F6")
+    (reg '(#\Esc #\[ #\1 #\8 #\; #\2 #\~) #k"Shift-F7")
+    (reg '(#\Esc #\[ #\1 #\9 #\; #\2 #\~) #k"Shift-F8")
+    (reg '(#\Esc #\[ #\2 #\0 #\; #\2 #\~) #k"Shift-F9")
+    (reg '(#\Esc #\[ #\2 #\1 #\; #\2 #\~) #k"Shift-F10")
+    (reg '(#\Esc #\[ #\2 #\3 #\; #\2 #\~) #k"Shift-F11")
+    (reg '(#\Esc #\[ #\2 #\4 #\; #\2 #\~) #k"Shift-F12")))
 
 (defun translate-tty-event (data)
   (let ((string (coerce data 'string)))

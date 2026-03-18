@@ -20,21 +20,42 @@
       (push (namestring f) entries))
     (nreverse entries)))
 
+(defun glob-match-p (pattern name)
+  "Return T if NAME matches shell-style glob PATTERN (case-insensitive).
+* matches any sequence of characters including empty."
+  (let ((p (string-downcase pattern))
+        (n (string-downcase name)))
+    (labels ((match (ip in)
+               (cond
+                 ((= ip (length p)) (= in (length n)))
+                 ((char= (char p ip) #\*)
+                  (loop for k from in to (length n)
+                        thereis (match (1+ ip) k)))
+                 ((= in (length n)) nil)
+                 ((char= (char p ip) (char n in)) (match (1+ ip) (1+ in)))
+                 (t nil))))
+      (match 0 0))))
+
 (defun file-completion-filter (input)
   "Return file candidates matching INPUT dynamically from the filesystem.
-When INPUT names an existing directory (ends with /), list its contents.
-Otherwise, list the parent directory filtered by the name prefix."
+When INPUT ends with /, list that directory's contents.
+Otherwise, list the parent directory filtered by the name prefix.
+The prefix may contain * wildcards for glob-style matching."
   (when (plusp (length input))
-    (let* ((merged (merge-pathnames input
+    (let* ((ends-with-slash (char= (char input (1- (length input))) #\/))
+           (merged (merge-pathnames input
                      (or (and *parse-default*
                               (directory-namestring *parse-default*))
                          (default-directory))))
            (namestring (namestring merged)))
       (cond
-        ;; input is a directory — list its contents
-        ((uiop:directory-exists-p namestring)
-         (file-list-directory namestring))
-        ;; input is a partial name — list parent dir, filter by prefix
+        ;; Explicit trailing slash — user wants to descend into this directory.
+        ;; Check the filesystem only in this case (not for bare names).
+        (ends-with-slash
+         (when (uiop:directory-exists-p namestring)
+           (file-list-directory namestring)))
+        ;; Partial name or glob — list parent dir, filter by prefix.
+        ;; Uses glob-match-p when the prefix contains *.
         (t
          (let* ((dir (directory-namestring namestring))
                 (prefix (file-namestring namestring))
@@ -44,9 +65,11 @@ Otherwise, list the parent directory filtered by the name prefix."
                (setf all (remove-if-not
                           (lambda (f)
                             (let ((name (file-display-name f)))
-                              (and (>= (length name) (length p))
-                                   (string-equal name p
-                                                 :end1 (length p)))))
+                              (if (find #\* p)
+                                  (glob-match-p p name)
+                                  (and (>= (length name) (length p))
+                                       (string-equal name p
+                                                     :end1 (length p))))))
                           all))))
            all))))))
 
@@ -150,11 +173,18 @@ For files, returns the filename."
           (setf offset sel)))
       (when (minusp offset) (setf offset 0))
       (setf (getf (ui-tree-state tree) :scroll-offset) offset)
-      ;; row 0
-      (push (list (make-ui-text :content (concatenate 'string prompt input))
-                  (make-ui-text :content status)
-                  (make-ui-text :content msg))
-            rows)
+      ;; row 0 — scrolling input viewport so cursor never leaves col 0
+      (let* ((w0 (first col-widths))
+             (avail (max 0 (- w0 (length prompt))))
+             (off (getf state :cursor-offset 0))
+             (view-start (max 0 (min off (- (length input) avail))))
+             (visible-input (subseq input view-start
+                                    (min (length input) (+ view-start avail)))))
+        (setf (getf (ui-tree-state tree) :view-start) view-start)
+        (push (list (make-ui-text :content (concatenate 'string prompt visible-input))
+                    (make-ui-text :content status)
+                    (make-ui-text :content msg))
+              rows))
       ;; rows 1..N
       (loop for row from 1 below height
             for idx = (+ offset (1- row))
@@ -185,11 +215,12 @@ For files, returns the filename."
     (setf (buffer-writable (ui-tree-buffer tree)) t)
     (setf (ui-tree-root tree) grid)
     (render-tree tree)
-    ;; cursor
+    ;; cursor — account for scrolled viewport
     (let* ((prompt (getf (ui-tree-state tree) :prompt ""))
            (off (cursor-offset tree))
+           (view-start (getf (ui-tree-state tree) :view-start 0))
            (line (mark-line (region-start region)))
-           (pos (min (+ (length prompt) off) (line-length line))))
+           (pos (min (+ (length prompt) (- off view-start)) (line-length line))))
       (move-mark (buffer-point *echo-area-buffer*) (mark line pos)))
     ;; pin display
     (move-mark (window-display-start *echo-area-window*)
@@ -213,8 +244,16 @@ For files, returns the filename."
 
 (defun echo-delete-char ()
   (when (buffer-ui-tree *echo-area-buffer*)
-    (when (delete-char-before-cursor (buffer-ui-tree *echo-area-buffer*))
-      (echo-refilter (buffer-ui-tree *echo-area-buffer*)))))
+    (let* ((tree (buffer-ui-tree *echo-area-buffer*))
+           (did-something
+            (if (and (eq *parse-type* :file)
+                     (let ((off (cursor-offset tree)))
+                       (and (plusp off)
+                            (char= (char (input-string tree) (1- off)) #\/))))
+                (progn (kill-word-before-cursor tree #\/) t)
+                (delete-char-before-cursor tree))))
+      (when did-something
+        (echo-refilter tree)))))
 
 (defun echo-kill ()
   (when (buffer-ui-tree *echo-area-buffer*)

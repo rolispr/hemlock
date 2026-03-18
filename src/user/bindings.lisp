@@ -13,8 +13,11 @@
 ;;; This page defines prefix characters that set specified modifier bits on
 ;;; the next character typed.
 ;;;
-(setf (key-translation #k"escape") '(:bits :meta))
-(setf (key-translation #k"control-[") '(:bits :meta))
+;; Escape is keyboard-quit (alias for C-g), not a Meta prefix.
+;; Modern terminals send real Alt+key sequences, so the old escape-as-meta
+;; prefix is not needed.
+;;(setf (key-translation #k"escape") '(:bits :meta))
+;;(setf (key-translation #k"control-[") '(:bits :meta))
 (setf (key-translation #k"control-z") '(:bits :control :meta))
 (setf (key-translation #k"control-Z") '(:bits :control :meta))
 (setf (key-translation #k"control-^") '(:bits :control))
@@ -936,6 +939,7 @@
 (setf (logical-key-event-p #k"delete" :cancel) t)
 (setf (logical-key-event-p #k"backspace" :cancel) t)
 (setf (logical-key-event-p #k"control-g" :abort) t)
+(setf (logical-key-event-p #k"escape" :abort) t)
 (setf (logical-key-event-p #k"escape" :exit) t)
 (setf (logical-key-event-p #k"y" :yes) t)
 (setf (logical-key-event-p #k"space" :yes) t)

@@ -1196,16 +1196,26 @@ dimensions are correct before update-window-image runs."
 ;;; Font attribute support: color, bold.
 
 (defun setaf (color)
-  (when hemlock.terminfo:set-a-foreground
-    (tty-write-cmd
-     (hemlock.terminfo:tputs
-      (hemlock.terminfo:tparm hemlock.terminfo:set-a-foreground color)))))
+  "Set terminal foreground color.  COLOR is either an integer ANSI index
+or a list (R G B) for 24-bit truecolor."
+  (if (listp color)
+      (tty-write-cmd (format nil "~C[38;2;~D;~D;~Dm" #\Escape
+                             (first color) (second color) (third color)))
+      (when hemlock.terminfo:set-a-foreground
+        (tty-write-cmd
+         (hemlock.terminfo:tputs
+          (hemlock.terminfo:tparm hemlock.terminfo:set-a-foreground color))))))
 
 (defun setab (color)
-  (when hemlock.terminfo:set-a-background
-    (tty-write-cmd
-     (hemlock.terminfo:tputs
-      (hemlock.terminfo:tparm hemlock.terminfo:set-a-background color)))))
+  "Set terminal background color.  COLOR is either an integer ANSI index
+or a list (R G B) for 24-bit truecolor."
+  (if (listp color)
+      (tty-write-cmd (format nil "~C[48;2;~D;~D;~Dm" #\Escape
+                             (first color) (second color) (third color)))
+      (when hemlock.terminfo:set-a-background
+        (tty-write-cmd
+         (hemlock.terminfo:tputs
+          (hemlock.terminfo:tparm hemlock.terminfo:set-a-background color))))))
 
 (defun enter-bold-mode ()
   (when hemlock.terminfo:enter-bold-mode

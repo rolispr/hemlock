@@ -43,6 +43,43 @@
 (defvar *ts-buffer-states* (make-hash-table :test #'eq))
 (defvar *ts-last-error* nil)
 
+;;; Truecolor syntax palette — vice-alt base16 (from lem/nymph).
+;;; Indices 1–9 correspond to ts-capture-name-to-font return values.
+;;; Comment slot uses #6a9955 (VS Code green) in place of base03 #323643
+;;; which is nearly invisible on a black terminal background.
+(defparameter *hemlock-syntax-palette*
+  #(nil                        ; 0 = default/reset
+    (:fg (106 153  85))        ; 1 = comment        #6a9955  green  (base03 substitute)
+    (:fg ( 68 255 221))        ; 2 = string         #44ffdd  base0B cyan-green
+    (:fg (246 117  68))        ; 3 = number/const   #F67544  base09 orange
+    (:fg (130 101 255))        ; 4 = keyword        #8265ff  base0E purple
+    (:fg ( 47 177 212))        ; 5 = function       #2fb1d4  base0D blue
+    (:fg (  0 202 255))        ; 6 = builtin/op     #00caff  base0C cyan
+    (:fg (255  61 129))        ; 7 = variable       #ff3d81  base08 pink
+    (:fg (255 255 115))        ; 8 = type/param     #ffff73  base0A yellow
+    (:fg (244 244 247)))       ; 9 = const.builtin  #f4f4f7  base07 bright white
+  "Nymph vice-alt base16 syntax color palette for truecolor terminals.
+Slot index matches the return value of ts-capture-name-to-font.")
+
+(defparameter *hemlock-syntax-palette-16*
+  #(nil 2 6 3 5 4 6 1 3 7)
+  "ANSI 16-color fallback indices for *hemlock-syntax-palette* slots.
+; idx: 0  1  2  3  4  5  6  7  8  9
+; 1=green(2) 2=cyan(6) 3=yellow(3) 4=magenta(5) 5=blue(4) 6=cyan(6) 7=red(1) 8=yellow(3) 9=white(7)")
+
+(defvar *ts-color-support* nil
+  "Cached terminal color support level: :truecolor, :256color, or :16color.")
+
+(defun ts-detect-color-support ()
+  "Return the terminal's color support level, caching the result."
+  (or *ts-color-support*
+      (setf *ts-color-support*
+            (let ((ct   (uiop:getenv "COLORTERM"))
+                  (term (uiop:getenv "TERM")))
+              (cond ((or (equal ct "truecolor") (equal ct "24bit")) :truecolor)
+                    ((and term (search "256color" term))            :256color)
+                    (t                                              :16color))))))
+
 ;;; Sento actor infrastructure.
 (defvar *ts-actor-system* nil "Sento actor system for tree-sitter background work.")
 (defvar *ts-actor*        nil "Pinned sento actor — ALL C tree-sitter calls run here.")
@@ -95,35 +132,35 @@
 
 
 (defun ts-capture-name-to-font (name)
+  "Map a tree-sitter capture name to a *hemlock-syntax-palette* index.
+Returns NIL for unrecognised captures (no color applied)."
   (cond
-   ((or (string= name "keyword")
-        (string= name "keyword.function"))
-    5)
-   ((or (string= name "function")
-        (string= name "function.definition"))
-    6)
-   ((string= name "function.call")
-    4)
-   ((or (string= name "string")
-        (string= name "character"))
-    2)
+   ;; 1 = comment (green)
+   ((or (string= name "comment") (string= name "comment.block")) 1)
+   ;; 2 = string (cyan-green)
+   ((string= name "string") 2)
+   ;; 3 = number / constant / escape sequences / character literals (orange)
    ((or (string= name "number")
         (string= name "constant")
-        (string= name "constant.builtin"))
-    3)
-   ((or (string= name "comment")
-        (string= name "comment.block"))
-    1)
-   ((or (string= name "variable")
-        (string= name "variable.parameter"))
-    1)
-   ((string= name "operator")
-    6)
-   ((or (string= name "string.escape")
-        (string= name "string.special"))
-    2)
-   ((string= name "type")
-    4)
+        (string= name "string.escape")
+        (string= name "string.special")
+        (string= name "character")) 3)
+   ;; 4 = keyword (purple)
+   ((or (string= name "keyword") (string= name "keyword.function")) 4)
+   ;; 5 = function / function.call / function.definition (blue)
+   ((or (string= name "function")
+        (string= name "function.call")
+        (string= name "function.definition")) 5)
+   ;; 6 = builtins / operators (cyan)
+   ((or (string= name "function.builtin")
+        (string= name "variable.builtin")
+        (string= name "operator")) 6)
+   ;; 7 = variable (pink)
+   ((string= name "variable") 7)
+   ;; 8 = type / variable.parameter (yellow)
+   ((or (string= name "type") (string= name "variable.parameter")) 8)
+   ;; 9 = constant.builtin — T, NIL, etc. stand out as bright white
+   ((string= name "constant.builtin") 9)
    (t nil)))
 
 (defun ts-actor-receive (msg)
@@ -306,14 +343,27 @@
                  (incf i)))
       (nreverse result))))
 
+(defun ts-resolve-font (index)
+  "Resolve a ts font integer to a color form suitable for the terminal.
+Returns a (:fg (R G B)) plist for truecolor/256color terminals, an integer
+ANSI index for 16-color terminals, or NIL for unrecognised indices."
+  (when (and (plusp index) (< index (length *hemlock-syntax-palette*)))
+    (case (ts-detect-color-support)
+      ((:truecolor :256color) (aref *hemlock-syntax-palette* index))
+      (t                      (aref *hemlock-syntax-palette-16* index)))))
+
 (defun ts-store-colors-on-lines (buffer highlight-table)
   (let ((line (mark-line (buffer-start-mark buffer)))
         (line-num 0))
     (loop while line
-          do (let* ((ranges     (gethash line-num highlight-table))
-                    (new-colors (if ranges
-                                    (ts-normalize-ranges ranges (line-length line))
-                                  nil)))
+          do (let* ((raw        (gethash line-num highlight-table))
+                    (normed     (when raw (ts-normalize-ranges raw (line-length line))))
+                    (new-colors (delete nil
+                                        (mapcar (lambda (r)
+                                                  (let ((color (ts-resolve-font (third r))))
+                                                    (when color
+                                                      (list (first r) (second r) color))))
+                                                normed))))
                (unless (equal (getf (line-plist line) 'syntax-colors) new-colors)
                  (setf (getf (line-plist line) 'syntax-colors) new-colors)))
           (setf line (line-next line))
