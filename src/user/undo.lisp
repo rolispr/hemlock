@@ -70,17 +70,14 @@
         (method-undo (undo-info-method-undo *undo-info*)))
     (if (not (eq buffer (current-buffer)))
         (editor-error "Undo info is for buffer ~S." (buffer-name buffer)))
-    (when (prompt-for-y-or-n :prompt (format nil "Undo the last ~A? "
-                                             (undo-info-name *undo-info*))
-                             :must-exist t)
-      (funcall (undo-info-method *undo-info*))
-      (cond (method-undo
-             (rotatef (undo-info-name *undo-info*)
-                      (undo-info-hold-name *undo-info*))
-             (rotatef (undo-info-method *undo-info*)
-                      (undo-info-method-undo *undo-info*)))
-            (t (if cleanup (funcall cleanup))
-               (setf *undo-info* nil))))))
+    (funcall (undo-info-method *undo-info*))
+    (cond (method-undo
+           (rotatef (undo-info-name *undo-info*)
+                    (undo-info-hold-name *undo-info*))
+           (rotatef (undo-info-method *undo-info*)
+                    (undo-info-method-undo *undo-info*)))
+          (t (if cleanup (funcall cleanup))
+             (setf *undo-info* nil)))))
 
 
 

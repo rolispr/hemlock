@@ -350,17 +350,95 @@
 ;;; underhang, then this is 0.
 ;;;    3) The index in line after the last character displayed.
 ;;;
+
+;;; Merge syntax-colors and selection-colors via a per-character slot array.
+;;; Syntax wins on :fg; selection wins on :bg.  Returns nil when there's nothing to do.
+(defun %compute-merged-font-changes (line offset dis-line width string underhang
+                                     syntax-colors selection-colors)
+  ;; Free existing font-changes.
+  (let ((changes (dis-line-font-changes dis-line)))
+    (when changes
+      (loop with prev = changes
+            for current = (font-change-next changes)
+            then (font-change-next current)
+            while current
+            do (setf (font-change-mark current) nil)
+            (setf prev current)
+            finally
+            (setf (dis-line-font-changes dis-line) nil)
+            (shiftf (font-change-next prev) *free-font-changes* changes))))
+  (let* ((line-len (line-length line))
+         (slots    (when (plusp line-len)
+                     (make-array line-len :initial-element nil))))
+    (when slots
+      ;; Fill syntax fg.
+      (dolist (range syntax-colors)
+        (let ((s (max 0 (min (first  range) line-len)))
+              (e (max 0 (min (second range) line-len)))
+              (f (third range)))
+          (loop for i from s below e
+                do (setf (aref slots i) f))))
+      ;; Overlay selection bg — merges with existing fg.
+      (dolist (range selection-colors)
+        (let ((s  (max 0 (min (first  range) line-len)))
+              (e  (max 0 (min (second range) line-len)))
+              (bg (third range)))
+          (loop for i from s below e
+                do (let ((existing (aref slots i)))
+                     (setf (aref slots i)
+                           (if (and (listp existing) (getf existing :fg))
+                               (append existing bg)
+                               bg))))))
+      ;; Run-length encode slots into font-change linked list.
+      (let ((prev  nil)
+            (xbase (if string
+                       (- (length (the simple-string string)) underhang)
+                       0))
+            (i     offset))
+        (loop while (< i line-len)
+              for run-form = (aref slots i)
+              for run-start = i
+              do (loop while (and (< i line-len) (equal (aref slots i) run-form))
+                       do (incf i))
+              when run-form
+              do (let ((len (if (eq line open-line)
+                                (cached-real-line-length line 10000 offset run-start)
+                                (real-line-length line 10000 offset run-start))))
+                   (when (and len (< len width))
+                     (let ((x (+ len xbase)))
+                       (when (< x width)
+                         (let ((new (alloc-font-change x run-form nil)))
+                           (if prev
+                               (setf (font-change-next prev) new)
+                               (setf (dis-line-font-changes dis-line) new))
+                           (setq prev new))
+                         ;; Emit reset at run end.
+                         (let ((end-len (if (eq line open-line)
+                                            (cached-real-line-length line 10000 offset i)
+                                            (real-line-length line 10000 offset i))))
+                           (when (and end-len (< end-len width))
+                             (let ((ex (+ end-len xbase)))
+                               (when (< ex width)
+                                 (let ((reset (alloc-font-change ex 0 nil)))
+                                   (setf (font-change-next prev) reset)
+                                   (setq prev reset)))))))))))))))
+
 (defun compute-line-image (string underhang line offset dis-line width)
   "Build a dis-line image from Line starting at Offset.  String and
   Underhang carry over characters from a previous wrapped line.  Width
   is the display field width.  Returns three values: a new overhang
   string or NIL, a new underhang or NIL, and the index after the last
-  character displayed.  When syntax-colors are present on the line's
-  plist, font-change structures are built from those ranges; otherwise
-  font-marks on the line are used."
-  (let ((syntax-colors (getf (line-plist line) 'syntax-colors)))
+  character displayed.  When syntax-colors or selection-colors are present
+  on the line's plist, font-change structures are built via slot-array merge;
+  otherwise font-marks on the line are used."
+  (let ((syntax-colors    (getf (line-plist line) 'syntax-colors))
+        (selection-colors (getf (line-plist line) 'selection-colors)))
     (cond
-     (syntax-colors
+     ((or syntax-colors selection-colors)
+      (%compute-merged-font-changes line offset dis-line width string underhang
+                                    syntax-colors selection-colors))
+     (t
+      (sync-dis-line-tag line dis-line)
       (let ((changes (dis-line-font-changes dis-line)))
         (when changes
           (loop with prev = changes
@@ -372,122 +450,62 @@
                 finally
                 (setf (dis-line-font-changes dis-line) nil)
                 (shiftf (font-change-next prev) *free-font-changes* changes))))
-      (let ((prev nil)
-            (line-len (line-length line)))
-        (setf syntax-colors (sort syntax-colors #'< :key #'first))
-        (dolist (range syntax-colors)
-          (let ((start-charpos (min (first range)  line-len))
-                (end-charpos   (min (second range) line-len))
-                (font          (third range)))
-            ;; Start-of-range node
-            (cond
-              ;; Normal case: range starts in visible area
-              ((>= start-charpos offset)
-               (let ((len (if (eq line open-line)
-                              (cached-real-line-length line 10000 offset start-charpos)
-                            (real-line-length line 10000 offset start-charpos))))
-                 (when (and len (< len width))
-                   (let ((x (+ len (if string
-                                       (- (length (the simple-string string)) underhang)
-                                     0))))
-                     (when (< x width)
-                       (let ((new (alloc-font-change x font nil)))
-                         (if prev
-                             (setf (font-change-next prev) new)
-                           (setf (dis-line-font-changes dis-line) new))
-                         (setq prev new)))))))
-              ;; Straddle case: range started before offset but ends after it —
-              ;; emit at the leftmost visible column of this dis-line.
-              ((> end-charpos offset)
-               (let ((x (if string (- (length (the simple-string string)) underhang) 0)))
-                 (when (< x width)
-                   (let ((new (alloc-font-change x font nil)))
-                     (if prev
-                         (setf (font-change-next prev) new)
-                       (setf (dis-line-font-changes dis-line) new))
-                     (setq prev new))))))
-            ;; End-of-range reset node (font=0) — terminates this range
-            (when (and prev (>= end-charpos offset))
-              (let ((end-len (if (eq line open-line)
-                                 (cached-real-line-length line 10000 offset end-charpos)
-                               (real-line-length line 10000 offset end-charpos))))
-                (when (and end-len (< end-len width))
-                  (let ((x (+ end-len (if string
-                                          (- (length (the simple-string string)) underhang)
-                                        0))))
-                    (when (< x width)
-                      (let ((reset (alloc-font-change x 0 nil)))
-                        (setf (font-change-next prev) reset)
-                        (setq prev reset)))))))))))
-      (t
-       (sync-dis-line-tag line dis-line)
-       (let ((changes (dis-line-font-changes dis-line)))
-         (when changes
-           (loop with prev = changes
-                 for current = (font-change-next changes)
-                 then (font-change-next current)
-                 while current
-                 do (setf (font-change-mark current) nil)
-                 (setf prev current)
-                 finally
-                 (setf (dis-line-font-changes dis-line) nil)
-                 (shiftf (font-change-next prev) *free-font-changes* changes))))
-       (let ((marks (line-marks line)))
-         (when (loop for m in marks
-                     thereis (fast-font-mark-p m))
-           (let ((prev nil))
-             (let ((max -1)
-                   (max-mark nil))
-               (dolist (m marks)
-                 (when (fast-font-mark-p m)
-                   (let ((charpos (mark-charpos m)))
-                     (when (and (< charpos offset) (> charpos max))
-                       (setq max charpos  max-mark m)))))
-               (when max-mark
-                 (setq prev (alloc-font-change 0 (font-mark-font max-mark) max-mark))
-                 (setf (dis-line-font-changes dis-line) prev)))
-             (loop with bound = (1- offset)
-                   with line-len = (line-length line)
-                   do (let ((min most-positive-fixnum)
-                            (min-mark nil))
-                        (dolist (m marks)
-                          (when (fast-font-mark-p m)
-                            (let ((charpos (mark-charpos m)))
-                              (when (and (> charpos bound) (< charpos min))
-                                (setq min charpos  min-mark m)))))
-                        (unless min-mark (loop-finish))
-                        (let* ((safe-min (min min line-len))
-                               (len (if (eq line open-line)
-                                        (cached-real-line-length line 10000 offset safe-min)
-                                      (real-line-length line 10000 offset safe-min))))
-                          (when (< len width)
-                            (let ((new (alloc-font-change
-                                        (+ len
-                                           (if string
-                                               (- (length (the simple-string string)) underhang)
-                                             0))
-                                        (font-mark-font min-mark)
-                                        min-mark)))
-                              (if prev
-                                  (setf (font-change-next prev) new)
-                                (setf (dis-line-font-changes dis-line) new))
-                              (setq prev new))))
-                        (setf bound min)))))))))
-    (cond
-     (string
-      (let ((len (strlen string))
-            (chars (dis-line-chars dis-line))
-            (xpos 0))
-        (declare (type (or fixnum null) xpos) (simple-string chars))
-        (display-some-chars string underhang len chars xpos width nil)
-        (cond
-         ((null xpos)
-          (values string underhang offset))
-         ((eq line open-line)
-          (compute-cached-line-image offset dis-line xpos width))
-         (t
-          (compute-normal-line-image line offset dis-line xpos width)))))
-     ((eq line open-line)
-      (compute-cached-line-image offset dis-line 0 width))
-     (t
-      (compute-normal-line-image line offset dis-line 0 width))))
+      (let ((marks (line-marks line)))
+        (when (loop for m in marks
+                    thereis (fast-font-mark-p m))
+          (let ((prev nil))
+            (let ((max -1)
+                  (max-mark nil))
+              (dolist (m marks)
+                (when (fast-font-mark-p m)
+                  (let ((charpos (mark-charpos m)))
+                    (when (and (< charpos offset) (> charpos max))
+                      (setq max charpos  max-mark m)))))
+              (when max-mark
+                (setq prev (alloc-font-change 0 (font-mark-font max-mark) max-mark))
+                (setf (dis-line-font-changes dis-line) prev)))
+            (loop with bound = (1- offset)
+                  with line-len = (line-length line)
+                  do (let ((min most-positive-fixnum)
+                           (min-mark nil))
+                       (dolist (m marks)
+                         (when (fast-font-mark-p m)
+                           (let ((charpos (mark-charpos m)))
+                             (when (and (> charpos bound) (< charpos min))
+                               (setq min charpos  min-mark m)))))
+                       (unless min-mark (loop-finish))
+                       (let* ((safe-min (min min line-len))
+                              (len (if (eq line open-line)
+                                       (cached-real-line-length line 10000 offset safe-min)
+                                     (real-line-length line 10000 offset safe-min))))
+                         (when (< len width)
+                           (let ((new (alloc-font-change
+                                       (+ len
+                                          (if string
+                                              (- (length (the simple-string string)) underhang)
+                                            0))
+                                       (font-mark-font min-mark)
+                                       min-mark)))
+                             (if prev
+                                 (setf (font-change-next prev) new)
+                               (setf (dis-line-font-changes dis-line) new))
+                             (setq prev new))))
+                       (setf bound min)))))))))
+  (cond
+   (string
+    (let ((len (strlen string))
+          (chars (dis-line-chars dis-line))
+          (xpos 0))
+      (declare (type (or fixnum null) xpos) (simple-string chars))
+      (display-some-chars string underhang len chars xpos width nil)
+      (cond
+       ((null xpos)
+        (values string underhang offset))
+       ((eq line open-line)
+        (compute-cached-line-image offset dis-line xpos width))
+       (t
+        (compute-normal-line-image line offset dis-line xpos width)))))
+   ((eq line open-line)
+    (compute-cached-line-image offset dis-line 0 width))
+   (t
+    (compute-normal-line-image line offset dis-line 0 width))))

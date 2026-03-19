@@ -180,4 +180,7 @@
                (:file "shell")
                (:file "debug")
                (:file "dabbrev")
+               (:file "modal")
+               (:file "modal-textobjects" :depends-on ("modal"))
+               (:file "modal-bindings"    :depends-on ("modal" "modal-textobjects"))
                (:file "bindings")))))

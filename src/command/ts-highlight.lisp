@@ -31,17 +31,40 @@
 
 ;;; Per-buffer parse state.  parser-ptr and tree-ptr are owned exclusively
 ;;; by the actor thread and must never be touched from the command thread.
+;;; stable-tree is a copy set by the actor after each successful parse;
+;;; the command thread may read (but never free or modify) it between parse cycles.
 (defstruct ts-buffer-state
-  (parser-ptr nil)       ; C parser — actor thread only
-  (tree-ptr   nil)       ; C tree  — actor thread only
-  (tick       -1)
-  (parsing-p  nil)
-  (alive-p    t)
+  (parser-ptr  nil)      ; C parser — actor thread only
+  (tree-ptr    nil)      ; C tree  — actor thread only
+  (stable-tree nil)      ; C tree copy — written by actor, read by command thread
+  (tick        -1)
+  (parsing-p   nil)
+  (alive-p     t)
   (pending-highlights nil)
   (pending-tick       nil))
 
 (defvar *ts-buffer-states* (make-hash-table :test #'eq))
 (defvar *ts-last-error* nil)
+
+(defparameter *hemlock-selection-bg*
+  '(49 47 93)
+  "Truecolor RGB background for the active selection (vice-alt base02).")
+
+(defparameter *hemlock-selection-bg-16*
+  4
+  "ANSI 16-color background index for the active selection (blue).")
+
+;;; Lines that had selection-colors set in the previous redisplay cycle.
+(defvar *selection-prev-lines* nil)
+
+;;; Cached selection state — update-selection-colors-for-windows short-circuits
+;;; when these match the current cycle, preventing the infinite redisplay loop
+;;; caused by unconditionally calling %selection-invalidate-window.
+(defvar *selection-prev-active*        nil)
+(defvar *selection-prev-point-line*    nil)
+(defvar *selection-prev-point-charpos* nil)
+(defvar *selection-prev-mark-line*     nil)
+(defvar *selection-prev-mark-charpos*  nil)
 
 ;;; Sento actor infrastructure.
 (defvar *ts-actor-system* nil "Sento actor system for tree-sitter background work.")
@@ -325,6 +348,10 @@ Returns NIL for unrecognised captures (no color applied)."
 
 ;;; Free C resources — MUST be called from the actor thread.
 (defun ts-free-state-resources (state)
+  (let ((stable (ts-buffer-state-stable-tree state)))
+    (when (and stable (not (cffi:null-pointer-p stable)))
+      (tree-sitter/ffi:ts-tree-delete stable)
+      (setf (ts-buffer-state-stable-tree state) nil)))
   (let ((tree (ts-buffer-state-tree-ptr state)))
     (when (and tree (not (cffi:null-pointer-p tree)))
       (tree-sitter/ffi:ts-tree-delete tree)
@@ -365,6 +392,13 @@ Returns NIL for unrecognised captures (no color applied)."
                   (setf (ts-buffer-state-pending-highlights state) highlights
                         (ts-buffer-state-pending-tick        state) tick
                         (ts-buffer-state-tree-ptr            state) new-tree-ptr)
+                  ;; Update stable snapshot for command-thread structural queries.
+                  (let ((old-stable (ts-buffer-state-stable-tree state)))
+                    (when (and old-stable (not (cffi:null-pointer-p old-stable)))
+                      (tree-sitter/ffi:ts-tree-delete old-stable)))
+                  (setf (ts-buffer-state-stable-tree state)
+                        (when (and new-tree-ptr (not (cffi:null-pointer-p new-tree-ptr)))
+                          (tree-sitter/ffi:ts-tree-copy new-tree-ptr)))
                   ;; Wake up the main thread so it applies highlights immediately.
                   (ts-wake-up-main-thread))
                 (when (and (not (ts-buffer-state-alive-p state))
@@ -412,9 +446,12 @@ Returns NIL for unrecognised captures (no color applied)."
                               (ts-buffer-text buffer)))))))
 
 ;;; Called from redisplay-loop (twice: redisplay-loop and redisplay-windows-from-mark).
+;;; Phase 0: update selection highlight plists.
 ;;; Phase 1: dispatch parses for dirty buffers.
 ;;; Phase 2: apply completed parse results to window dis-lines.
 (defun ts-ensure-colors-for-windows ()
+  ;; Phase 0: selection highlights (runs every cycle, independent of TS init).
+  (ignore-errors (update-selection-colors-for-windows))
   ;; Surface any error from a previous parse or init failure.
   (when *ts-last-error*
     (let ((e *ts-last-error*))
@@ -452,6 +489,92 @@ Returns NIL for unrecognised captures (no color applied)."
                       (setf (ts-buffer-state-tick state) tick))
                     (ts-invalidate-window-dis-lines win)))))))
       (error (e) (setf *ts-last-error* e)))))
+
+;;; Invalidate all dis-lines in a window for selection rerender.
+;;; Sets every dis-line's old-chars to :selection-stale and decrements window-tick
+;;; so maybe-update-window-image forces a full re-render.
+(defun %selection-invalidate-window (window)
+  (when (window-first-line window)
+    (loop for dl-cons = (cdr (window-first-line window)) then (cdr dl-cons)
+          until (or (null dl-cons) (eq dl-cons the-sentinel))
+          do (setf (dis-line-old-chars (car dl-cons)) :selection-stale)))
+  (setf (window-tick window)
+        (1- (buffer-modified-tick (window-buffer window)))))
+
+;;; Phase 0: update per-line selection-colors plists for the current region.
+;;; Called at the top of ts-ensure-colors-for-windows every redisplay cycle.
+;;;
+;;; Key invariant: %selection-invalidate-window is called ONLY when the
+;;; selection state actually changed from the previous cycle.  Calling it
+;;; unconditionally when region-active-p would force a full repaint every
+;;; cycle → infinite redisplay loop ("ghost cursor flying around").
+(defun update-selection-colors-for-windows ()
+  (let* ((active (region-active-p))
+         (buffer (when active (current-buffer)))
+         (point  (when active (buffer-point buffer)))
+         (mark   (when active (buffer-mark buffer)))
+         (pl     (when point (mark-line    point)))
+         (pc     (when point (mark-charpos point)))
+         (ml     (when mark  (mark-line    mark)))
+         (mc     (when mark  (mark-charpos mark))))
+    ;; Short-circuit: if selection state is identical to last cycle, do nothing.
+    (when (and (eq active *selection-prev-active*)
+               (eq pl    *selection-prev-point-line*)
+               (eql pc   *selection-prev-point-charpos*)
+               (eq ml    *selection-prev-mark-line*)
+               (eql mc   *selection-prev-mark-charpos*))
+      (return-from update-selection-colors-for-windows))
+    ;; State changed — clear stale lines from the previous cycle.
+    (when *selection-prev-lines*
+      (let ((stale-buffers nil))
+        (dolist (line *selection-prev-lines*)
+          (setf (getf (line-plist line) 'selection-colors) nil)
+          (let ((buf (line-buffer line)))
+            (when buf (pushnew buf stale-buffers :test #'eq))))
+        (setf *selection-prev-lines* nil)
+        (dolist (buf stale-buffers)
+          (dolist (win *window-list*)
+            (when (eq (window-buffer win) buf)
+              (%selection-invalidate-window win))))))
+    ;; Paint selection for current active region.
+    (when (and active mark)
+      (let* ((bg     (case (detect-color-support)
+                       ((:truecolor :256color) (list :bg *hemlock-selection-bg*))
+                       (t                      (list :bg-16 *hemlock-selection-bg-16*))))
+             (start      (if (mark< mark point) mark point))
+             (end        (if (mark< mark point) point mark))
+             (start-line (mark-line start))
+             (end-line   (mark-line end))
+             (line       start-line))
+        (loop
+          (when (null line) (return))
+          (let ((s (if (eq line start-line) (mark-charpos start) 0))
+                (e (if (eq line end-line)
+                       (mark-charpos end)
+                       (line-length line))))
+            (when (< s e)
+              (setf (getf (line-plist line) 'selection-colors)
+                    (list (list s e bg)))
+              (push line *selection-prev-lines*)))
+          (when (eq line end-line) (return))
+          (setf line (line-next line)))
+        ;; Invalidate windows showing this buffer (once, because state changed).
+        (dolist (win *window-list*)
+          (when (eq (window-buffer win) buffer)
+            (%selection-invalidate-window win)))))
+    ;; Save current state for next cycle's comparison.
+    (setf *selection-prev-active*        active
+          *selection-prev-point-line*    pl
+          *selection-prev-point-charpos* pc
+          *selection-prev-mark-line*     ml
+          *selection-prev-mark-charpos*  mc)))
+
+(defun ts-stable-tree-for-buffer (buffer)
+  "Return the most recently parsed tree for BUFFER as a raw C pointer, or NIL.
+Read-only: do not modify or free. Safe to call from the command thread between
+parse cycles. Returns NIL when tree-sitter is unavailable or buffer untouched."
+  (let ((state (gethash buffer *ts-buffer-states*)))
+    (and state (ts-buffer-state-stable-tree state))))
 
 (eval-when (:load-toplevel :execute)
   (defvar hemlock::*after-editor-initializations-funs* nil)

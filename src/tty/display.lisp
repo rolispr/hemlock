@@ -1287,6 +1287,9 @@ or a list (R G B) for 24-bit truecolor."
                                 (format nil "~C[48;2;~D;~D;~Dm" #\Escape
                                         (first background) (second background) (third background)))
                                (setab background))))
+                       (let ((background-16 (and (listp font) (getf font :bg-16))))
+                         (when background-16
+                           (setab background-16)))
                        (let ((boldp (and (listp font) (getf font :bold))))
                          (when boldp
                            (enter-bold-mode)))
