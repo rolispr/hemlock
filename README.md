@@ -7,12 +7,11 @@ Hemlock is a Common Lisp editor with a long history — born at CMU in the 1980s
 
 ### What's in here
 
-- **TTY backend** — terminal rendering, full color support (truecolor, 256, 16)
-- **Tree-sitter** — async parse actor, per-line syntax colors, stable-tree for safe reads from the command thread
-- **Modal editing** — Normal/Select modes, full Helix keymap, spanning selections, TS textobjects
-- **Selection coloring** — region highlight painted via slot-array merge with syntax colors
-- **Wire protocol** — bidirectional master/slave over TCP for eval servers
-- **Echo area completions** — interactive completion in the minibuffer
+- **TTY backend**   — terminal rendering, full color support (truecolor, 256, 16)
+- **Tree-sitter**   - WIP
+- **Terminal**      - full vt100/xterm capabilties
+- **Modal editing** — Normal/Select modes, Mostly Helix keymap, spanning selections, TS textobjects, with inspiration in other places
+- **Completions**   — interactive completion in the minibuffer
 
 ---
 
