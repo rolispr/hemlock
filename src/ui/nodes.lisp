@@ -97,6 +97,20 @@ COL-WIDTHS is a list of integers, one per column."
   (col-widths nil :type list))   ; list of integers
 
 
+;;;; Scroll helper
+
+(defun scroll-to-selection (sel offset max-visible)
+  "Return a scroll offset that keeps SEL visible within MAX-VISIBLE rows,
+given the current first-visible index OFFSET.  When SEL is negative
+(nothing selected), returns OFFSET clamped to zero."
+  (when (minusp sel)
+    (return-from scroll-to-selection (max 0 offset)))
+  (let ((o offset))
+    (when (>= sel (+ o max-visible)) (setf o (1+ (- sel max-visible))))
+    (when (< sel o)                  (setf o sel))
+    (max 0 o)))
+
+
 ;;;; Tree container
 
 (defstruct (ui-tree (:copier nil))

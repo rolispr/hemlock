@@ -1,16 +1,12 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;;
-;;; This file contains Xref code, for M-. and other commands.
+;;;    Cross-reference browser: M-., Who Calls, Who References, etc.
 ;;;
 
 (in-package :hemlock)
 
 
-
-(defvar *xref-entries* nil)
-(defvar *xref-entries-end* nil)
-;;;
+;;;; Data model
 
 (defstruct (xref-entry
              (:constructor internal-make-xref-entry (name file position)))
@@ -22,72 +18,13 @@
   (let* ((location (cdr (assoc :location (cdr alist))))
          (file (second (assoc :file location)))
          (position (second (assoc :position location))))
-    (internal-make-xref-entry (car alist)
-                              file
-                              position)))
+    (internal-make-xref-entry (car alist) file position)))
 
-;;; This is the xref buffer if it exists.
-;;;
 (defvar *xref-buffer* nil)
 
-;;; This is the cleanup method for deleting *xref-buffer*.
-;;;
 (defun delete-xref-buffers (buffer)
   (when (eq buffer *xref-buffer*)
-    (setf *xref-buffer* nil)
-    (setf *xref-entries* nil)))
-
-
-;;;; Commands.
-
-(defmode "Xref" :major-p t
-  :documentation
-  "Xref lists Lisp definitions.")
-
-(defcommand "Xref Quit" (p)
-  "Kill the xref buffer."
-  ""
-  (declare (ignore p))
-  (when *xref-buffer* (delete-buffer-if-possible *xref-buffer*)))
-
-(defcommand "Xref Goto" (p)
-  "Change to the entry's buffer."
-  "Change to the entry's buffer."
-  (declare (ignore p))
-  (let ((entry (array-element-from-mark (current-point) *xref-entries*)))
-    (when entry
-      (change-to-definition entry))))
-
-(defun refresh-xref (buf entries)
-  (with-writable-buffer (buf)
-    (delete-region (buffer-region buf))
-    (setf *xref-entries-end* (length entries))
-    (setf *xref-entries* (coerce entries 'vector))
-    (with-output-to-mark (s (buffer-point buf))
-      (dolist (entry entries)
-        (xref-write-line entry s)))))
-
-(defun make-xref-buffer (entries)
-  (let ((buf (or *xref-buffer* (make-buffer "*Xref*" :modes '("Xref")))))
-    (setf *xref-buffer* buf)
-    (refresh-xref buf entries)
-    (let ((fields (buffer-modeline-fields *xref-buffer*)))
-      (setf (cdr (last fields))
-            (list (or (modeline-field :xref-cmds)
-                      (make-modeline-field
-                       :name :xref-cmds :width 18
-                       :function
-                       #'(lambda (buffer window)
-                           (declare (ignore buffer window))
-                           "  Type ? for help.")))))
-      (setf (buffer-modeline-fields *xref-buffer*) fields))
-    (buffer-start (buffer-point buf))
-    (change-to-buffer buf)))
-
-(defun xref-write-line (entry s)
-  (format s "  ~A ~40T~A~%"
-          (shorten-string 36 (xref-entry-name entry))
-          (shorten-string 39 (xref-entry-file entry))))
+    (setf *xref-buffer* nil)))
 
 (defun shorten-string (len str)
   (if (<= (length str) len)
@@ -96,6 +33,121 @@
               "..."
               (subseq str (- (length str) (ceiling (- len 3) 2))))))
 
+
+;;;; Display
+
+(defun xref-window ()
+  (find-if (lambda (w) (eq (window-buffer w) *xref-buffer*)) *window-list*))
+
+(defun xref-row (entry width)
+  "Build a selectable row for ENTRY within WIDTH columns."
+  (let* ((name-w (min 38 (floor width 2)))
+         (file-w (max 0 (- width name-w 2))))
+    (make-ui-selectable
+     :data entry
+     :child (make-ui-hstack
+             :spacing 0
+             :children (list
+                        (make-ui-box :width name-w :align :left
+                                     :child (make-ui-text
+                                             :content (shorten-string name-w (xref-entry-name entry))
+                                             :face 10))
+                        (make-ui-text :content (shorten-string file-w (xref-entry-file entry))
+                                      :face 11))))))
+
+(defun xref-render (tree)
+  "Render the entry list into the tree's buffer."
+  (let* ((state   (ui-tree-state tree))
+         (entries (getf state :entries))
+         (sel     (getf state :selection 0))
+         (n       (length entries))
+         (width   (ui-tree-width tree))
+         (win     (xref-window))
+         (height  (if win (window-height win) 20))
+         (offset  (scroll-to-selection sel (getf state :scroll-offset 0) height)))
+    (setf (getf (ui-tree-state tree) :scroll-offset) offset)
+    (let ((rows nil))
+      (loop for i from offset below (min (+ offset height) n)
+            for entry = (nth i entries)
+            do (let ((row (xref-row entry width)))
+                 (setf (ui-selectable-selectedp row) (= i sel))
+                 (push row rows)))
+      (setf (ui-tree-root tree) (make-ui-vstack :children (nreverse rows))))
+    (with-writable-buffer ((ui-tree-buffer tree))
+      (render-tree tree))
+    (when win
+      (move-mark (window-display-start win)
+                 (region-start (buffer-region (ui-tree-buffer tree)))))))
+
+(defun make-xref-buffer (entries)
+  "Display ENTRIES in *Xref*, creating the buffer if necessary."
+  (let ((buf (or *xref-buffer*
+                 (make-buffer "*Xref*" :modes '("Xref")
+                              :delete-hook '(delete-xref-buffers)))))
+    (setf *xref-buffer* buf)
+    (when (buffer-ui-tree buf)
+      (uninstall-tree (buffer-ui-tree buf)))
+    (let* ((win   (or (xref-window) (car *window-list*)))
+           (width (if win (window-width win) 80))
+           (tree  (make-ui-tree
+                   :buffer buf
+                   :width width
+                   :state (list :entries entries
+                                :selection 0
+                                :scroll-offset 0))))
+      (install-tree tree)
+      (setf (buffer-writable buf) nil)
+      (xref-render tree))
+    (change-to-buffer buf)))
+
+
+;;;; Commands
+
+(defmode "Xref" :major-p t
+  :documentation
+  "Xref lists cross-reference results.")
+
+(defcommand "Xref Quit" (p)
+  "Kill the xref buffer."
+  ""
+  (declare (ignore p))
+  (when *xref-buffer* (delete-buffer-if-possible *xref-buffer*)))
+
+(defcommand "Xref Goto" (p)
+  "Visit the definition under the cursor."
+  "Visit the definition under the cursor."
+  (declare (ignore p))
+  (let ((tree (and *xref-buffer* (buffer-ui-tree *xref-buffer*))))
+    (when tree
+      (let* ((state   (ui-tree-state tree))
+             (entries (getf state :entries))
+             (sel     (getf state :selection 0)))
+        (when (< -1 sel (length entries))
+          (change-to-definition (nth sel entries)))))))
+
+(defcommand "Xref Next" (p)
+  "Move selection to the next entry."
+  "Move selection to the next entry."
+  (declare (ignore p))
+  (let ((tree (and *xref-buffer* (buffer-ui-tree *xref-buffer*))))
+    (when tree
+      (let* ((state (ui-tree-state tree))
+             (n     (length (getf state :entries)))
+             (sel   (getf state :selection 0)))
+        (setf (getf (ui-tree-state tree) :selection) (min (1- n) (1+ sel)))
+        (xref-render tree)))))
+
+(defcommand "Xref Previous" (p)
+  "Move selection to the previous entry."
+  "Move selection to the previous entry."
+  (declare (ignore p))
+  (let ((tree (and *xref-buffer* (buffer-ui-tree *xref-buffer*))))
+    (when tree
+      (let* ((state (ui-tree-state tree))
+             (sel   (getf state :selection 0)))
+        (setf (getf (ui-tree-state tree) :selection) (max 0 (1- sel)))
+        (xref-render tree)))))
+
 (defcommand "Xref Help" (p)
   "Show this help."
   "Show this help."
@@ -103,7 +155,7 @@
   (describe-mode-command nil "Xref"))
 
 
-;;; Find Definition
+;;;; Find Definition
 
 (defun change-to-definition (entry)
   (let ((file (xref-entry-file entry))
@@ -115,7 +167,8 @@
         (character-offset (current-point) (1- position)))
       t)))
 
-;;; sb-introspect-based definition finding.
+
+;;;; sb-introspect backend
 
 (defun %ds-to-xref-alist (name ds)
   "Convert a definition-source to make-xref-entry alist format."
@@ -183,10 +236,6 @@
 (defcommand "Find Definitions" (p)
   "" ""
   (let ((default (hemlock::symbol-string-at-point)))
-    ;; Fixme: MARK-SYMBOL isn't very good, meaning that often we
-    ;; will get random forms rather than a symbol.  Let's at least
-    ;; catch the case where the result is more than a line long,
-    ;; and give up.
     (when (find #\newline default)
       (setf default nil))
     (find-definitions

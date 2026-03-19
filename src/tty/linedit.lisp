@@ -271,7 +271,7 @@
             :buffer buffer)
   (bind-key "Linedit Apropos" #k"control-c control-d control-a"
             :buffer buffer)
-  (bind-key "Linedit Fuzzy Complete" #k"control-c meta-i" :buffer buffer)
+  (bind-key "Linedit Complete Symbol" #k"control-c meta-i" :buffer buffer)
   (bind-key "Linedit Test" #k"control-c control-d control-t"
             :buffer buffer)
   (bind-key "Linedit Find Definitions" #k"meta-." :buffer buffer)
@@ -1225,12 +1225,12 @@ to the appropriate home directory."
 ;; fixme: would be cooler if this didn't clear the screen.
 ;; TTY-EXCURSION would be more effective if Unix terminals weren't that
 ;; useless.  Perhaps we should give up and do without it.
-(defcommand "Linedit Fuzzy Complete"
+(defcommand "Linedit Complete Symbol"
     (p &optional (sym (hemlock::agent-symbol-at-point)))
     "" ""
   (declare (ignore p))
   (tty-excursion (lambda ()
-                   (hemlock::fuzzy-complete-symbol-command nil)
+                   (hemlock::complete-symbol-command nil)
                    (hemlock::refresh-screen-command nil))
                  :nothing-to-do-message "No completions."
                  :clear-screen-before-p :prompt

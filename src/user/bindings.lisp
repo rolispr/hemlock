@@ -13,9 +13,8 @@
 ;;; This page defines prefix characters that set specified modifier bits on
 ;;; the next character typed.
 ;;;
-;; Escape is keyboard-quit (alias for C-g), not a Meta prefix.
-;; Modern terminals send real Alt+key sequences, so the old escape-as-meta
-;; prefix is not needed.
+;; Escape is NOT a Meta prefix — modern terminals send real Alt+key sequences.
+;; Escape is used directly as a command key (modal editing, keyboard-quit).
 ;;(setf (key-translation #k"escape") '(:bits :meta))
 ;;(setf (key-translation #k"control-[") '(:bits :meta))
 (setf (key-translation #k"control-z") '(:bits :control :meta))
@@ -341,7 +340,7 @@
 (bind-key "Editor Macroexpand Expression" #k"control-m" :mode "Editor")
 (bind-key "Editor Describe Function Call" #k"control-meta-A" :mode "Editor")
 (bind-key "Editor Describe Symbol" #k"control-meta-S" :mode "Editor")
-(bind-key "Editor Fuzzy Complete Symbol" #k"control-c meta-i" :mode "Editor")
+(bind-key "Complete Symbol" #k"control-c meta-i" :mode "Editor")
 
 ;;;; Session.
 (bind-key "Confirm Session Input" #k"return" :mode "Session")
@@ -407,7 +406,8 @@
 (bind-key "Describe Symbol" #k"control-meta-S")
 (bind-key "Goto Definition" #k"control-meta-F")
 
-(bind-key "Fuzzy Complete Symbol" #k"control-c meta-i" :mode "Lisp")
+(bind-key "Complete Symbol" #k"tab" :mode "Lisp")
+(bind-key "Complete Symbol" #k"control-c meta-i" :mode "Lisp")
 
 
 
@@ -767,32 +767,36 @@
 (bind-key "Bufed Expunge" #k"x" :mode "Bufed")
 (bind-key "Bufed Quit" #k"q" :mode "Bufed")
 (bind-key "Bufed Goto" #k"space" :mode "Bufed")
-(bind-key "Bufed Goto" #k"e" :mode "Bufed")
-(bind-key "Bufed Goto and Quit" #k"super-leftdown" :mode "Bufed")
-(bind-key "Bufed Save File" #k"s" :mode "Bufed")
-(bind-key "Next Line" #k"n" :mode "Bufed")
-(bind-key "Previous Line" #k"p" :mode "Bufed")
-
-
-(bind-key "Bufed Help" #k"?" :mode "Bufed")
+(bind-key "Bufed Goto"     #k"e"         :mode "Bufed")
+(bind-key "Bufed Goto"     #k"return"    :mode "Bufed")
+(bind-key "Bufed Save File" #k"s"        :mode "Bufed")
+(bind-key "Bufed Next"     #k"n"         :mode "Bufed")
+(bind-key "Bufed Next"     #k"downarrow" :mode "Bufed")
+(bind-key "Bufed Previous" #k"p"         :mode "Bufed")
+(bind-key "Bufed Previous" #k"uparrow"   :mode "Bufed")
+(bind-key "Bufed Refresh"  #k"g"         :mode "Bufed")
+(bind-key "Bufed Help"     #k"?"         :mode "Bufed")
 
 
 
 ;;;; Coned.
 
-(bind-key "Coned" #k"control-x control-meta-b")
-(bind-key "Coned Delete" #k"d" :mode "Coned")
-(bind-key "Coned Delete" #k"control-d" :mode "Coned")
-(bind-key "Coned Delete" #k"Delete" :mode "Coned")
-(bind-key "Coned Undelete" #k"u" :mode "Coned")
-(bind-key "Coned Expunge" #k"!" :mode "Coned")
-(bind-key "Coned Expunge" #k"x" :mode "Coned")
-(bind-key "Coned Quit" #k"q" :mode "Coned")
-(bind-key "Coned Goto" #k"space" :mode "Coned")
-(bind-key "Coned Refresh" #k"g" :mode "Coned")
-(bind-key "Next Line" #k"n" :mode "Coned")
-(bind-key "Previous Line" #k"p" :mode "Coned")
-(bind-key "Coned Help" #k"?" :mode "Coned")
+(bind-key "Coned" #k"control-x control-meta-c")
+(bind-key "Coned Delete"   #k"d"         :mode "Coned")
+(bind-key "Coned Delete"   #k"control-d" :mode "Coned")
+(bind-key "Coned Delete"   #k"Delete"    :mode "Coned")
+(bind-key "Coned Undelete" #k"u"         :mode "Coned")
+(bind-key "Coned Expunge"  #k"x"         :mode "Coned")
+(bind-key "Coned Expunge"  #k"!"         :mode "Coned")
+(bind-key "Coned Quit"     #k"q"         :mode "Coned")
+(bind-key "Coned Goto"     #k"space"     :mode "Coned")
+(bind-key "Coned Goto"     #k"return"    :mode "Coned")
+(bind-key "Coned Next"     #k"n"         :mode "Coned")
+(bind-key "Coned Next"     #k"downarrow" :mode "Coned")
+(bind-key "Coned Previous" #k"p"         :mode "Coned")
+(bind-key "Coned Previous" #k"uparrow"   :mode "Coned")
+(bind-key "Coned Refresh"  #k"g"         :mode "Coned")
+(bind-key "Coned Help"     #k"?"         :mode "Coned")
 
 
 
@@ -806,9 +810,14 @@
 (bind-key "Who References"   #k"control-c control-w control-r" :mode "Lisp")
 (bind-key "Who Sets"         #k"control-c control-w control-s" :mode "Lisp")
 
-(bind-key "Xref Quit" #k"q" :mode "Xref")
-(bind-key "Xref Goto" #k"space" :mode "Xref")
-(bind-key "Xref Help" #k"?" :mode "Xref")
+(bind-key "Xref Quit"     #k"q"          :mode "Xref")
+(bind-key "Xref Goto"     #k"space"      :mode "Xref")
+(bind-key "Xref Goto"     #k"return"     :mode "Xref")
+(bind-key "Xref Next"     #k"n"          :mode "Xref")
+(bind-key "Xref Next"     #k"downarrow"  :mode "Xref")
+(bind-key "Xref Previous" #k"p"          :mode "Xref")
+(bind-key "Xref Previous" #k"uparrow"    :mode "Xref")
+(bind-key "Xref Help"     #k"?"          :mode "Xref")
 
 
 
@@ -825,17 +834,7 @@
 
 
 
-;;;; Fuzzylist
 
-(bind-key "Fuzzylist Pick" #k"space" :mode "Fuzzylist")
-(bind-key "Fuzzylist Quit" #k"q" :mode "Fuzzylist")
-(bind-key "Fuzzylist Find Definition" #k"." :mode "Fuzzylist")
-(bind-key "Fuzzylist Help" #k"?" :mode "Fuzzylist")
-
-(bind-key "Completelist Pick" #k"space" :mode "Completelist")
-(bind-key "Completelist Quit" #k"q" :mode "Completelist")
-(bind-key "Completelist Find Definition" #k"." :mode "Completelist")
-(bind-key "Completelist Help" #k"?" :mode "Completelist")
 
 
 

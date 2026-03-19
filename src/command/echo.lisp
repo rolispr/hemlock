@@ -76,7 +76,10 @@
 (defvar *parse-help* ()
   "Help string for the current parse.")
 
-(defvar *parse-type* :string "A hack. :String, :File or :Keyword.")
+(defvar *parse-type* :string "A hack. :String, :File, :Keyword, or :Symbol.")
+
+(defvar *parse-symbol-package* nil
+  "Package name string for :symbol parses.  Bound by Complete Symbol.")
 
 
 
@@ -171,7 +174,9 @@
     (move-mark *parse-starting-mark* point)
     (insert-string point (or *parse-default-string* *parse-default*))
     ;; create completion display if we have string tables or file prompt
-    (when (or *parse-string-tables* (eq *parse-type* :file))
+    (when (or *parse-string-tables*
+              (eq *parse-type* :file)
+              (eq *parse-type* :symbol))
       (make-echo-completions))
     (setf (current-window) *echo-area-window*)
     (unwind-protect
@@ -398,6 +403,17 @@
         (*parse-default* (if defaultp (prin1-to-string default))))
       (parse-for-something)))
 
+
+(defun prompt-for-symbol (package-name &key ((:default-string *parse-default-string*))
+                                            ((:prompt *parse-prompt*) "Symbol: ")
+                                            ((:help *parse-help*) "Complete a symbol."))
+  "Prompt for a symbol name using the echo-area ranked completion popup.
+PACKAGE-NAME is the default package for completion.
+Returns the completed symbol name string."
+  (let ((*parse-type* :symbol)
+        (*parse-symbol-package* package-name)
+        (*parse-verification-function* (lambda (string) (list string))))
+    (parse-for-something)))
 
 (defun prompt-for-string (&key ((:default *parse-default*))
                                ((:default-string *parse-default-string*))

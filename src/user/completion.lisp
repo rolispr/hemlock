@@ -562,10 +562,7 @@
            (message "no matches")
            nil))))
     (when completion
-      (%insert-completion completion))
-    (when (and show-matches-p matches)
-      (split-window-command nil)
-      (make-completelist-buffer (mapcar #'make-completelist-entry matches)))))
+      (%insert-completion completion))))
 
 (defun %insert-completion (completion)
   (let ((point (current-point)))
@@ -658,95 +655,3 @@
       (indent-command p)
       (complete-for-mode-command p)))
 
-;;; Mode
-
-(defvar *completelist-entries* nil)
-(defvar *completelist-entries-end* 0)
-;;;
-
-(defun make-completelist-entry (str)
-  (internal-make-fuzzylist-entry str nil nil "????????"))
-
-;;; This is the completelist buffer if it exists.
-;;;
-(defvar *completelist-buffer* nil)
-
-;;; This is the cleanup method for deleting *completelist-buffer*.
-;;;
-(defun delete-completelist-buffers (buffer)
-  (when (eq buffer *completelist-buffer*)
-    (setf *completelist-buffer* nil)
-    (setf *completelist-entries* nil)))
-
-
-;;;; Commands.
-
-(defmode "Completelist" :major-p t
-  :documentation "Completelist mode presents a list of completions.")
-
-(defcommand "Completelist Quit" (p)
-  "Kill the completelist buffer."
-  ""
-  (declare (ignore p))
-  (when *completelist-buffer*
-        (delete-buffer-if-possible *completelist-buffer*)))
-
-(defun completelist-entry-from-mark (mark)
-  (declare (ignore mark))
-  (array-element-from-mark (current-point) *completelist-entries*))
-
-(defcommand "Completelist Find Definition" (p)
-  "" ""
-  (declare (ignore p))
-  (let ((entry (completelist-entry-from-mark (current-point))))
-    (when entry
-      (change-to-definition entry))))
-
-(defcommand "Completelist Pick" (p)
-  "" ""
-  (declare (ignore p))
-  (let ((entry (completelist-entry-from-mark (current-point))))
-    (when entry
-      (completelist-quit-command nil)
-      (delete-window-command nil)
-      (%insert-completion (fuzz-completed-string entry)))))
-
-(defun refresh-completelist (buf entries)
-  (with-writable-buffer (buf)
-    (delete-region (buffer-region buf))
-    (setf *completelist-entries-end* (length entries))
-    (setf *completelist-entries* (coerce entries 'vector))
-    (with-output-to-mark (s (buffer-point buf))
-      (dolist (entry entries)
-        (completelist-write-line entry s)))))
-
-(defun make-completelist-buffer (entries)
-  (let ((buf (or *completelist-buffer*
-                 (make-buffer "*Completelist*" :modes '("Completelist")))))
-    (setf *completelist-buffer* buf)
-    (refresh-completelist buf entries)
-    (let ((fields (buffer-modeline-fields *completelist-buffer*)))
-      (setf (cdr (last fields))
-            (list (or (modeline-field :completelist-cmds)
-                      (make-modeline-field
-                       :name :completelist-cmds :width 18
-                       :function
-                       #'(lambda (buffer window)
-                           (declare (ignore buffer window))
-                           "  Type ? for help.")))))
-      (setf (buffer-modeline-fields *completelist-buffer*) fields))
-    (buffer-start (buffer-point buf))
-    (change-to-buffer buf)))
-
-(defun completelist-write-line (entry s)
-  (format s "~A ~40T~A~%"
-          (fuzz-completed-string entry)
-          ;; (fuzz-score entry)
-          ;; (fuzz-chunks entry)
-          (fuzz-classification-string entry)))
-
-(defcommand "Completelist Help" (p)
-  "Show this help."
-  "Show this help."
-  (declare (ignore p))
-  (describe-mode-command nil "Completelist"))

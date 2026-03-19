@@ -35,7 +35,19 @@
   (let ((content (ui-text-content node)))
     (when (plusp (length content))
       (insert-string point content)))
-  (setf (ui-node-end-mark node) (copy-mark point :left-inserting)))
+  (setf (ui-node-end-mark node) (copy-mark point :left-inserting))
+  (let ((face (ui-text-face node)))
+    (when face
+      (let ((color (if (listp face) face (resolve-font face))))
+        (when color
+          (let* ((start (ui-node-start-mark node))
+                 (end   (ui-node-end-mark node))
+                 (line  (mark-line start))
+                 (sc    (mark-charpos start))
+                 (ec    (mark-charpos end)))
+            (when (and (eq line (mark-line end)) (< sc ec))
+              (push (list sc ec color)
+                    (getf (line-plist line) 'syntax-colors)))))))))
 
 
 ;;;; Separator
@@ -181,6 +193,11 @@
 ;;;; Grid
 
 (defmethod render-node ((node ui-grid) point width)
+  "Render a grid into the buffer at POINT.  Each cell is rendered directly so
+that face/color spans from render-node (ui-text) are stored on the main
+buffer's lines.  After each cell the written character count is compared to
+the declared column width and the cell is padded with spaces or truncated to
+exactly that width."
   (declare (ignore width))
   (setf (ui-node-start-mark node) (copy-mark point :right-inserting))
   (let ((col-widths (ui-grid-col-widths node))
@@ -189,13 +206,20 @@
           do (loop for cell in row
                    for w in col-widths
                    do (setf (ui-node-parent cell) node)
-                      (let ((content (render-node-to-string cell w)))
-                        (insert-string point
-                          (if (> (length content) w)
-                              (subseq content 0 w)
-                              (concatenate 'string content
-                                (make-string (- w (length content))
-                                             :initial-element #\space))))))
+                      (let* ((line  (mark-line point))
+                             (col0  (mark-charpos point)))
+                        (render-node cell point w)
+                        (let ((written (if (eq (mark-line point) line)
+                                           (- (mark-charpos point) col0)
+                                           w)))
+                          (cond
+                            ((< written w)
+                             (insert-string point
+                               (make-string (- w written) :initial-element #\space)))
+                            ((> written w)
+                             (with-mark ((excess point :left-inserting))
+                               (setf (mark-charpos excess) (+ col0 w))
+                               (delete-region (region excess point))))))))
              (when more-rows
                (insert-character point #\newline))))
   (setf (ui-node-end-mark node) (copy-mark point :left-inserting)))
@@ -204,27 +228,25 @@
 ;;;; Utility
 
 (defun render-node-to-string (node width)
-  "Render NODE into a string of WIDTH columns.
-For ui-text nodes (the common case in grid cells) returns the content
-directly without allocating a hemlock buffer."
-  (typecase node
-    (ui-text
-     (let ((s (ui-text-content node)))
-       (if (<= (length s) width)
-           s
-           (subseq s 0 width))))
-    (t
-     ;; Fall back to rendering into a temp buffer for complex nodes.
-     (let ((buf (or (make-buffer " *ui-temp*" :delete-hook nil)
-                    ;; Buffer already exists (e.g. from an interrupted render).
-                    ;; Delete the stale one and create a fresh one.
-                    (progn
-                      (let ((old (getstring " *ui-temp*" *buffer-names*)))
-                        (when old (delete-buffer old)))
-                      (make-buffer " *ui-temp*" :delete-hook nil)))))
-       (when buf
-         (unwind-protect
-             (let ((point (buffer-point buf)))
-               (render-node node point width)
-               (line-string (mark-line (region-start (buffer-region buf)))))
-           (delete-buffer buf)))))))
+  "Render NODE into a string of WIDTH columns.  For face-less ui-text nodes
+returns the content string directly; all other nodes, and ui-text nodes with
+a face, render into a temporary buffer so that render-node runs in full."
+  (when (and (ui-text-p node) (null (ui-text-face node)))
+    (let ((s (ui-text-content node)))
+      (return-from render-node-to-string
+        (if (<= (length s) width)
+            s
+            (subseq s 0 width)))))
+  (let ((buf (or (make-buffer " *ui-temp*" :delete-hook nil)
+                 ;; Buffer already exists (e.g. from an interrupted render).
+                 ;; Delete the stale one and create a fresh one.
+                 (progn
+                   (let ((old (getstring " *ui-temp*" *buffer-names*)))
+                     (when old (delete-buffer old)))
+                   (make-buffer " *ui-temp*" :delete-hook nil)))))
+    (when buf
+      (unwind-protect
+          (let ((point (buffer-point buf)))
+            (render-node node point width)
+            (line-string (mark-line (region-start (buffer-region buf)))))
+        (delete-buffer buf)))))

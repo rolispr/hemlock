@@ -43,43 +43,6 @@
 (defvar *ts-buffer-states* (make-hash-table :test #'eq))
 (defvar *ts-last-error* nil)
 
-;;; Truecolor syntax palette — vice-alt base16 (from lem/nymph).
-;;; Indices 1–9 correspond to ts-capture-name-to-font return values.
-;;; Comment slot uses #6a9955 (VS Code green) in place of base03 #323643
-;;; which is nearly invisible on a black terminal background.
-(defparameter *hemlock-syntax-palette*
-  #(nil                        ; 0 = default/reset
-    (:fg (106 153  85))        ; 1 = comment        #6a9955  green  (base03 substitute)
-    (:fg ( 68 255 221))        ; 2 = string         #44ffdd  base0B cyan-green
-    (:fg (246 117  68))        ; 3 = number/const   #F67544  base09 orange
-    (:fg (130 101 255))        ; 4 = keyword        #8265ff  base0E purple
-    (:fg ( 47 177 212))        ; 5 = function       #2fb1d4  base0D blue
-    (:fg (  0 202 255))        ; 6 = builtin/op     #00caff  base0C cyan
-    (:fg (255  61 129))        ; 7 = variable       #ff3d81  base08 pink
-    (:fg (255 255 115))        ; 8 = type/param     #ffff73  base0A yellow
-    (:fg (244 244 247)))       ; 9 = const.builtin  #f4f4f7  base07 bright white
-  "Nymph vice-alt base16 syntax color palette for truecolor terminals.
-Slot index matches the return value of ts-capture-name-to-font.")
-
-(defparameter *hemlock-syntax-palette-16*
-  #(nil 2 6 3 5 4 6 1 3 7)
-  "ANSI 16-color fallback indices for *hemlock-syntax-palette* slots.
-; idx: 0  1  2  3  4  5  6  7  8  9
-; 1=green(2) 2=cyan(6) 3=yellow(3) 4=magenta(5) 5=blue(4) 6=cyan(6) 7=red(1) 8=yellow(3) 9=white(7)")
-
-(defvar *ts-color-support* nil
-  "Cached terminal color support level: :truecolor, :256color, or :16color.")
-
-(defun ts-detect-color-support ()
-  "Return the terminal's color support level, caching the result."
-  (or *ts-color-support*
-      (setf *ts-color-support*
-            (let ((ct   (uiop:getenv "COLORTERM"))
-                  (term (uiop:getenv "TERM")))
-              (cond ((or (equal ct "truecolor") (equal ct "24bit")) :truecolor)
-                    ((and term (search "256color" term))            :256color)
-                    (t                                              :16color))))))
-
 ;;; Sento actor infrastructure.
 (defvar *ts-actor-system* nil "Sento actor system for tree-sitter background work.")
 (defvar *ts-actor*        nil "Pinned sento actor — ALL C tree-sitter calls run here.")
@@ -343,15 +306,6 @@ Returns NIL for unrecognised captures (no color applied)."
                  (incf i)))
       (nreverse result))))
 
-(defun ts-resolve-font (index)
-  "Resolve a ts font integer to a color form suitable for the terminal.
-Returns a (:fg (R G B)) plist for truecolor/256color terminals, an integer
-ANSI index for 16-color terminals, or NIL for unrecognised indices."
-  (when (and (plusp index) (< index (length *hemlock-syntax-palette*)))
-    (case (ts-detect-color-support)
-      ((:truecolor :256color) (aref *hemlock-syntax-palette* index))
-      (t                      (aref *hemlock-syntax-palette-16* index)))))
-
 (defun ts-store-colors-on-lines (buffer highlight-table)
   (let ((line (mark-line (buffer-start-mark buffer)))
         (line-num 0))
@@ -360,7 +314,7 @@ ANSI index for 16-color terminals, or NIL for unrecognised indices."
                     (normed     (when raw (ts-normalize-ranges raw (line-length line))))
                     (new-colors (delete nil
                                         (mapcar (lambda (r)
-                                                  (let ((color (ts-resolve-font (third r))))
+                                                  (let ((color (resolve-font (third r))))
                                                     (when color
                                                       (list (first r) (second r) color))))
                                                 normed))))

@@ -75,9 +75,16 @@ The prefix may contain * wildcards for glob-style matching."
 
 (defun completion-candidates ()
   "Return the initial candidate list for the current parse type."
-  (if (eq *parse-type* :file)
-      (file-completion-filter (or *parse-default-string* *parse-default* ""))
-      (hemlock::string-table-candidates *parse-string-tables*)))
+  (cond
+    ((eq *parse-type* :file)
+     (file-completion-filter (or *parse-default-string* *parse-default* "")))
+    ((eq *parse-type* :symbol)
+     (let ((matches (hemlock::fuzzy-completions
+                     (or *parse-default-string* "")
+                     (or *parse-symbol-package* "cl"))))
+       (mapcar #'first (first matches))))
+    (t
+     (hemlock::string-table-candidates *parse-string-tables*))))
 
 (defun file-display-name (namestring)
   "Return a short display name for a file path.
@@ -109,7 +116,7 @@ For files, returns the filename."
          (all (completion-candidates))
          (w0 (floor width 2))
          (w1 (floor width 4))
-         (w2 (- width w0 w1))
+         (w2 (- width w0 w1 1))
          (default (or *parse-default-string* *parse-default* "")))
     (let ((tree (make-ui-tree
                  :buffer *echo-area-buffer*
@@ -140,6 +147,28 @@ For files, returns the filename."
           (delete-region r))))))
 
 
+
+;;;; Symbol chunk highlighting
+
+(defun symbol-chunk-nodes (str chunks)
+  "Build a list of ui-text nodes for STR with CHUNKS highlighted in face 14.
+CHUNKS is a list of (offset substring) pairs from fuzzy-completions."
+  (if (null chunks)
+      (list (make-ui-text :content str))
+      (let ((nodes nil)
+            (pos 0))
+        (dolist (chunk chunks)
+          (let ((start (first chunk))
+                (sub   (second chunk)))
+            (when (< pos start)
+              (push (make-ui-text :content (subseq str pos start)) nodes))
+            (push (make-ui-text :content sub :face 14) nodes)
+            (setf pos (+ start (length sub)))))
+        (when (< pos (length str))
+          (push (make-ui-text :content (subseq str pos)) nodes))
+        (nreverse nodes))))
+
+
 ;;;; Grid building
 
 (defun build-completion-grid (tree)
@@ -148,9 +177,18 @@ For files, returns the filename."
          (prompt (getf state :prompt ""))
          (input (input-string tree))
          (all (getf state :candidates))
-         (filtered (if (eq *parse-type* :file)
-                       (file-completion-filter input)
-                       (hemlock::filter-completions input all)))
+         (filtered
+          (cond
+            ((eq *parse-type* :file)
+             (file-completion-filter input))
+            ((eq *parse-type* :symbol)
+             (let* ((raw (hemlock::fuzzy-completions
+                          input (or *parse-symbol-package* "cl")))
+                    (matches (first raw)))
+               (setf (getf (ui-tree-state tree) :symbol-matches) matches)
+               (mapcar #'first matches)))
+            (t
+             (hemlock::filter-completions input all))))
          (sel (getf state :selection -1))
          (msg (getf state :message ""))
          (height (getf state :height 3))
@@ -165,13 +203,9 @@ For files, returns the filename."
       (setf sel (1- n)
             (getf (ui-tree-state tree) :selection) sel))
     (let* ((max-visible (1- height))
-           (offset (getf state :scroll-offset 0)))
-      (when (>= sel 0)
-        (when (>= sel (+ offset max-visible))
-          (setf offset (1+ (- sel max-visible))))
-        (when (< sel offset)
-          (setf offset sel)))
-      (when (minusp offset) (setf offset 0))
+           (offset (scroll-to-selection sel
+                                        (getf state :scroll-offset 0)
+                                        max-visible)))
       (setf (getf (ui-tree-state tree) :scroll-offset) offset)
       ;; row 0 — scrolling input viewport so cursor never leaves col 0
       (let* ((w0 (first col-widths))
@@ -189,15 +223,35 @@ For files, returns the filename."
       (loop for row from 1 below height
             for idx = (+ offset (1- row))
             do (if (< idx n)
-                   (let* ((cand (nth idx filtered))
-                          (display (completion-display-name cand))
-                          (selected (= idx sel))
-                          (prefix (if selected "> " "  ")))
-                     (push (list (make-ui-text
-                                  :content (concatenate 'string prefix display))
-                                 (make-ui-text :content "")
-                                 (make-ui-text :content ""))
-                           rows))
+                   (if (eq *parse-type* :symbol)
+                       (let* ((match    (nth idx (getf (ui-tree-state tree) :symbol-matches)))
+                              (completed (first match))
+                              (chunks   (third match))
+                              (class    (fourth match))
+                              (selected (= idx sel))
+                              (prefix   (make-ui-text :content (if selected "> " "  ")))
+                              (name-nodes (symbol-chunk-nodes completed chunks))
+                              (col1     (make-ui-hstack :spacing 0
+                                                        :children (cons prefix name-nodes)))
+                              (class-w  (max 0 (1- (second col-widths))))
+                              (class-s  (or class "")))
+                         (push (list col1
+                                     (make-ui-text
+                                      :content (if (> (length class-s) class-w)
+                                                   (subseq class-s 0 class-w)
+                                                   class-s)
+                                      :face 11)
+                                     (make-ui-text :content ""))
+                               rows))
+                       (let* ((cand (nth idx filtered))
+                              (display (completion-display-name cand))
+                              (selected (= idx sel))
+                              (prefix (if selected "> " "  ")))
+                         (push (list (make-ui-text
+                                      :content (concatenate 'string prefix display))
+                                     (make-ui-text :content "")
+                                     (make-ui-text :content ""))
+                               rows)))
                    (push (list (make-ui-text :content "")
                                (make-ui-text :content "")
                                (make-ui-text :content ""))

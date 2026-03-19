@@ -372,10 +372,12 @@
                 finally
                 (setf (dis-line-font-changes dis-line) nil)
                 (shiftf (font-change-next prev) *free-font-changes* changes))))
-      (let ((prev nil))
+      (let ((prev nil)
+            (line-len (line-length line)))
+        (setf syntax-colors (sort syntax-colors #'< :key #'first))
         (dolist (range syntax-colors)
-          (let ((start-charpos (first range))
-                (end-charpos   (second range))
+          (let ((start-charpos (min (first range)  line-len))
+                (end-charpos   (min (second range) line-len))
                 (font          (third range)))
             ;; Start-of-range node
             (cond
@@ -445,6 +447,7 @@
                  (setq prev (alloc-font-change 0 (font-mark-font max-mark) max-mark))
                  (setf (dis-line-font-changes dis-line) prev)))
              (loop with bound = (1- offset)
+                   with line-len = (line-length line)
                    do (let ((min most-positive-fixnum)
                             (min-mark nil))
                         (dolist (m marks)
@@ -453,9 +456,10 @@
                               (when (and (> charpos bound) (< charpos min))
                                 (setq min charpos  min-mark m)))))
                         (unless min-mark (loop-finish))
-                        (let ((len (if (eq line open-line)
-                                       (cached-real-line-length line 10000 offset min)
-                                     (real-line-length line 10000 offset min))))
+                        (let* ((safe-min (min min line-len))
+                               (len (if (eq line open-line)
+                                        (cached-real-line-length line 10000 offset safe-min)
+                                      (real-line-length line 10000 offset safe-min))))
                           (when (< len width)
                             (let ((new (alloc-font-change
                                         (+ len

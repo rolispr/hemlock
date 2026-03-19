@@ -627,6 +627,7 @@
    #:prompt-for-keyword
    #:prompt-for-expression
    #:prompt-for-string
+   #:prompt-for-symbol
    #:prompt-for-variable
    #:prompt-for-y-or-n
    #:prompt-for-yes-or-no
@@ -889,6 +890,7 @@
    #:*parse-prompt*
    #:*parse-help*
    #:*parse-type*
+   #:*parse-symbol-package*
 
    ;; editor-input internals (input.lisp) — used by tty backend
    #:*real-editor-input*
@@ -957,6 +959,7 @@
    #:render-node #:render-tree
    #:ui-tree-get #:selected-node #:selection-move
    #:collect-selectables #:update-selection
+   #:scroll-to-selection
 
    ;; ui-tree buffer ownership and edit protection
    #:*tree-rendering*

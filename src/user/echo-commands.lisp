@@ -212,6 +212,11 @@
                    (echo-select 1))))
               (spacep (echo-type-char #\space))
               (t (echo-set-message "No possible completion.")))))
+         ;; tab for symbol: cycle to next match
+         ((eq *parse-type* :symbol)
+          (if (plusp (length filtered))
+              (echo-select 1)
+              (echo-set-message "No completions.")))
          ;; non-keyword/file: just insert the character
          (t (echo-type-char char)))))
     (t

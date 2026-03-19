@@ -1,53 +1,121 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;;
-;;; This file contains Coned (Connection Editing) code.
+;;;    Connection browser (Coned).
 ;;;
 
 (in-package :hemlock)
 
 
-
-;;;; Representation of existing connections.
-
-;;; This is the array of connections in the coned connection.  Each element is a cons,
-;;; where the CAR is the connection, and the CDR indicates whether the connection
-;;; should be deleted (t deleted, nil don't).
-;;;
-(defvar *coned-connections* nil)
-(defvar *coned-connections-end* nil)
-;;;
+;;;; Data model
 
 (defstruct (coned-connection
              (:constructor make-coned-connection (connection)))
   connection
   (deleted nil))
 
-(defun coned-connection (x)
-  (coned-connection-connection x))
-
-
-;;; This is the coned buffer if it exists.
-;;;
 (defvar *coned-buffer* nil)
 
-;;; This is the cleanup method for deleting *coned-buffer*.
-;;;
 (defun delete-coned-buffers (buffer)
   (when (eq buffer *coned-buffer*)
-    (setf *coned-buffer* nil)
-    (setf *coned-connections* nil)))
+    (setf *coned-buffer* nil)))
 
-
-;;;; Commands.
+(defun delete-coned-connection (conn)
+  (delete-connection conn))
+
+
+;;;; Display
+
+(defun coned-window ()
+  (find-if (lambda (w) (eq (window-buffer w) *coned-buffer*)) *window-list*))
+
+(defun coned-connections ()
+  (mapcar #'make-coned-connection (list-all-connections)))
+
+(defun coned-row (item width)
+  "Build a selectable row for a coned-connection within WIDTH columns."
+  (let* ((conn      (coned-connection-connection item))
+         (deletedp  (coned-connection-deleted item))
+         (name-w    (min 24 (floor width 3)))
+         (type-w    16)
+         (buf-w     (max 0 (- width 1 name-w type-w 2)))
+         (name-face (if deletedp 12 10))
+         (buf-name  (let ((b (connection-buffer conn)))
+                      (if b (buffer-name b) ""))))
+    (make-ui-selectable
+     :data item
+     :child (make-ui-hstack
+             :spacing 0
+             :children (list
+                        (make-ui-box :width 1 :align :left
+                                     :child (make-ui-text
+                                             :content (if deletedp "D" " ")
+                                             :face (when deletedp 12)))
+                        (make-ui-box :width name-w :align :left
+                                     :child (make-ui-text
+                                             :content (shorten-string name-w (connection-name conn))
+                                             :face name-face))
+                        (make-ui-box :width type-w :align :left
+                                     :child (make-ui-text
+                                             :content (shorten-string type-w (princ-to-string (type-of conn)))
+                                             :face 11))
+                        (make-ui-text :content (shorten-string buf-w buf-name)
+                                      :face 11))))))
+
+(defun coned-render (tree)
+  "Render the connection list into the tree's buffer."
+  (let* ((state   (ui-tree-state tree))
+         (conns   (getf state :connections))
+         (sel     (getf state :selection 0))
+         (n       (length conns))
+         (width   (ui-tree-width tree))
+         (win     (coned-window))
+         (height  (if win (window-height win) 20))
+         (offset  (scroll-to-selection sel (getf state :scroll-offset 0) height)))
+    (setf (getf (ui-tree-state tree) :scroll-offset) offset)
+    (let ((rows nil))
+      (loop for i from offset below (min (+ offset height) n)
+            for item = (nth i conns)
+            do (let ((row (coned-row item width)))
+                 (setf (ui-selectable-selectedp row) (= i sel))
+                 (push row rows)))
+      (setf (ui-tree-root tree) (make-ui-vstack :children (nreverse rows))))
+    (with-writable-buffer ((ui-tree-buffer tree))
+      (render-tree tree))
+    (when win
+      (move-mark (window-display-start win)
+                 (region-start (buffer-region (ui-tree-buffer tree)))))))
+
+(defun coned-open-or-refresh ()
+  "Open the Coned buffer, or refresh it if already open."
+  (let ((buf (or *coned-buffer*
+                 (make-buffer "Coned" :modes '("Coned")
+                              :delete-hook '(delete-coned-buffers)))))
+    (setf *coned-buffer* buf)
+    (when (buffer-ui-tree buf)
+      (uninstall-tree (buffer-ui-tree buf)))
+    (let* ((win   (or (coned-window) (car *window-list*)))
+           (width (if win (window-width win) 80))
+           (tree  (make-ui-tree
+                   :buffer buf
+                   :width width
+                   :state (list :connections (coned-connections)
+                                :selection 0
+                                :scroll-offset 0))))
+      (install-tree tree)
+      (setf (buffer-writable buf) nil)
+      (coned-render tree))
+    (change-to-buffer buf)))
+
+
+;;;; Commands
 
 (defmode "Coned" :major-p t
   :documentation
-  "Coned allows the user view and delete connections.")
+  "Coned lists active connections and supports deletion.")
 
 (defhvar "Virtual Connection Deletion"
-  "When set, \"Coned Delete\" marks a buffer for deletion instead of immediately
-   deleting it."
+  "When set, \"Coned Delete\" marks a connection for deletion instead of
+   immediately deleting it."
   :value t)
 
 (defhvar "Coned Delete Confirm"
@@ -55,155 +123,123 @@
    confirmation before taking action."
   :value t)
 
-(defcommand "Coned Delete" (p)
-  "Delete the connection."
-  "Delete the connection."
-  (declare (ignore p))
-  (let* ((point (current-point))
-         (buf-info (array-element-from-mark point *coned-connections*)))
-    (if (and (not (value virtual-connection-deletion))
-             (or (not (value coned-delete-confirm))
-                 (prompt-for-y-or-n :prompt "Delete connection? " :default t
-                                    :must-exist t :default-string "Y")))
-        (delete-coned-connection (coned-connection buf-info))
-        (with-writable-buffer (*coned-buffer*)
-          (setf (coned-connection-deleted buf-info) t)
-          (with-mark ((point point))
-            (setf (next-character (line-start point)) #\D))
-          (line-offset point 1)))))
-
-(defcommand "Coned Undelete" (p)
-  "Undelete the connection."
-  "Undelete the connection."
-  (declare (ignore p))
-  (with-writable-buffer (*coned-buffer*)
-    (setf (coned-connection-deleted
-           (array-element-from-mark (current-point) *coned-connections*))
-          nil)
-    (with-mark ((point (current-point)))
-      (setf (next-character (line-start point)) #\space)
-      (line-offset point 1))))
-
-(defcommand "Coned Expunge" (p)
-  "Expunge connections marked for deletion."
-  "Expunge connections marked for deletion."
-  (declare (ignore p))
-  (expunge-coned-connections))
-
-(defcommand "Coned Quit" (p)
-  "Kill the coned buffer, expunging any buffer marked for deletion."
-  "Kill the coned buffer, expunging any buffer marked for deletion."
-  (declare (ignore p))
-  (expunge-coned-connections)
-  (when *coned-buffer* (delete-buffer-if-possible *coned-buffer*)))
-
-;;; EXPUNGE-CONED-CONNECTIONS deletes the marked connections in the coned buffer,
-;;; signalling an error if the current buffer is not the coned buffer.  This
-;;; returns t if it deletes some buffer, otherwise nil.  We build a list of
-;;; connections before deleting any because the CONED-DELETE-HOOK moves elements
-;;; around in *coned-connections*.
-;;;
-(defun expunge-coned-connections ()
-  (unless (eq *coned-buffer* (current-buffer))
-    (editor-error "Not in the Coned buffer."))
-  (let (connections)
-    (dotimes (i *coned-connections-end*)
-      (let ((buf-info (svref *coned-connections* i)))
-        (when (coned-connection-deleted buf-info)
-          (push (coned-connection buf-info) connections))))
-    (if (and connections
-             (or (not (value coned-delete-confirm))
-                 (prompt-for-y-or-n :prompt "Delete connections? " :default t
-                                    :must-exist t :default-string "Y")))
-        (dolist (b connections t) (delete-coned-connection b))))
-  (refresh-coned *coned-buffer*))
-
-(defun delete-coned-connection (conn)
-  (delete-connection conn))
-
-
-(defcommand "Coned Goto" (p)
-  "Change to the connection's buffer."
-  "Change to the connection's buffer."
-  (declare (ignore p))
-  (change-to-buffer
-   (or (connection-buffer
-        (coned-connection
-         (array-element-from-mark (current-point) *coned-connections*)))
-       (editor-error "connection has no buffer"))))
-
-(defun refresh-coned (buf)
-  (with-writable-buffer (buf)
-    (delete-region (buffer-region buf))
-    (let ((connections (list-all-connections)))
-      (setf *coned-connections-end* (length connections))
-      (setf *coned-connections*
-            (map 'vector #'make-coned-connection connections))
-      (with-output-to-mark (s (buffer-point buf))
-        (dolist (c connections)
-          (coned-write-line c s))))))
-
 (defcommand "Coned" (p)
-  "Creates a list of connections in a buffer supporting operations such as deletion
-   and selection.  If there already is a coned buffer, just go to it."
-  "Creates a list of connections in a buffer supporting operations such as deletion
-   and selection.  If there already is a coned buffer, just go to it."
+  "Open the connection browser, refreshing it if already open."
+  "Open the connection browser, refreshing it if already open."
   (declare (ignore p))
-  (let ((buf (or *coned-buffer*
-                 (make-buffer "Coned" :modes '("Coned")
-                              :delete-hook (list #'delete-coned-buffers)))))
-    (unless *coned-buffer*
-      (setf *coned-buffer* buf)
-      (refresh-coned buf)
-      (let ((fields (buffer-modeline-fields *coned-buffer*)))
-        (setf (cdr (last fields))
-              (list (or (modeline-field :coned-cmds)
-                        (make-modeline-field
-                         :name :coned-cmds :width 18
-                         :function
-                         #'(lambda (buffer window)
-                             (declare (ignore buffer window))
-                             "  Type ? for help.")))))
-        (setf (buffer-modeline-fields *coned-buffer*) fields))
-      (buffer-start (buffer-point buf)))
-    (change-to-buffer buf)))
+  (coned-open-or-refresh))
 
 (defcommand "Coned Refresh" (p)
-  "" ""
+  "Refresh the connection list."
+  "Refresh the connection list."
   (declare (ignore p))
-  (when *coned-buffer*
-    (refresh-coned *coned-buffer*)))
+  (let ((tree (and *coned-buffer* (buffer-ui-tree *coned-buffer*))))
+    (when tree
+      (setf (getf (ui-tree-state tree) :connections) (coned-connections)
+            (getf (ui-tree-state tree) :selection) 0
+            (getf (ui-tree-state tree) :scroll-offset) 0)
+      (coned-render tree))))
 
-(defun coned-write-line (connection s)
-  (format s "  ~A ~20T~A ~20T~A~%"
-          (connection-name connection)
-          (type-of connection)
-          (let ((buf (connection-buffer connection)))
-            (when buf
-              (buffer-name buf)))))
+(defcommand "Coned Next" (p)
+  "Move selection to the next connection."
+  "Move selection to the next connection."
+  (declare (ignore p))
+  (let ((tree (and *coned-buffer* (buffer-ui-tree *coned-buffer*))))
+    (when tree
+      (let* ((state (ui-tree-state tree))
+             (n     (length (getf state :connections)))
+             (sel   (getf state :selection 0)))
+        (setf (getf (ui-tree-state tree) :selection) (min (1- n) (1+ sel)))
+        (coned-render tree)))))
 
+(defcommand "Coned Previous" (p)
+  "Move selection to the previous connection."
+  "Move selection to the previous connection."
+  (declare (ignore p))
+  (let ((tree (and *coned-buffer* (buffer-ui-tree *coned-buffer*))))
+    (when tree
+      (let* ((state (ui-tree-state tree))
+             (sel   (getf state :selection 0)))
+        (setf (getf (ui-tree-state tree) :selection) (max 0 (1- sel)))
+        (coned-render tree)))))
+
+(defun coned-selected (tree)
+  "Return the selected coned-connection, or NIL."
+  (let* ((state (ui-tree-state tree))
+         (conns (getf state :connections))
+         (sel   (getf state :selection 0)))
+    (when (< -1 sel (length conns))
+      (nth sel conns))))
+
+(defcommand "Coned Delete" (p)
+  "Mark the selected connection for deletion."
+  "Mark the selected connection for deletion."
+  (declare (ignore p))
+  (let ((tree (and *coned-buffer* (buffer-ui-tree *coned-buffer*))))
+    (when tree
+      (let ((item (coned-selected tree)))
+        (when item
+          (if (not (value virtual-connection-deletion))
+              (when (or (not (value coned-delete-confirm))
+                        (prompt-for-y-or-n :prompt "Delete connection? "
+                                           :default t :must-exist t :default-string "Y"))
+                (delete-coned-connection (coned-connection-connection item))
+                (coned-open-or-refresh))
+              (progn
+                (setf (coned-connection-deleted item) t)
+                (coned-render tree))))))))
+
+(defcommand "Coned Undelete" (p)
+  "Unmark the selected connection."
+  "Unmark the selected connection."
+  (declare (ignore p))
+  (let ((tree (and *coned-buffer* (buffer-ui-tree *coned-buffer*))))
+    (when tree
+      (let ((item (coned-selected tree)))
+        (when item
+          (setf (coned-connection-deleted item) nil)
+          (coned-render tree))))))
+
+(defcommand "Coned Expunge" (p)
+  "Delete all connections marked for deletion."
+  "Delete all connections marked for deletion."
+  (declare (ignore p))
+  (unless (eq *coned-buffer* (current-buffer))
+    (editor-error "Not in the Coned buffer."))
+  (let ((tree (buffer-ui-tree *coned-buffer*)))
+    (when tree
+      (let ((marked (remove-if-not #'coned-connection-deleted
+                                   (getf (ui-tree-state tree) :connections))))
+        (when (and marked
+                   (or (not (value coned-delete-confirm))
+                       (prompt-for-y-or-n :prompt "Delete connections? "
+                                          :default t :must-exist t :default-string "Y")))
+          (dolist (item marked)
+            (delete-coned-connection (coned-connection-connection item)))
+          (coned-open-or-refresh))))))
+
+(defcommand "Coned Quit" (p)
+  "Expunge marked connections and kill the Coned buffer."
+  "Expunge marked connections and kill the Coned buffer."
+  (declare (ignore p))
+  (coned-expunge-command nil)
+  (when *coned-buffer* (delete-buffer-if-possible *coned-buffer*)))
+
+(defcommand "Coned Goto" (p)
+  "Switch to the selected connection's buffer."
+  "Switch to the selected connection's buffer."
+  (declare (ignore p))
+  (let ((tree (and *coned-buffer* (buffer-ui-tree *coned-buffer*))))
+    (when tree
+      (let ((item (coned-selected tree)))
+        (when item
+          (let ((buf (connection-buffer (coned-connection-connection item))))
+            (if buf
+                (change-to-buffer buf)
+                (editor-error "Connection has no buffer."))))))))
 
 (defcommand "Coned Help" (p)
   "Show this help."
   "Show this help."
   (declare (ignore p))
   (describe-mode-command nil "Coned"))
-
-
-
-;;;; Maintenance hooks.
-
-(eval-when (:compile-toplevel :execute)
-(defmacro with-coned-point ((point buffer &optional pos) &rest body)
-  (let ((pos (or pos (gensym))))
-    `(when (and *coned-connections*
-                (not (eq *coned-buffer* ,buffer))
-                (not (eq *echo-area-buffer* ,buffer)))
-       (let ((,pos (position ,buffer *coned-connections* :key #'car
-                             :test #'eq :end *coned-connections-end*)))
-         (unless ,pos (error "Unknown Coned buffer."))
-         (let ((,point (buffer-point *coned-buffer*)))
-           (unless (line-offset (buffer-start ,point) ,pos 0)
-             (error "Coned buffer not displayed?"))
-           (with-writable-buffer (*coned-buffer*) ,@body))))))
-) ;eval-when
