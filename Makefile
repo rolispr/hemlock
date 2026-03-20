@@ -17,7 +17,7 @@ src/io/libspawn-ctty.$(SHLIB_EXT): src/io/spawn-ctty.c
 
 src/tree-sitter-cl/lib/libts-wrapper.$(SHLIB_EXT): src/tree-sitter-cl/c-wrapper/ts-wrapper.c
 	mkdir -p src/tree-sitter-cl/lib
-	$(CC) $(SHLIB_FLAG) -o $@ $< -ltree-sitter
+	$(CC) $(SHLIB_FLAG) $(shell pkg-config --cflags --libs tree-sitter) -o $@ $<
 
 build: src/io/libspawn-ctty.$(SHLIB_EXT) src/tree-sitter-cl/lib/libts-wrapper.$(SHLIB_EXT)
 	$(SBCL) --non-interactive --load init.lisp \
