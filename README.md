@@ -10,7 +10,7 @@ Hemlock is a Common Lisp editor inspired by ZWEI and Emacs with a long history �
 
 - **TTY backend**   — terminal rendering, full color support (truecolor, 256, 16)
 - **Tree-sitter**   - WIP
-- **Terminal**      - full vt100/xterm capabilties
+- **Terminal**      - full vt100/xterm emulation
 - **Modal editing** — Normal/Select modes, Mostly Helix keymap, spanning selections, TS textobjects, with inspiration in other places
 - **Completions**   — interactive completion in the minibuffer
 
