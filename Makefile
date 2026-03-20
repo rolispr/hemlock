@@ -15,7 +15,10 @@ endif
 src/io/libspawn-ctty.$(SHLIB_EXT): src/io/spawn-ctty.c
 	$(CC) $(SHLIB_FLAG) -o $@ $<
 
-build: src/io/libspawn-ctty.$(SHLIB_EXT)
+src/tree-sitter-cl/lib/libts-wrapper.$(SHLIB_EXT): src/tree-sitter-cl/c-wrapper/ts-wrapper.c
+	$(CC) $(SHLIB_FLAG) -o $@ $< -ltree-sitter
+
+build: src/io/libspawn-ctty.$(SHLIB_EXT) src/tree-sitter-cl/lib/libts-wrapper.$(SHLIB_EXT)
 	$(SBCL) --non-interactive --load init.lisp \
 		--eval '(push :deploy-console *features*)' \
 		--eval '(asdf:load-system :hemlock)' \
@@ -27,4 +30,5 @@ test: src/io/libspawn-ctty.$(SHLIB_EXT)
 		--eval '(asdf:test-system :hemlock-tests)'
 
 clean:
-	rm -rf bin/ src/io/libspawn-ctty.so src/io/libspawn-ctty.dylib
+	rm -rf bin/ src/io/libspawn-ctty.so src/io/libspawn-ctty.dylib \
+	       src/tree-sitter-cl/lib/libts-wrapper.so src/tree-sitter-cl/lib/libts-wrapper.dylib

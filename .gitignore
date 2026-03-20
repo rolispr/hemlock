@@ -11,3 +11,5 @@ bin/
 ocicl/
 log.txt
 hemlock-*.tar.gz
+src/tree-sitter-cl/lib/libts-wrapper.so
+src/tree-sitter-cl/lib/libts-wrapper.dylib
