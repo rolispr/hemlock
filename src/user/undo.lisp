@@ -55,32 +55,6 @@
 
 
 
-;;;; -- Commands --
-
-(defcommand "Undo" (p)
-  "Undo last major change, kill, etc.
-   Simple insertions and deletions cannot be undone.  If you change the buffer
-   in this way before you undo, you may get slightly wrong results, but this
-   is probably still useful."
-  "This is not intended to be called in Lisp code."
-  (declare (ignore p))
-  (if (not *undo-info*) (editor-error "No currently undoable command."))
-  (let ((buffer (undo-info-buffer *undo-info*))
-        (cleanup (undo-info-cleanup *undo-info*))
-        (method-undo (undo-info-method-undo *undo-info*)))
-    (if (not (eq buffer (current-buffer)))
-        (editor-error "Undo info is for buffer ~S." (buffer-name buffer)))
-    (funcall (undo-info-method *undo-info*))
-    (cond (method-undo
-           (rotatef (undo-info-name *undo-info*)
-                    (undo-info-hold-name *undo-info*))
-           (rotatef (undo-info-method *undo-info*)
-                    (undo-info-method-undo *undo-info*)))
-          (t (if cleanup (funcall cleanup))
-             (setf *undo-info* nil)))))
-
-
-
 ;;;; -- Primitives --
 
 (defun save-for-undo (name method

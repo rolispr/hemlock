@@ -370,6 +370,18 @@
                    (return-from done nil)))))))))
     (setf undoing-undo-list undo-list)))
 
+(defcommand "Redo" (p)
+  "Redo the last undone operation."
+  "Redo the last undone operation."
+  (declare (ignore p))
+  ;; In emacs-style undo, redo is undo of the undo entries. Force a new
+  ;; boundary so the next undo walks into the previously-applied undo records.
+  (let ((buffer (current-buffer)))
+    (when (and buffer (buffer-undo-p buffer))
+      (push nil (buffer-undo-list buffer))))
+  (setf last-was-undo-p nil)
+  (undo-command nil))
+
 ;;;; Undo in region
 
 (defun make-selective-undo-list (start-pos end-pos undo-list)
