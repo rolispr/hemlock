@@ -1357,7 +1357,6 @@
    #:random-typeout-stream-window
    #:window-group-height
    #:window-group-width
-   #:add-xwindow-object
    #:device-hunk-device
    #:device-hunks
    #:font-family-cursor-y-offset
@@ -1373,7 +1372,6 @@
    #:make-window-group
    #:random-typeout-stream-mark
    #:random-typeout-stream-window
-   #:remove-xwindow-object
    #:window-for-hunk
    #:window-group-height
    #:window-group-width
@@ -1534,7 +1532,7 @@
   (:import-from :hemlock.wire #:dispatch-events #:dispatch-events-no-hang)
   (:export #:dispatch-events #:dispatch-events-no-hang #:dispatch-events-timeout))
 
-
+;;; not quite sure on you...
 (defpackage :hemlock-ext
   (:use :common-lisp :hemlock-interface)
   (:shadowing-import-from :hemlock-interface #:char-code-limit)
@@ -1570,27 +1568,9 @@
    #:set-file-permissions
    #:skip-whitespace
 
-   ;; CLX object-set infrastructure (defined in clx/object-set.lisp, still in-package hemlock-ext)
-   #:make-object-set
-   #:default-clx-event-handler
-   #:serve-exposure
-   #:serve-graphics-exposure
-   #:serve-no-exposure
-   #:serve-configure-notify
-   #:serve-destroy-notify
-   #:serve-unmap-notify
-   #:serve-map-notify
-   #:serve-reparent-notify
-   #:serve-gravity-notify
-   #:serve-circulate-notify
-   #:serve-client-message
-   #:serve-key-press
-   #:serve-button-press
-   #:serve-button-release
-   #:serve-enter-notify
-   #:serve-leave-notify
-
-   ;; CLX event handling (defined via fdefinition in clx/events.lisp)
+   ;; CLX forward-reference bridge — rompsite.lisp calls these via hemlock-ext::,
+   ;; clx/events.lisp provides the implementation via setf fdefinition.
+   ;; These exist solely as a meeting point between core and the CLX backend.
    #:disable-clx-event-handling
    #:flush-display-events
    #:object-set-event-handler
@@ -1893,24 +1873,25 @@
 (defpackage :hemlock.x11
   (:use :common-lisp :hemlock.text :hemlock.command :hemlock :trivial-gray-streams)
   (:shadowing-import-from :hemlock.text #:char-code-limit)
-
-  (:import-from :hemlock-ext
-   #:serve-button-press
-   #:serve-button-release
-   #:serve-circulate-notify
-   #:serve-client-message
-   #:serve-configure-notify
-   #:serve-destroy-notify
-   #:serve-enter-notify
-   #:serve-exposure
-   #:serve-graphics-exposure
-   #:serve-gravity-notify
-   #:serve-key-press
-   #:serve-leave-notify
-   #:serve-map-notify
-   #:serve-no-exposure
-   #:serve-reparent-notify
-   #:serve-unmap-notify))
+  (:export
+   ;; Object-set infrastructure (defined in clx/object-set.lisp)
+   #:make-object-set #:object-set #:object-set-name #:object-set-default-handler
+   #:object-set-table
+   #:add-xwindow-object #:remove-xwindow-object #:lisp--map-xwindow
+   ;; Event service (defined in clx/object-set.lisp)
+   #:serve-key-press #:serve-key-release
+   #:serve-button-press #:serve-button-release
+   #:serve-motion-notify #:serve-enter-notify #:serve-leave-notify
+   #:serve-focus-in #:serve-focus-out
+   #:serve-exposure #:serve-graphics-exposure #:serve-no-exposure
+   #:serve-visibility-notify #:serve-create-notify #:serve-destroy-notify
+   #:serve-unmap-notify #:serve-map-notify #:serve-map-request
+   #:serve-reparent-notify #:serve-configure-notify #:serve-gravity-notify
+   #:serve-resize-request #:serve-configure-request
+   #:serve-circulate-notify #:serve-circulate-request
+   #:serve-property-notify #:serve-selection-clear
+   #:serve-selection-request #:serve-selection-notify
+   #:serve-colormap-notify #:serve-client-message))
 
 (defpackage :hemlock-user
     (:use :common-lisp :hemlock.text :hemlock.command :hemlock)

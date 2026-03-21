@@ -1,10 +1,6 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; Hemlock introspection layer — SBCL backend.
-;;;
-;;; Replaces the conium dependency with direct SBCL internal calls.
-;;; Ported from the SLY slynk SBCL backend (public domain).
-;;; SBCL-only; hemlock is SBCL-only in practice.
+;;; Hemlock introspection layer
 ;;;
 
 (defpackage :hemlock.introspect

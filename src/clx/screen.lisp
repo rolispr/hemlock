@@ -36,7 +36,7 @@
 ;;; :configure-notify events.
 ;;;
 (defvar *hemlock-windows*
-  (hemlock-ext:make-object-set "Hemlock Windows" 'hemlock-ext:default-clx-event-handler))
+  (make-object-set "Hemlock Windows" 'default-clx-event-handler))
 
 
 

@@ -2,13 +2,16 @@
 
 (asdf:defsystem :hemlock
   :description "Hemlock text editor"
-  :licence "Public Domain"
+  ;; unsure?
+  :licence ""
   :defsystem-depends-on (:deploy)
   :build-operation "deploy-op"
   :build-pathname "hemlock"
   :entry-point "hemlock::main"
   :depends-on (:hemlock.tty :hemlock.term))
 
+
+;;; for building binaries
 (deploy:define-hook (:deploy asdf) (directory)
   (declare (ignorable directory))
   #+asdf (asdf:clear-source-registry)

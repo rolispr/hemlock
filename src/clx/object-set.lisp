@@ -3,7 +3,7 @@
 ;;; X window object-set and event-serving infrastructure.
 ;;; Extracted from hemlock-ext.lisp; belongs to the CLX backend.
 
-(in-package :hemlock-ext)
+(in-package :hemlock.x11)
 
 (defstruct (object-set (:constructor make-object-set (name &optional default-handler)))
   name
@@ -12,10 +12,10 @@
 
 (defvar *xwindow-hash* (make-hash-table :test #'eq))
 
-(defun hi::add-xwindow-object (window object object-set)
+(defun add-xwindow-object (window object object-set)
   (setf (gethash window *xwindow-hash*) (list object object-set)))
 
-(defun hi::remove-xwindow-object (window)
+(defun remove-xwindow-object (window)
   (remhash window *xwindow-hash*))
 
 (defun lisp--map-xwindow (window)
