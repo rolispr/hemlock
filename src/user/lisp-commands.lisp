@@ -173,8 +173,8 @@
   (insert-string (current-point) (string #\newline))
   (let ((input-region (get-interactive-input)))
     (when input-region
-      (if hi::*reading-lispbuf-input*
-          (throw 'hi::lispbuf-input
+      (if *reading-lispbuf-input*
+          (throw 'lispbuf-input
             (concatenate 'string
                          (region-to-string input-region)))
           (let* ((output (value eval-output-stream))

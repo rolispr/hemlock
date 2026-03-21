@@ -894,7 +894,6 @@
 
 ;;; PRINT-DIRECTORY is exported from the EXTENSIONS package.
 ;;;
-#-(or cmu scl)
 (defmacro out-synonym-of (stream &optional check-type)
   (let ((svar (gensym)))
     `(let ((,svar ,stream))
@@ -903,7 +902,6 @@
              (t ,@(if check-type `((check-type ,svar ,check-type)))
                 ,svar)))))
 
-#-(or cmu scl)
 (defun print-directory (pathname stream &key all verbose return-list)
   "Like Directory, but prints a terse, multi-column directory listing
    instead of returning a list of pathnames.  When :all is supplied and
@@ -916,7 +914,6 @@
         (print-directory-verbose pathname all return-list)
         (print-directory-formatted pathname all return-list))))
 
-#-(or cmu scl)
 (defun list-directory (directory &optional all)
   (setf directory (directory-namestring directory))
   (sort (remove-if (if all
@@ -932,7 +929,6 @@
         #'string<
         :key #'file-namestring))
 
-#-(or cmu scl)
 (defun write-file-mode (mode)
   (macrolet ((frob (bit name &optional sbit sname negate)
                `(if ,(if negate
@@ -955,7 +951,6 @@
     (frob 1 #\w)
     (frob 0 #\x)))
 
-#-(or cmu scl)
 (defun print-directory-verbose (pathname all return-list)
   (let* ((contents (list-directory pathname all))
          (result nil)
@@ -1008,10 +1003,8 @@
     (message "Dired: ~D files read" n)
     (nreverse result)))
 
-#-(or cmu scl)
 (defconstant unix-to-universal-time 2208988800)
 
-#-(or cmu scl)
 (defun decode-universal-time-for-files (time current-year)
   (multiple-value-bind (sec min hour day month year)
       (decode-universal-time (+ time unix-to-universal-time))
@@ -1022,9 +1015,8 @@
                    (1- month))
             day (= current-year year) year hour min)))
 
-#-(or cmu scl)
 (defun print-directory-formatted (pathname all return-list)
-  (let ((width (or (hi::stream-line-length *standard-output*) 80))
+  (let ((width (or (stream-line-length *standard-output*) 80))
         (names ())
         (cnt 0)
         (max-len 0)

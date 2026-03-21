@@ -431,9 +431,3 @@
                 (when package
                   (hemlock::canonicalize-agent-package-name package)))
               (tag-package ptag)))))
-
-;; $Log: exp-syntax.lisp,v $
-;; Revision 1.1  2004-07-09 15:16:14  gbaumann
-;; moved syntax highlighting out to another file.
-;;
-;;

@@ -488,24 +488,3 @@
                 (t
                  (xlib:draw-rectangle xwindow gcontext x y3 1 3 t)))
           (incf x font-width))))))
-
-;; $Log: hunk-draw.lisp,v $
-;; Revision 1.2  2004-09-03 23:06:48  abakic
-;; Changes to get rid of warnings and notes. As a side-effect, more code
-;; has been commented out. There should be no more warnings nor notes
-;; with CMUCL, and only two style warnings with SBCL. Not tested with
-;; other implementations yet. TODO: spread key bindings to different
-;; files.
-;;
-;; Revision 1.1.1.1  2004/07/09 13:38:02  gbaumann
-;; import
-;;
-;; Revision 1.5  2004/05/26 16:36:39  gilbert
-;; DEVICE, BITMAP-DEVICE and TTY-DEVICE are now CLOS classes. Made the
-;; former DEVICE-xyz slots into methods in a feeble attempt to separate
-;; the device from the rest of Hemlock.
-;;
-;; Revision 1.4  2003/08/05 19:54:17  gilbert
-;; - did away with some macros
-;; - invested in a left margin for added readability of hemlock frames.
-;;

@@ -6,10 +6,6 @@
 
 (in-package :hemlock.command)
 
-;;; Default-font used to be in the above list, but when I cleaned up the way
-;;; Hemlock compiles, a name conflict occurred because "Default Font" is a
-;;; Hemlock variable.  It is now exported by the export list in rompsite.lisp.
-
 (defvar *default-font-family* (make-font-family))
 
 

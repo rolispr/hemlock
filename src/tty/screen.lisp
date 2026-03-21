@@ -493,8 +493,6 @@ This distinguishes a bare Escape keypress from an Alt+key escape sequence."
       (redisplay-window-all window)
       (when (eq hunk last) (return)))))
 
-;;;; from rompsite.lisp
-
 (defmethod device-show-mark ((device tty-device) window x y time)
   (declare (ignore time))
   (cond ((listen-editor-input *editor-input*))

@@ -317,11 +317,3 @@
 ;;;     (when dps
 ;;;       (object-set-event-handler (car dps) timeout))))
 
-;;; Bind the hemlock-ext: symbols so that backward-compat references from
-;;; rompsite.lisp and hemlock-ext.lisp (which use hemlock-ext: qualified names)
-;;; resolve to our implementations.
-(setf (fdefinition 'hemlock-ext:object-set-event-handler)    #'object-set-event-handler)
-(setf (fdefinition 'hemlock-ext::call-with-clx-event-handling) #'call-with-clx-event-handling)
-(setf (fdefinition 'hemlock-ext:flush-display-events)         #'flush-display-events)
-(setf (fdefinition 'hemlock-ext:disable-clx-event-handling)   #'disable-clx-event-handling)
-(setf (fdefinition 'hemlock-ext:translate-key-event)          #'translate-key-event)

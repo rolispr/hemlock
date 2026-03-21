@@ -5,13 +5,6 @@
 ;; Note: I want real relative package names like the Symbolics has
 ;; them. In the mean time:
 
-#+CMU
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (progn
-    ;; Just in case the original Hemlock is loaded.
-    (dolist (p '("HEMLOCK" "HEMLOCK-INTERNALS"))
-      (when (find-package p)
-        (delete-package p)))))
 
 
 ;;;
@@ -62,7 +55,14 @@
    #:declfun
    ;; device-hunk class and accessors (struct.lisp)
    #:device-hunk
-   ;; tty-device class and accessors (struct.lisp)
+   ;; value-node struct (table.lisp)
+   #:value-node
+   #:value-node-proper
+   #:value-node-folded
+   #:value-node-value
+   #:make-value-node
+   ;; tty-device class and accessors (defined in struct.lisp, must be exported
+   ;; from hemlock.text because the class is defined here — hemlock.tty USEs this)
    #:tty-device #:%make-tty-device
    #:tty-device-dumbp #:tty-device-lines #:tty-device-columns
    #:tty-device-display-string #:tty-device-standout-init #:tty-device-standout-end
@@ -82,12 +82,6 @@
    #:tty-device-cm-x-add-char #:tty-device-cm-y-add-char
    #:tty-device-cm-x-condx-char #:tty-device-cm-y-condx-char
    #:tty-device-cm-x-condx-add-char #:tty-device-cm-y-condx-add-char
-   ;; value-node struct (table.lisp)
-   #:value-node
-   #:value-node-proper
-   #:value-node-folded
-   #:value-node-value
-   #:make-value-node
    ;; string-table internals (table.lisp)
    #:string-table-num-nodes
    #:string-table-value-nodes
@@ -817,7 +811,7 @@
    #:site-init
    #:%init-syntax-table
    #:%init-line-image
-   ;; rompsite.lisp — entry-point functions used from main.lisp (hemlock pkg)
+   ;; platform.lisp — entry-point functions used from main.lisp (hemlock pkg)
    ;; display constants (winimage.lisp) — re-exported through hemlock.display to hemlock.tty
    #:unaltered-bits #:changed-bit #:moved-bit #:new-bit #:the-sentinel
    #:site-wrapper-macro
@@ -850,16 +844,18 @@
    #:command-loop-catcher
    #:editor-top-level-catcher
    #:hemlock-exit
-   ;; key-dispatch.lisp — used from main.lisp
+   ;; key-dispatch.lisp
    #:*invoke-hook*
    #:%command-loop
+   ;; streams.lisp — internal state for lispbuf input
+   #:*reading-lispbuf-input*
+   #:lispbuf-input
    ;; window.lisp — used from main.lisp
    #:%init-redisplay
-   ;; echo.lisp — referenced via hi:: from user-layer files
+   ;; echo.lisp
    #:display-prompt-nicely
    #:key-event-case
    #:after-editor-initializations
-   ;; symbols referenced via hi:: from user-layer or tty files
    #:line-tag
    #:default-filter
    #:queue-buffer-change
@@ -991,6 +987,11 @@
    ))
 
 
+;;;
+;;; hemlock-interface — stable API for command writers.
+;;; Use this package when writing new modes, commands, or extensions.
+;;; Re-exports curated symbols from hemlock.text and hemlock.command.
+;;;
 (defpackage :hemlock-interface
     (:use :hemlock.text :hemlock.command)
   (:shadowing-import-from :hemlock.text #:char-code-limit)
@@ -1299,99 +1300,17 @@
    #:goto-buffer-start
    #:goto-buffer-end
 
-   ;;;; !!!!
-   ;;;; !!!! Everything below here is because putting bit-screen.lisp,
-   ;;;; !!!! bit-display.lisp and hunk-draw.lisp into its own package.
-   ;;;; !!!! Besides the DEVICE-xyz entries this list should be empty.
-   ;;;; !!!! --GB 2004-05-26
-   ;;;; !!!!
-
-   #:device                             ;[class]
-   ;; their methods
-   #:device-init
-   #:device-make-window
-   #:device-exit
-   #:device-smart-redisplay
-   #:device-dumb-redisplay
-   #:device-after-redisplay
-   #:device-clear
-   #:device-note-read-wait
-   #:device-force-output
-   #:device-finish-output
-   #:device-put-cursor
-   #:device-show-mark
-   #:device-next-window
-   #:device-previous-window
-   #:device-delete-window
-   #:device-random-typeout-full-more
-   #:device-random-typeout-line-more
-   #:device-random-typeout-setup
-   #:device-random-typeout-cleanup
-   #:device-beep
-   ;;
-   #:device-hunk
-   #:random-typeout-stream
-   #:with-mark
-   #:init-bitmap-screen-manager
-   #:reverse-video-hook-fun             ;### only defined in bitmap device, refered to from rompsite.lisp
-
-   ;; variables, due to bit-screen.lisp
-   #:*current-buffer*
-   #:*current-window*
-   #:*cursor-background-color*
-   #:*cursor-foreground-color*
-   #:*default-font-family*
-   #:*echo-area-buffer*
-   #:*hemlock-cursor*
-   #:*random-typeout-buffers*
-   #:*random-typeout-ml-fields*
-   #:*window-list*
-   #:child-interesting-xevents-mask
-   #:group-interesting-xevents-mask
-   #:random-typeout-xevents-mask
-   #:the-sentinel
-   #:*default-foreground-pixel*         ;### rompsite.lisp
-   #:*default-background-pixel*         ;### rompsite.lisp
-   ;; functions, due to bit-screen.lisp
-   #:device-hunks
-   #:random-typeout-stream-window
-   #:window-group-height
-   #:window-group-width
-   #:device-hunk-device
-   #:device-hunks
-   #:font-family-cursor-y-offset
-   #:font-family-height
-   #:font-family-map
-   #:font-family-width
-   #:get-hemlock-cursor
-   #:get-hemlock-grey-pixmap
-   #:hemlock-window
-   #:hlet
-   #:make-black-color
-   #:make-white-color
-   #:make-window-group
-   #:random-typeout-stream-mark
-   #:random-typeout-stream-window
-   #:window-for-hunk
-   #:window-group-height
-   #:window-group-width
-   #:window-group-xparent
-   #:window-hunk
-   #:window-input-handler
-   #:window-modeline-buffer
-   #:windowed-monitor-p
-   ;;;; grrr
-   #:bitmap-device-display
-   #:bitmap-hunk-font-family
-   #:bitmap-hunk-modeline-dis-line
-   #:bitmap-hunk-modeline-pos
-   #:bitmap-hunk-trashed
-   #:bitmap-hunk-window
-   #:bitmap-hunk-window-group
-   #:bitmap-hunk-xwindow
-   #:changed-bit
-   #:*create-initial-windows-hook*
-   #:*create-window-hook*
+   ;; Display device protocol (public interface for backends)
+   #:device
+   #:device-init #:device-exit #:device-make-window #:device-delete-window
+   #:device-smart-redisplay #:device-dumb-redisplay #:device-after-redisplay
+   #:device-clear #:device-force-output #:device-finish-output
+   #:device-put-cursor #:device-show-mark #:device-beep
+   #:device-next-window #:device-previous-window
+   #:device-note-read-wait #:device-enlarge-window
+   #:device-random-typeout-full-more #:device-random-typeout-line-more
+   #:device-random-typeout-setup #:device-random-typeout-cleanup
+   #:device-hunk #:device-hunk-device #:device-hunks
    #:default-font
    #:define-window-cursor
    #:*delete-window-hook*
@@ -1532,7 +1451,11 @@
   (:import-from :hemlock.wire #:dispatch-events #:dispatch-events-no-hang)
   (:export #:dispatch-events #:dispatch-events-no-hang #:dispatch-events-timeout))
 
-;;; not quite sure on you...
+;;;
+;;; hemlock-ext — external extension API.
+;;; For code outside hemlock that needs to interact with the editor:
+;;; key event construction, portability primitives, event dispatch.
+;;;
 (defpackage :hemlock-ext
   (:use :common-lisp :hemlock-interface)
   (:shadowing-import-from :hemlock-interface #:char-code-limit)
@@ -1568,20 +1491,19 @@
    #:set-file-permissions
    #:skip-whitespace
 
-   ;; CLX forward-reference bridge — rompsite.lisp calls these via hemlock-ext::,
-   ;; clx/events.lisp provides the implementation via setf fdefinition.
-   ;; These exist solely as a meeting point between core and the CLX backend.
-   #:disable-clx-event-handling
-   #:flush-display-events
-   #:object-set-event-handler
-   #:translate-key-event
-
    ;; System-level re-exports
    #:serve-event
    #:sap-ref-8
    #:print-directory
    ))
 
+;;;
+;;; hemlock-internals — implementation details needed by the hemlock package
+;;; but not part of the public command-writer API (hemlock-interface).
+;;;
+;;; If a symbol is already exported from hemlock.text or hemlock.command
+;;; (and thus available via hemlock-interface), it does NOT belong here.
+;;;
 (defpackage :hemlock-internals
   (:use :common-lisp :hemlock.text :hemlock.command
         :command-line-arguments
@@ -1590,190 +1512,39 @@
   (:shadowing-import-from :hemlock.text #:char-code-limit)
   (:shadow #:show-option-help)
   (:shadowing-import-from :hemlock-ext #:concat)
-  ;;
   (:export
-   #:*fast*                             ;hmm not sure about this one
-
-   ;; rompsite.lisp
-   #:show-mark #:*input-transcript* #:fun-defined-from-pathname
-   #:editor-describe-function #:pause-hemlock #:store-cut-string
-   #:fetch-cut-string #:schedule-event #:remove-scheduled-event
-   #:enter-window-autoraise #:directoryp #:merge-relative-pathnames
-   ;;
-   ;; Export default-font to prevent a name conflict that occurs due to
-   ;; the Hemlock variable "Default Font" defined in SITE-INIT below.
-   ;;
-   #:default-font
+   ;; platform.lisp — internal functions called from hemlock package code
+   #:fun-defined-from-pathname
+   #:editor-describe-function
+   #:schedule-event #:remove-scheduled-event
+   #:enter-window-autoraise
+   #:*input-transcript*
    #:*beep-function* #:beep
+   #:default-font
 
-   ;;
-   #:mark #:mark-line #:mark-charpos #:markp #:region #:region-start #:region-end
-   #:regionp #:buffer #:bufferp #:buffer-modes #:buffer-point #:buffer-writable
-   #:buffer-delete-hook #:buffer-windows #:buffer-variables #:buffer-write-date
-   #:region #:regionp #:region-start #:region-end #:window #:windowp #:window-height
-   #:window-width #:window-display-start #:window-display-end #:window-point
-   #:window-display-recentering #:commandp #:command #:command-function
-   #:command-documentation #:modeline-field #:modeline-field-p
+   ;; Internal editor state
+   #:*global-variable-names* #:*mode-names* #:*buffer-names*
+   #:*character-attribute-names* #:*command-names*
+   #:*background-image*
+   #:after-editor-initializations
 
-   ;; from input.lisp
-   #:get-key-event #:unget-key-event #:clear-editor-input #:listen-editor-input
-   #:*last-key-event-typed* #:*key-event-history* #:*editor-input*
-   #:*real-editor-input* #:input-waiting #:last-key-event-cursorpos
-
-   ;; from macros.lisp
-   #:invoke-hook #:value #:setv #:hlet #:string-to-variable #:add-hook #:remove-hook
-   #:defcommand #:with-mark #:use-buffer #:editor-error #:canonical-case
-   #:editor-error-format-string #:editor-error-format-arguments #:do-strings
-   #:command-case #:reprompt #:with-output-to-mark #:with-input-from-region
-   #:handle-lisp-errors #:with-pop-up-display #:*random-typeout-buffers*
-
-   ;; from line.lisp
-   #:line #:linep #:line-previous #:line-next #:line-plist #:line-signature
-
-   ;; from ring.lisp
-   #:ring #:ringp #:make-ring #:ring-push #:ring-pop #:ring-length #:ring-ref
-   #:rotate-ring
-
-   ;; from table.lisp
-   #:string-table #:string-table-p #:make-string-table
-   #:string-table-separator #:getstring
-   #:find-ambiguous #:complete-string #:find-containing
-   #:delete-string #:clrstring #:do-strings
-
-   ;; bit-display.lisp
-   #:redisplay #:redisplay-all
-
-   ;; bit-screen.lisp
-   #:make-xwindow-like-hwindow          ;used in input.lisp
+   ;; Window creation hooks (used by backends)
    #:*create-window-hook* #:*delete-window-hook*
    #:*random-typeout-hook* #:*create-initial-windows-hook*
-
-   ;; buffer.lisp
-   #:buffer-modified #:buffer-region #:buffer-name #:buffer-pathname
-   #:buffer-major-mode #:buffer-minor-mode #:buffer-modeline-fields
-   #:buffer-modeline-field-p #:current-buffer #:current-point
-   #:in-recursive-edit #:exit-recursive-edit #:abort-recursive-edit
-   #:recursive-edit #:defmode #:mode-major-p #:mode-variables #:mode-documentation
-   #:make-buffer #:delete-buffer #:with-writable-buffer #:buffer-start-mark
-   #:buffer-end-mark #:*buffer-list*
-
-   ;; charmacs.lisp
-   #:do-alpha-chars
-
-   ;; cursor.lisp
-   #:mark-to-cursorpos #:center-window #:displayed-p #:scroll-window
-   #:mark-column #:cursorpos-to-mark #:move-to-column
-
-   ;; display.lisp
-   #:redisplay #:redisplay-all
-
-   ;; echo.lisp
-   #:*echo-area-buffer* #:*echo-area-stream* #:*echo-area-window*
-   #:*parse-starting-mark* #:*parse-input-region*
-   #:*parse-verification-function* #:*parse-string-tables*
-   #:*parse-value-must-exist* #:*parse-default* #:*parse-default-string*
-   #:*parse-prompt* #:*parse-help* #:clear-echo-area #:message #:loud-message
-   #:prompt-for-buffer #:prompt-for-file #:prompt-for-integer
-   #:prompt-for-keyword #:prompt-for-expression #:prompt-for-string
-   #:prompt-for-variable #:prompt-for-yes-or-no #:prompt-for-y-or-n
-   #:prompt-for-key-event #:prompt-for-key
-   #:logical-key-event-p
-   #:logical-key-event-key-events
-   #:define-logical-key-event #:*parse-type* #:current-variable-tables
-
-   ;; files.lisp
-   #:read-file #:write-file
+   #:make-xwindow-like-hwindow
 
 
-   ;; font.lisp
-   #:font-mark #:delete-font-mark #:delete-line-font-marks #:move-font-mark
-   #:window-font
+   ;; Entry points
+   #:hemlock #:main #:with-editor #:call-with-editor
+   #:linedit #:formedit #:repl
 
-   ;; htext1.lisp
-   #:line-length #:line-buffer #:line-string #:line-character #:mark #:mark-kind
-   #:copy-mark #:delete-mark #:move-to-position #:region #:make-empty-region
-   #:start-line-p #:end-line-p #:empty-line-p #:blank-line-p #:blank-before-p
-   #:blank-after-p #:same-line-p #:mark< #:mark<= #:mark> #:mark>= #:mark= #:mark/=
-   #:line< #:line<= #:line> #:line>= #:first-line-p #:last-line-p #:buffer-signature
-   #:lines-related
-
-
-   ;; htext2.lisp
-   #:region-to-string #:string-to-region #:line-to-region
-   #:previous-character #:next-character #:count-lines
-   #:count-characters #:line-start #:line-end #:buffer-start
-   #:buffer-end #:move-mark #:mark-before #:mark-after
-   #:character-offset #:line-offset #:region-bounds
-   #:set-region-bounds #:*print-region*
-
-
-   ;; htext3.lisp
-   #:insert-character #:insert-string #:insert-region #:ninsert-region
-
-
-   ;; htext4.lisp
-   #:delete-characters #:delete-region #:delete-and-save-region #:copy-region
-   #:filter-region
-
-
-   ;; interp.lisp
-   #:bind-key #:delete-key-binding #:get-command #:map-bindings
-   #:make-command #:command-name #:command-bindings #:last-command-type
-   #:prefix-argument #:exit-hemlock #:*invoke-hook* #:key-translation
-
-
-   ;; main.lisp
-   #:*global-variable-names* #:*mode-names* #:*buffer-names*
-   #:*character-attribute-names* #:*command-names* #:*buffer-list*
-   #:*window-list* #:*last-key-event-typed* #:after-editor-initializations
-   #:*background-image*
-
-   ;; screen.lisp
-   #:make-window #:delete-window #:next-window #:previous-window
-
-
-   ;; search1.lisp
-   #:search-pattern #:search-pattern-p #:find-pattern #:replace-pattern
-   #:new-search-pattern
-
-
-   ;; streams.lisp
-   #:make-hemlock-output-stream
-   #:hemlock-region-stream #:hemlock-region-stream-p
-   #:hemlock-output-stream #:make-hemlock-region-stream
-   #:hemlock-output-stream-p #:make-kbdmac-stream
-   #:modify-kbdmac-stream
-
-   ;; syntax.lisp
-   #:character-attribute-name
-   #:defattribute #:character-attribute-documentation #:character-attribute
-   #:character-attribute-hooks #:character-attribute-p #:shadow-attribute
-   #:unshadow-attribute #:find-attribute #:reverse-find-attribute
-
-   ;; vars.lisp
-   #:variable-value #:variable-hooks #:variable-documentation #:variable-name
-   #:hemlock-bound-p #:defhvar #:delete-variable
-
-   ;; window.lisp
-   #:current-window #:window-buffer #:modeline-field-width
-   #:modeline-field-function #:make-modeline-field #:update-modeline-fields
-   #:update-modeline-field #:modeline-field-name #:modeline-field
-   #:editor-finish-output #:*window-list*
-
-   ;; start hemlock
-   #:hemlock
-   #:main
-   #:with-editor
-   #:call-with-editor
-   #:linedit
-   #:formedit
-   #:repl
-
+   ;; Re-exported for hemlock package use
    #:concat))
 
 
 (defpackage :hemlock
-  (:use :common-lisp :hemlock.text :hemlock.command :hi :hemlock-ext)
+  (:use :common-lisp :hemlock.text :hemlock.command :hi :hemlock-ext
+        :trivial-gray-streams)
 ;;;  (:import-from :hemlock-ext #:delq #:memq #:assq)
 ;;;  (:import-from :hemlock-internals #:*fast*)
   (:import-from :hemlock-internals #:hemlock)
@@ -1800,25 +1571,20 @@
            #:call-with-standard-synonym-streams)
   (:shadowing-import-from #:hemlock-ext
                           #:char-code-limit)
-  ;;  #+cmu
-  ;; These are defined in EXTENSONS package in CMUCL
   (:shadowing-import-from :hemlock-ext
    #:*all-modifier-names*
    #:assq
    #:concat
    #:char-key-event
-   #:default-clx-event-handler
    #:default-directory
    #:define-clx-modifier
    #:define-key-event-modifier
    #:define-keysym
    #:define-mouse-keysym
    #:delq
-   #:disable-clx-event-handling
    #:do-alpha-key-events
    #:file-writable
    #:fixnump
-   #:flush-display-events
    #:key-event
    #:key-event-bit-p
    #:key-event-bits
@@ -1833,20 +1599,16 @@
    #:make-key-event-bits
    #:memq
    #:name-keysym
-   #:object-set-event-handler
    #:print-pretty-key
    #:print-pretty-key-event
    #:quit
 
-   ;; these four are from system package
-   #:make-object-set
+   ;; these are from system package
    #:sap-ref-8
    #:serve-event
    #:without-interrupts
 
-   #:translate-key-event
-   #:translate-mouse-key-event
-   #:with-clx-event-handling))
+   #:translate-mouse-key-event))
 
 
 (defpackage :hemlock.display
@@ -1867,7 +1629,15 @@
    #:redisplay-all
    #:random-typeout-redisplay
    #:prepare-window-for-redisplay
-   #:maybe-recenter-window))
+   #:maybe-recenter-window
+   ;; Display state
+   #:random-typeout-stream #:random-typeout-stream-window
+   #:random-typeout-stream-mark
+   #:*random-typeout-buffers* #:*random-typeout-ml-fields*
+   #:*default-font-family* #:font-family-cursor-y-offset
+   #:font-family-height #:font-family-map #:font-family-width
+   #:window-for-hunk #:window-hunk #:window-input-handler
+   #:window-modeline-buffer))
 
 
 (defpackage :hemlock.x11
@@ -1891,7 +1661,29 @@
    #:serve-circulate-notify #:serve-circulate-request
    #:serve-property-notify #:serve-selection-clear
    #:serve-selection-request #:serve-selection-notify
-   #:serve-colormap-notify #:serve-client-message))
+   #:serve-colormap-notify #:serve-client-message
+   ;; CLX event handling
+   #:call-with-clx-event-handling
+   #:object-set-event-handler
+   #:flush-display-events
+   #:disable-clx-event-handling
+   #:default-clx-event-handler
+   ;; Bitmap device/hunk (CLX-specific)
+   #:bitmap-device-display
+   #:bitmap-hunk-font-family #:bitmap-hunk-modeline-dis-line
+   #:bitmap-hunk-modeline-pos #:bitmap-hunk-trashed
+   #:bitmap-hunk-window #:bitmap-hunk-window-group #:bitmap-hunk-xwindow
+   #:init-bitmap-screen-manager #:reverse-video-hook-fun
+   ;; CLX window management
+   #:make-window-group #:window-group-height #:window-group-width
+   #:window-group-xparent #:hemlock-window
+   #:get-hemlock-cursor #:get-hemlock-grey-pixmap
+   #:make-black-color #:make-white-color
+   #:child-interesting-xevents-mask #:group-interesting-xevents-mask
+   #:random-typeout-xevents-mask
+   #:*default-foreground-pixel* #:*default-background-pixel*
+   #:*hemlock-cursor* #:*cursor-background-color* #:*cursor-foreground-color*
+   #:windowed-monitor-p))
 
 (defpackage :hemlock-user
     (:use :common-lisp :hemlock.text :hemlock.command :hemlock)
@@ -1925,49 +1717,3 @@
   (:use :common-lisp :hemlock.text :hemlock.command :hemlock :hemlock.display
         :hemlock.io)
   (:shadowing-import-from :hemlock.text #:char-code-limit))
-
-
-;; $Log: package.lisp,v $
-;; Revision 1.4  2004-09-03 23:06:51  abakic
-;; Changes to get rid of warnings and notes. As a side-effect, more code
-;; has been commented out. There should be no more warnings nor notes
-;; with CMUCL, and only two style warnings with SBCL. Not tested with
-;; other implementations yet. TODO: spread key bindings to different
-;; files.
-;;
-;; Revision 1.3  2004/08/10 05:58:04  rstrandh
-;; Removed logical-key-event-name and logical-key-event-documentation
-;; as they were never used.
-;;
-;; Revision 1.2  2004/08/10 05:24:16  rstrandh
-;; Removed the string table *logical-key-event-names* as it was never
-;; used, only written to.
-;;
-;; Added #k"control=[" as an alias for ESCAPE, because that is what
-;; I use all the time (rather than trying to find the META key).
-;;
-;; Revision 1.1  2004/07/09 15:00:36  gbaumann
-;; Let us see if this works.
-;;
-;; Revision 1.9  2003/08/05 19:58:21  gilbert
-;; - we now have a HEMLOCK-INTERFACE package which exports symbols mentioned
-;;   in the Command Implementors Manual.
-;;
-;; Revision 1.8  2003/07/28 20:35:32  jdz
-;; BEEP function now works.
-;;
-;; Revision 1.7  2003/07/27 10:11:06  jdz
-;; HEMLOCK-EXT package is now used by HEMLOCK.  Conflicting symbols from
-;; EXTENSIONS package in CMUCL are shadowed.
-;;
-;; Revision 1.6  2003/05/12 11:01:48  gbyers
-;; Conditionalize (Gray streams package) for OpenMCL.
-;;
-;; Revision 1.5  2003/03/26 07:50:10  gilbert
-;; Port to SCL by Douglas Crosher
-;;
-;; Revision 1.4  2003/03/06 21:38:58  gilbert
-;; The symbol *FAST* is now exported from HI (no idea if that is the
-;; right thing to do) and imported into HEMLOCK. Fixes bug:
-;; auto-save.lisp was not compiling.
-;;

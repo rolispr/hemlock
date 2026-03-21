@@ -11,20 +11,6 @@
 ;;; Code:lispinit.lisp uses this for a couple interrupt handlers, and
 ;;; eval-server.lisp.
 ;;;
-#+CMU
-(defmacro without-hemlock (&body body)
-  "When in the editor and not in the debugger, call the exit method of Hemlock's
-   device, so we can type.  Do the same thing on exit but call the init method."
-  `(progn
-     (when (and *in-the-editor* (not debug::*in-the-debugger*))
-       (let ((device (device-hunk-device (window-hunk (current-window)))))
-         (device-exit device)))
-     ,@body
-     (when (and *in-the-editor* (not debug::*in-the-debugger*))
-       (let ((device (device-hunk-device (window-hunk (current-window)))))
-         (device-init device)))))
-
-#-CMU
 (defmacro without-hemlock (&body body)
   "When in the editor and not in the debugger, call the exit method of Hemlock's
    device, so we can type.  Do the same thing on exit but call the init method."
@@ -198,7 +184,7 @@
            (*default-backend* *default-backend*)
            ;; $DISPLAY set: prefer a windowed backend, else fall back to TTY
            (display
-            (or (find-if (lambda (b) (member b '(:clx :qt :webui))) *available-backends*)
+            (or (find-if (lambda (b) (member b '(:clx :webui))) *available-backends*)
                 :tty))
            ;; No $DISPLAY: always use TTY
            (t :tty))))
@@ -308,8 +294,7 @@
          stream))
 
 (defvar *illegal-read-stream*
-  #+CMU (lisp::make-lisp-stream :in #'in-hemlock-standard-input-read)
-  #-CMU (make-broadcast-stream))
+  (make-broadcast-stream))
 
 (declaim (special *gc-notify-before*
                   *gc-notify-after*))
@@ -320,7 +305,7 @@
   "Evaluates body in a context where events are handled for the display
    by calling handler on the display.  This destroys any previously established
    handler for display."
-  `(hemlock-ext::call-with-clx-event-handling (lambda () ,@body) ,display ,handler))
+  `(hemlock.x11::call-with-clx-event-handling (lambda () ,@body) ,display ,handler))
 
 ;; fixme: this is neither site-specific nor should it be a macro.
 (defmacro site-wrapper-macro (&body body)
@@ -336,7 +321,7 @@
                 ,@body)
                (t
                 (with-clx-event-handling
-                    (*editor-windowed-input* #'hemlock-ext:object-set-event-handler)
+                    (*editor-windowed-input* #'hemlock.x11::object-set-event-handler)
                   ,@body)))))
      (when *current-window*
        (let ((device (device-hunk-device (window-hunk (current-window)))))

@@ -50,7 +50,7 @@
 
 (defun cleanup-for-wm-closed-display (closed-display)
   ;; Remove fd-handlers
-  (hemlock-ext:disable-clx-event-handling closed-display)
+  (disable-clx-event-handling closed-display)
   ;; Close file descriptor and note DEAD.
   (xlib:close-display closed-display)
   ;;

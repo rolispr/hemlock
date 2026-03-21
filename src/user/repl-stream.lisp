@@ -16,9 +16,9 @@
 
 (defconstant session-stream-output-buffer-size 512)
 
-(defclass session-stream (hi::trivial-gray-stream-mixin
-                     hi::fundamental-character-output-stream
-                     hi::fundamental-character-input-stream)
+(defclass session-stream (trivial-gray-stream-mixin
+                     fundamental-character-output-stream
+                     fundamental-character-input-stream)
   ((wire
     :initarg  :wire
     :initform nil
@@ -107,13 +107,7 @@
                                       (- (length input) newline 1)
                                       (length input)))
                             input))
-                         #+NILGB
-                         (cons
-                          (ext:make-stream-command (car input)
-                                                   (cdr input)))
-                         #+NILGB
-                         (symbol
-                          (ext:make-stream-command input)))))))
+)))))
   nil)
 
 ;;; TS-STREAM-SET-LINE-LENGTH -- Internal Interface.
@@ -141,9 +135,6 @@
                      (first (first current)))
                 (cond ((null current)
                        (return nil))
-                      #+NILGB
-                      ((ext:stream-command-p first)
-                       (return t))
                       ((>= (session-stream-input-read-index stream)
                            (length (the simple-string first)))
                        (pop (session-stream-current-input stream))
@@ -156,39 +147,31 @@
           (dispatch-events-no-hang)
           (check)))))
 
-(defmethod hi::stream-listen ((stream session-stream))
+(defmethod stream-listen ((stream session-stream))
   (%session-stream-listen stream))
 
 ;;; %TS-STREAM-IN -- Internal.
 ;;;
 ;;; The READ-CHAR stream method.
 ;;;
-(defmethod hi::stream-read-char ((stream session-stream))
-  (hi::stream-force-output stream)
+(defmethod stream-read-char ((stream session-stream))
+  (stream-force-output stream)
   (wait-for-session-input stream)
   (let ((first (first (session-stream-current-input stream))))
     (etypecase first
       (string
        (prog1 (schar first (session-stream-input-read-index stream))
-         (incf (session-stream-input-read-index stream))))
-      #+NILGB
-      (ext:stream-command
-       (error 'unexpected-stream-command
-              :context "in the READ-CHAR method")))))
+         (incf (session-stream-input-read-index stream)))))))
 
-(defmethod hi::stream-read-char-no-hang ((stream session-stream))
+(defmethod stream-read-char-no-hang ((stream session-stream))
   (cond
     ((%session-stream-listen stream)
-     (hi::stream-force-output stream)
+     (stream-force-output stream)
      (let ((first (first (session-stream-current-input stream))))
        (etypecase first
          (string
           (prog1 (schar first (session-stream-input-read-index stream))
-            (incf (session-stream-input-read-index stream))))
-         #+NILGB
-         (ext:stream-command
-          (error 'unexpected-stream-command
-                 :context "in the READ-CHAR method")))))
+            (incf (session-stream-input-read-index stream)))))))
     (t
      ;; not :eof!
      nil)))
@@ -212,11 +195,7 @@
                            (pop (session-stream-current-input stream))
                            (subseq (pop (session-stream-current-input stream))
                                    (session-stream-input-read-index stream)))
-                  (setf (session-stream-input-read-index stream) 0)))
-               #+NILGB
-               (ext:stream-command
-                (error 'unexpected-stream-command
-                       :context "in the READ-CHAR method")))))))
+                  (setf (session-stream-input-read-index stream) 0))))))))
     (do ((result (next-str) (concatenate 'simple-string result (next-str))))
         ((char= (schar result (1- (length result))) #\newline)
          (values (subseq result 0 (1- (length result)))
@@ -259,7 +238,7 @@
 ;;;
 ;;; Output a single character to stream.
 ;;;
-(defmethod hi::stream-write-char ((stream session-stream) char)
+(defmethod stream-write-char ((stream session-stream) char)
   (declare (base-char char))
   (when (= (session-stream-output-buffer-index stream)
            session-stream-output-buffer-size)
@@ -281,7 +260,7 @@
 ;;; Output a string to stream.
 ;;;
 #+(or)
-(defmethod hi::stream-write-string ((stream session-stream) string &optional (start 0) (end (length string)))
+(defmethod stream-write-string ((stream session-stream) string &optional (start 0) (end (length string)))
   ;; This can't be true generally: --GB
   #+NIL (declare (simple-string string))
   (declare (fixnum start end))
@@ -320,7 +299,7 @@
 ;;;
 ;;; Unread a single character.
 ;;;
-(defmethod hi::stream-unread-char ((stream session-stream) char)
+(defmethod stream-unread-char ((stream session-stream) char)
   (let ((first (first (session-stream-current-input stream))))
     (cond ((and (stringp first)
                 (> (session-stream-input-read-index stream) 0))
@@ -336,22 +315,20 @@
 ;;;
 (defmethod close ((stream session-stream) &key abort)
   (unless abort
-    (force-output stream))
-  #+NILGB (lisp::set-closed-flame stream)       ;Hugh!? what is that? --GB
-  )
+    (force-output stream)))
 
 ;;; %TS-STREAM-CLEAR-INPUT -- Internal.
 ;;;
 ;;; Pass the request to the editor and clear any buffered input.
 ;;;
-(defmethod hi::stream-clear-input ((stream session-stream))
+(defmethod stream-clear-input ((stream session-stream))
   (when (session-stream-wire stream)
     (hemlock.wire:remote-value (session-stream-wire stream)
                                (session-buffer-clear-input (session-stream-session stream))))
   (setf (session-stream-current-input stream) nil
         (session-stream-input-read-index stream) 0))
 
-(defmethod hi::stream-finish-output ((stream session-stream))
+(defmethod stream-finish-output ((stream session-stream))
   (when (session-stream-wire stream)
     (%session-stream-flsbuf stream)
     ;; Note: for the return value to come back,
@@ -361,53 +338,25 @@
                                (session-buffer-finish-output (session-stream-session stream))))
   t)
 
-(defmethod hi::stream-force-output ((stream session-stream))
-  (hi::stream-finish-output stream)
+(defmethod stream-force-output ((stream session-stream))
+  (stream-finish-output stream)
   t)
 
-(defmethod hi::stream-line-column ((stream session-stream))
+(defmethod stream-line-column ((stream session-stream))
   (session-stream-char-pos stream))
 
-(defmethod hi::stream-line-length ((stream session-stream))
+(defmethod stream-line-length ((stream session-stream))
   (session-stream-line-length stream))
 
-#+NILGB ;; -- hmm.
-(defmethod interactive-stream-p ((stream session-stream))
-  t)
-
-(defmethod hi::stream-clear-output ((stream session-stream))
+(defmethod stream-clear-output ((stream session-stream))
   (setf (session-stream-output-buffer-index stream) 0))
 
-;;; %TS-STREAM-MISC -- Internal.
-;;;
-;;; The misc stream method.
-;;;
-#+NILGB
-(defun %session-stream-misc (stream operation &optional arg1 arg2)
-  (case operation
-    (:get-command
-     (wait-for-session-input stream)
-     (etypecase (first (session-stream-current-input stream))
-       (stream-command
-        (setf (session-stream-input-read-index stream) 0)
-        (pop (session-stream-current-input stream)))
-       (string nil)))))
-
-(defmethod hi::stream-write-sequence
+(defmethod stream-write-sequence
     ((stream session-stream) (seq string) start end &key)
   (loop for i from start below end
         do (write-char (elt seq i) stream)))
 
-(defmethod hi::stream-read-sequence
+(defmethod stream-read-sequence
     ((stream session-stream) (seq string) start end &key)
   (loop for i from start below end
         do (setf (elt seq i) (read-char stream))))
-
-;; $Log: session-stream.lisp,v $
-;; Revision 1.1  2004-07-09 13:38:55  gbaumann
-;; Initial revision
-;;
-;; Revision 1.3  2003/08/05 19:51:13  gilbert
-;; initial agent lisp support, still not ready for prime time.
-;;
-;;

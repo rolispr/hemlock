@@ -98,7 +98,7 @@
   display-start               ; Window display start when switching to buf.
   %modeline-fields            ; List of modeline-field-info's.
   (delete-hook nil)           ; List of functions to call upon deletion.
-  (widget nil)                ; for virtual buffers, the Qt widget to show
+  (widget nil)                ; for virtual buffers, backend-specific widget
   (tag-line-number -1)        ; tags valid for earlier lines only
   (undo-p t)                  ; Flags the recording of 'Undo information.
   (undo-list nil)             ; Undo list for this buffer.

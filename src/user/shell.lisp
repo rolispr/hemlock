@@ -53,8 +53,8 @@
 ;;;    alias pushd 'pushd \!* ; echo ""`pwd`"/"'
 ;;;
 
-(defclass shell-filter-stream (hi::trivial-gray-stream-mixin
-                               hi::fundamental-character-output-stream)
+(defclass shell-filter-stream (trivial-gray-stream-mixin
+                               fundamental-character-output-stream)
   ((buffer
     :initform nil
     :initarg :buffer
@@ -71,27 +71,27 @@
                  :buffer buffer
                  :hemlock-stream hemlock-stream))
 
-(defmethod hi::stream-write-char ((stream shell-filter-stream) char)
+(defmethod stream-write-char ((stream shell-filter-stream) char)
   (if (eql char #\return)
       (with-mark ((m (current-point)))
         (line-start m)
         (kill-region (region m (current-point)) :kill-backward))
       (write-char char (shell-filter-stream-hemlock-stream stream))))
 
-(defmethod hi::stream-write-sequence
+(defmethod stream-write-sequence
     ((stream shell-filter-stream) seq start end &key)
   (check-type seq string)
   (if (position #\return seq)
       (loop for i from start below end
-            do (hi::stream-write-char stream (elt seq i)))
+            do (stream-write-char stream (elt seq i)))
       (shell-filter-string-out stream seq start end)))
 
 
-(defmethod hi::stream-line-length ((stream shell-filter-stream))
-  (hi::stream-line-length (shell-filter-stream-hemlock-stream stream)))
+(defmethod stream-line-length ((stream shell-filter-stream))
+  (stream-line-length (shell-filter-stream-hemlock-stream stream)))
 
-(defmethod hi::stream-line-column ((stream shell-filter-stream))
-  (hi::stream-line-column (shell-filter-stream-hemlock-stream stream)))
+(defmethod stream-line-column ((stream shell-filter-stream))
+  (stream-line-column (shell-filter-stream-hemlock-stream stream)))
 
 
 #+(or)
@@ -116,24 +116,14 @@
                (member (mark-kind mark) '(:right-inserting :left-inserting)))
     (error "~S is not a permanent mark." mark))
   (setf (shell-filter-stream-mark stream) mark)
-  ;;
-  ;; Free the current stream buffers, resetting the buffer pointers.
-  #+scl (lisp::free-stream-buffers stream)
-  ;;
   (case buffered
     (:none
-     #+scl
-     (setf (ext:stream-out-buffer stream) (lisp::make-stream-buffer 'base-char 0))
      (setf (old-lisp-stream-out stream) #'hemlock-output-unbuffered-out
            (old-lisp-stream-sout stream) #'hemlock-output-unbuffered-sout))
     (:line
-     #+scl
-     (setf (ext:stream-out-buffer stream) (lisp::make-stream-buffer 'base-char 0))
      (setf (old-lisp-stream-out stream) #'hemlock-output-line-buffered-out
            (old-lisp-stream-sout stream) #'hemlock-output-line-buffered-sout))
     (:full
-     #+scl
-     (setf (ext:stream-out-buffer stream) (lisp::make-stream-buffer 'base-char))
      (setf (old-lisp-stream-out stream) #'hemlock-output-buffered-out
            (old-lisp-stream-sout stream) #'hemlock-output-buffered-sout))
     (t

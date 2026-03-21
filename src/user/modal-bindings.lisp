@@ -137,13 +137,25 @@
 ;;;; ─── Normal mode — command palette ───────────────────────────────────────
 
 ;;; : opens the extended command prompt (helix-style command mode).
-;;; meta-x also works (for muscle memory) via the global meta-x binding.
 (bind-key "Extended Command" #k":" :mode "Normal")
 
 ;;; C-x T toggles modal editing globally from any mode (insert or normal).
-;;; Useful for buffers where you want to temporarily disable modal editing
-;;; and for test harnesses that need a reliable non-ESC-dependent binding.
 (bind-key "Toggle Modal Editing" #k"control-x T")
+
+
+;;;; ─── Normal mode — space leader ──────────────────────────────────────────
+
+(bind-key "Find File"          #k"space f" :mode "Normal")
+(bind-key "Select Buffer"      #k"space b" :mode "Normal")
+(bind-key "Save File"          #k"space s" :mode "Normal")
+(bind-key "Write File"         #k"space S" :mode "Normal")
+(bind-key "Extended Command"   #k"space x" :mode "Normal")
+(bind-key "Evaluate Expression" #k"space :" :mode "Normal")
+(bind-key "Dired"              #k"space d" :mode "Normal")
+(bind-key "Next Window"        #k"space w" :mode "Normal")
+(bind-key "Incremental Search" #k"space /" :mode "Normal")
+(bind-key "Describe Key"       #k"space ?" :mode "Normal")
+(bind-key "Exit Hemlock"       #k"space q" :mode "Normal")
 
 
 ;;;; ─── Normal mode — search ──────────────────────────────────────────────────
@@ -173,12 +185,12 @@
 
 ;;;; ─── Normal mode — page scroll ─────────────────────────────────────────────
 
-(bind-key "Scroll Window Up"   #k"control-b" :mode "Normal")
-(bind-key "Scroll Window Down" #k"control-f" :mode "Normal")
-(bind-key "Scroll Window Up"   #k"pageup"    :mode "Normal")
-(bind-key "Scroll Window Down" #k"pagedown"  :mode "Normal")
-(bind-key "Scroll Window Up"   #k"control-u" :mode "Normal")
-(bind-key "Scroll Window Down" #k"control-d" :mode "Normal")
+(bind-key "Helix Scroll Up"   #k"control-b" :mode "Normal")
+(bind-key "Helix Scroll Down" #k"control-f" :mode "Normal")
+(bind-key "Helix Scroll Up"   #k"pageup"    :mode "Normal")
+(bind-key "Helix Scroll Down" #k"pagedown"  :mode "Normal")
+(bind-key "Helix Scroll Up"   #k"control-u" :mode "Normal")
+(bind-key "Helix Scroll Down" #k"control-d" :mode "Normal")
 
 
 ;;;; ─── Normal mode — scrolling (z prefix) ────────────────────────────────────

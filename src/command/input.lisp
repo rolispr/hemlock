@@ -322,7 +322,7 @@
          (buffer (window-buffer window))
          (start (buffer-start-mark buffer)))
     (when (typep (device-hunk-device (window-hunk window))
-                 (the class (class-of 'hi::bitmap-device)))
+                 (the class (class-of 'bitmap-device)))
       (let ((*more-prompt-action* :normal))
         (update-modeline-field buffer window :more-prompt)
         (random-typeout-redisplay window))

@@ -394,6 +394,17 @@
       (mark-before point))))
 
 
+;;;; ─── Scroll Motions (collapse selection before scrolling) ─────────────────
+
+(define-helix-motion "Helix Scroll Down"
+  "Scroll window down, collapsing selection."
+  (scroll-window-down-command p))
+
+(define-helix-motion "Helix Scroll Up"
+  "Scroll window up, collapsing selection."
+  (scroll-window-up-command p))
+
+
 ;;;; ─── Goto Mode Commands (g submap) ────────────────────────────────────────
 
 (defcommand "Helix Goto Window Top" (p)
@@ -984,16 +995,35 @@
 
 ;;;; ─── Buffer Creation Hook ───────────────────────────────────────────────────
 
+(defvar *non-modal-major-modes*
+  '("Dired" "Bufed" "Debugger" "Debug" "Apropos" "Xref" "Coned"
+    "Grep" "Typeout" "View" "Fuzzylist" "Lisp-Lib")
+  "Major modes where Normal mode is automatically suppressed.
+   These buffers use their own single-key bindings directly.")
+
+(defun %non-modal-mode-p (buffer)
+  "Return T if BUFFER's major mode is in *non-modal-major-modes*."
+  (member (buffer-major-mode buffer) *non-modal-major-modes* :test #'string=))
+
 (defun %activate-normal-mode-if-needed (buffer)
   "Activate Normal mode on BUFFER if the global style is :modal and the
-   buffer has not explicitly opted out."
+   buffer has not explicitly opted out or is in a non-modal major mode."
   (when (and (not (string= (buffer-name buffer) "Echo Area"))
              (eq (variable-value 'default-editing-style :global) :modal)
-             (not (eq (modal-buffer-state buffer) :off)))
+             (not (eq (modal-buffer-state buffer) :off))
+             (not (%non-modal-mode-p buffer)))
     (setf (buffer-minor-mode buffer "Normal") t)
     (setf (modal-buffer-state buffer) :on)))
 
+(defun %maybe-deactivate-normal-on-mode-change (buffer mode-name)
+  "Deactivate Normal mode when a buffer switches to a non-modal major mode."
+  (when (member mode-name *non-modal-major-modes* :test #'string=)
+    (setf (buffer-minor-mode buffer "Normal") nil)
+    (setf (buffer-minor-mode buffer "Select") nil)
+    (setf (modal-buffer-state buffer) :off)))
+
 (add-hook make-buffer-hook #'%activate-normal-mode-if-needed)
+(add-hook buffer-major-mode-hook #'%maybe-deactivate-normal-on-mode-change)
 
 ;;; The "Main" buffer is created by setup-initial-buffer during %init-hemlock,
 ;;; which runs when main.lisp is loaded — before this (user-1) module loads.

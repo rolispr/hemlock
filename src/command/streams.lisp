@@ -12,9 +12,9 @@
 
 ;;; Note: although this stream is intended for output only it also supports
 ;;; input to help if the debugger is called.
-(defclass hemlock-output-stream (hi::trivial-gray-stream-mixin
-                                 hi::fundamental-character-output-stream
-                                 hi::fundamental-character-input-stream)
+(defclass hemlock-output-stream (trivial-gray-stream-mixin
+                                 fundamental-character-output-stream
+                                 fundamental-character-input-stream)
   ((mark
     :initform nil
     :accessor hemlock-output-stream-mark
@@ -31,19 +31,19 @@
 (defun hemlock-output-stream-p (x)
   (typep x 'hemlock-output-stream))
 
-(defmethod hi::stream-write-char ((stream hemlock-output-stream) char)
+(defmethod stream-write-char ((stream hemlock-output-stream) char)
   (funcall (old-lisp-stream-out stream) stream char))
 
-(defmethod hi::stream-write-sequence
+(defmethod stream-write-sequence
     ((stream hemlock-output-stream) seq start end &key)
   (check-type seq string)
   (hemlock-output-buffered-sout stream seq start end))
 
 
-(defmethod hi::stream-line-column ((stream hemlock-output-stream))
+(defmethod stream-line-column ((stream hemlock-output-stream))
   (mark-charpos (hemlock-output-stream-mark stream)))
 
-(defmethod hi::stream-line-length ((stream hemlock-output-stream))
+(defmethod stream-line-length ((stream hemlock-output-stream))
   (mark-charpos (hemlock-output-stream-mark stream))
   (let* ((buffer
           (line-buffer (mark-line (hemlock-output-stream-mark stream)))))
@@ -152,15 +152,15 @@
 ;;; at home, because it enters the command loop recursively in a potentially
 ;;; bad way, but it can be very useful for debugging purposes;
 
-(defvar hi::*reading-lispbuf-input* nil)
+(defvar *reading-lispbuf-input* nil)
 
 (defun ensure-output-stream-input (stream)
   (with-slots (input-string input-pos mark) stream
     (do ()
         ((and input-string (< input-pos (length input-string))))
       (setf input-string
-            (catch 'hi::lispbuf-input
-              (let ((hi::*reading-lispbuf-input* t)
+            (catch 'lispbuf-input
+              (let ((*reading-lispbuf-input* t)
                     (buffer (line-buffer (mark-line mark))))
                 (move-mark
                  (variable-value 'hemlock::buffer-input-mark :buffer buffer)

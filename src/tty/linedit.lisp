@@ -194,7 +194,7 @@
 ;;;; Linedit support
 
 (defun buffer-contains-complete-form-p ()
-  (let ((str (hi:region-to-string (hi:buffer-region (current-buffer)))))
+  (let ((str (region-to-string (buffer-region (current-buffer)))))
     (or (ppcre:all-matches "^\\s*$" str) ;including empty string
         (ppcre:all-matches "^," str)     ;slime-style repl hack
         (handler-case
@@ -226,7 +226,7 @@
   (hemlock::mark= (hemlock::region-start r) (hemlock::region-end r)))
 
 (defcommand "Linedit Delete Or Eof" (p) "" ""
-  (if (empty-region-p (hi:buffer-region (current-buffer)))
+  (if (empty-region-p (buffer-region (current-buffer)))
       (progn
         (hemlock::save-all-files-command nil)
         (throw 'linedit-eof nil))

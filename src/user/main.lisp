@@ -7,14 +7,6 @@
 
 (in-package :hemlock)
 
-#||
-GB
-(in-package :extensions)
-(export '(save-all-buffers *hemlock-version*))
-(in-package :hemlock-internals)
-||#
-
-
 
 (defun quit ()
   (uiop:quit))
@@ -256,7 +248,7 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
      - The symbol NIL -- No background image.
        (Not using a background image is faster, especially with remote X.)
 
-   Currently supported only in the Qt backend.")
+   Currently supported only in graphical backends.")
 
 
 
@@ -297,10 +289,8 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
          *trace-output*    stream))
  (hemlock.io:setup-wakeup-pipe))
 
-#-(or cmu scl)
 (defvar *command-line-options* nil)
 
-#-(or cmu scl)
 (defparameter *command-line-spec*
   (flet ((keywordize (sym value)
            (push (intern (string-upcase value) :keyword)
@@ -320,16 +310,15 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
        :type string)
       (("backend" "backend-type")
        :type string
-       :documentation "backend to use, one of tty, clx, or qt. If not specified, checks if $DISPLAY is set, and use the first available backend; without a $DISPLAY, falls back to TTY.  See also --tty et al."
+       :documentation "backend to use, one of tty, clx, or webui. If not specified, checks if $DISPLAY is set, and use the first available backend; without a $DISPLAY, falls back to TTY.  See also --tty et al."
        :action ,(alexandria:curry #'keywordize :backend-type))
-      ,@(loop for b in '(:tty :clx :qt)
+      ,@(loop for b in '(:tty :clx :webui)
               collect `(,(string-downcase b)
                         :type boolean
                         :documentation ,(format nil "short for --backend ~A" b)
                         :action ,(let ((b b))
                                    (alexandria:curry #'quick-backend b)))))))
 
-#-(or cmu scl)
 (defun show-cmd-line-help ()
   (format t "This is hemlock ~A.~%Usage:~%~%" *hemlock-version*)
   (format t "   ~A [OPTIONS] file...~%~%"
@@ -347,7 +336,6 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
 ;; Free Software available under an MIT-style license. See LICENSE
 ;; Copyright (c) 2003-2009 ITA Software, Inc.  All rights reserved.
 ;; Original author: Francois-Rene Rideau
-#-(or cmu scl)
 (defun show-option-help
        (specification &key (stream *standard-output*) sort-names)
   ;; TODO: be clever when trying to align stuff horizontally
@@ -375,7 +363,6 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
                       (cl-ppcre:split " " negation-documentation)))))))
 
 
-#-(or cmu scl)
 (defun main (&optional (arg-list (command-line-arguments:get-command-line-arguments)))
   (multiple-value-bind (keys rest)
                        (command-line-arguments:process-command-line-options
@@ -391,7 +378,8 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
         (assert (null rest))
         (apply #'hemlock:start-agent keys))
        (t
-        (apply #'hemlock rest keys))))))
+        (let ((files (if (cdr rest) rest (car rest))))
+          (apply #'hemlock files keys)))))))
 
 (defmacro with-editor
     ((&key (load-user-init t) backend-type display) &body body)
@@ -473,14 +461,11 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
     (error "already in the editor"))
   (when (and backend-type (not (validate-backend-type backend-type)))
     (error "Specified backend ~A not loaded" backend-type))
-  ;; fixme: pass DISPLAY to WITH-EVENT-LOOP, so that Qt can pick it up
-  ;; in case the user wants a DISPLAY != $DISPLAY
   (let* ((backend-type (or backend-type (choose-backend-type display)))
          (display (if (member backend-type '(:webui :tty :mini)) nil display))
          (*default-backend* backend-type))
     (setf *connection-backend*
           (ecase backend-type
-            (:qt :qt)
             ((:tty :clx :mini :webui) :sb-sys)))
     (with-existing-event-loop
         (or *main-event-base*
@@ -533,7 +518,10 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
          (hemlock::change-to-buffer buffer)
          (buffer-start (buffer-point buffer)))))
     ((or string pathname)
-     (hemlock::find-file-command () x))
+     (let ((path (pathname x)))
+       (if (uiop:directory-exists-p path)
+           (hemlock::dired-command () (namestring path))
+           (hemlock::find-file-command () path))))
     (t
      (error
       "~S is not a symbol or pathname.  I can't edit it!" x))))

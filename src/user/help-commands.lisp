@@ -85,7 +85,7 @@
 (defun apropos-command-output (str coms vars attr)
   (declare (list coms vars attr))
   (with-pop-up-display (s)
-    (let* ((w (hi::stream-line-length s))
+    (let* ((w (stream-line-length s))
            (div (make-string w :initial-element #\-))
            (col (truncate (* 2/3 w))))
       (flet ((write-padded (string)

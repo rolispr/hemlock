@@ -286,9 +286,7 @@
              (note-output-date note))
           (let ((new-name (make-pathname :type "fasl"
                                          :defaults (note-input-file note))))
-            (rename-file file new-name)
-            #+NILGB
-            (unix:unix-chmod (namestring new-name) #o644))
+            (rename-file file new-name))
           (delete-file file)))
     (maybe-send-next-note server))
   (values))
@@ -497,35 +495,6 @@
                              (eq (error-info-buffer error)
                                  buffer)))
     (queue-note note server)))
-
-;;; FILE-COMPILE-TEMP-FILE creates a a temporary file that is publicly
-;;; writable in the directory file is in and with a .fasl type.  Four values
-;;; are returned -- a pathname suitable for referencing file remotely, the
-;;; pathname of the temporary file created, a pathname suitable for referencing
-;;; the temporary file remotely, and the write date of the temporary file.
-;;;
-
-#+NILGB
-(defun file-compile-temp-file (file)
-  (let ((ofile (loop (let* ((sym (gensym))
-                            (f (merge-pathnames
-                                (format nil "compile-file-~A.fasl" sym)
-                                file)))
-                       (unless (probe-file f) (return f))))))
-    (multiple-value-bind (fd err)
-                         (unix:unix-open (namestring ofile)
-                                         unix:o_creat #o666)
-      (unless fd
-        (editor-error "Couldn't create compiler temporary output file:~%~
-        ~A" (unix:get-unix-error-msg err)))
-      (unix:unix-fchmod fd #o666)
-      (unix:unix-close fd))
-    (let ((net-ofile (pathname-for-remote-access ofile)))
-      (values (make-pathname :directory (pathname-directory net-ofile)
-                             :defaults file)
-              ofile
-              net-ofile
-              (file-write-date ofile)))))
 
 (defun pathname-for-remote-access (file)
   (let* ((machine (machine-instance))
@@ -1128,7 +1097,6 @@
     ;; operations.
     (dolist (note (server-info-notes server))
       (setf (note-state note) :aborted))
-    #+NILGB (ext:send-character-out-of-band (hemlock.wire:wire-fd wire) #\N)
     (hemlock.wire:remote-value wire (server-accept-operations))
     ;; Synch'ing with server here, causes any operations queued at the socket or
     ;; in the server to be ignored, and the last thing evaluated is an

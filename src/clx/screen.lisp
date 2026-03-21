@@ -529,7 +529,7 @@
   (declare (ignore event-key event-window root child same-screen-p root-x
                    root-y time send-event-p))
   (hunk-process-input hunk
-                      (hemlock-ext:translate-key-event
+                      (translate-key-event
                        (bitmap-device-display (device-hunk-device hunk))
                        key-code modifiers)
                       x y))
@@ -1456,7 +1456,7 @@
 
 (defmethod device-init ((device bitmap-device))
   (let ((display (bitmap-device-display device)))
-    (hemlock-ext:flush-display-events display)
+    (flush-display-events display)
     (hemlock-window display t)))
 
 (defun hemlock-window (display on)
@@ -1479,7 +1479,7 @@
 
 (defmethod device-after-redisplay ((device bitmap-device))
   (let ((display (bitmap-device-display device)))
-    (loop (unless (hemlock-ext:object-set-event-handler display) (return)))))
+    (loop (unless (object-set-event-handler display) (return)))))
 
 
 
@@ -1965,7 +1965,7 @@
     hunk))
 
 ;;;; ------------------------------------------------------------------------------------------
-;;;;  rompsite stuff.
+;;;;  Window management and Lisp/editor switching.
 ;;;;
 
 (declaim (special *echo-area-window*))

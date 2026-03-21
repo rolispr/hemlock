@@ -71,7 +71,7 @@
               :depends-on (bitmap-1 core-1 tree-sitter)
               :serial t
               :components
-              ((:file "rompsite")
+              ((:file "platform")
                (:file "input")
                (:file "macros")
                (:file "line" :pathname "../text/line")
@@ -98,7 +98,7 @@
                (:file "palette")
                (:file "ts-highlight")
                (:file "connections")
-               (:file "repl" :pathname "../user/repl" :depends-on ("macros" "rompsite" "connections"))))
+               (:file "repl" :pathname "../user/repl" :depends-on ("macros" "platform" "connections"))))
      (:module io
               :pathname "src/io/"
               :depends-on (core-2)

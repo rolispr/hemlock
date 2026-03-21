@@ -214,7 +214,7 @@
 (defun redisplay-window (window)
   "Maybe updates the window's image and calls the device's smart redisplay
    method.  NOTE: the smart redisplay method may throw to
-   'hi::redisplay-catcher to abort redisplay."
+   'redisplay-catcher to abort redisplay."
   (maybe-update-window-image window)
   (prog1
       (not (eq (window-first-changed window) the-sentinel))
@@ -245,7 +245,7 @@
 ;;; update the image or recenter because someone else may have modified the
 ;;; window's image and already have updated it; if nothing happened, then the
 ;;; smart method shouldn't do anything anyway.  NOTE: the smart redisplay
-;;; method may throw to 'hi::redisplay-catcher to abort redisplay.
+;;; method may throw to 'redisplay-catcher to abort redisplay.
 ;;;
 ;;; This return t if there are any changed lines, nil otherwise.
 ;;;

@@ -142,10 +142,6 @@
     (delete-string name *server-names*)
     (message "Agent ~A just died." name))
   (when (server-info-wire server)
-    #+NILGB
-    (let ((fd (hemlock.wire:wire-fd (server-info-wire server))))
-      (system:invalidate-descriptor fd)
-      (unix:unix-close fd))
     (setf (server-info-wire server) nil))
   (when (server-info-agent-info server)
     (session-buffer-wire-died (server-info-agent-info server))
@@ -482,64 +478,6 @@
                     (if p "compile" "eval")))
     (change-to-buffer background)))
 
-#+NILGB
-(defcommand "Kill Agent" (p)
-  "This aborts any operations in the agent, tells the agent to QUIT, and shuts
-   down the connection to the specified eval server.  This makes no attempt to
-   assure the eval server actually dies."
-  "This aborts any operations in the agent, tells the agent to QUIT, and shuts
-   down the connection to the specified eval server.  This makes no attempt to
-   assure the eval server actually dies."
-  (declare (ignore p))
-  (let ((default (and (value current-eval-server)
-                      (server-info-name (value current-eval-server)))))
-    (multiple-value-bind
-        (name info)
-        (prompt-for-keyword
-         (list *server-names*)
-         :prompt "Kill Agent: "
-         :help "Enter the name of the eval agent you wish to destroy."
-         :must-exist t
-         :default default
-         :default-string default)
-      (declare (ignore name))
-      (let ((wire (server-info-wire info)))
-        (when wire
-          (ext:send-character-out-of-band (hemlock.wire:wire-fd wire) #\N)
-          (hemlock.wire:remote wire (ext:quit))
-          (hemlock.wire:wire-force-output wire)))
-      (agent-died info))))
-
-#+NILGB
-(defcommand "Kill Agent and Buffers" (p)
-  "This is the same as \"Kill Agent\", but it also deletes the agent's
-   interaction and compilation buffers."
-  "This is the same as \"Kill Agent\", but it also deletes the agent's
-   interaction and compilation buffers."
-  (declare (ignore p))
-  (let ((default (and (value current-eval-server)
-                      (server-info-name (value current-eval-server)))))
-    (multiple-value-bind
-        (name info)
-        (prompt-for-keyword
-         (list *server-names*)
-         :prompt "Kill Agent: "
-         :help "Enter the name of the eval agent you wish to destroy."
-         :must-exist t
-         :default default
-         :default-string default)
-      (declare (ignore name))
-      (let ((wire (server-info-wire info)))
-        (when wire
-          (ext:send-character-out-of-band (hemlock.wire:wire-fd wire) #\N)
-          (hemlock.wire:remote wire (ext:quit))
-          (hemlock.wire:wire-force-output wire)))
-      (let ((buffer (server-info-agent-buffer info)))
-        (when buffer (delete-buffer-if-possible buffer)))
-      (let ((buffer (server-info-background-buffer info)))
-        (when buffer (delete-buffer-if-possible buffer)))
-      (agent-died info))))
-
 #+(or)
 (defcommand "Accept Agent Connections" (p)
   "This causes Hemlock to accept agent connections and displays the port of
@@ -663,11 +601,6 @@
                                                 (subseq (string symbol) 1)))))
                  `(when ,orig
                     (setf ,symbol ,orig)))))
-    #+NILGB
-    (progn
-      (frob system:*beep-function*)
-      (frob ext:*gc-notify-before*)
-      (frob ext:*gc-notify-after*))
     (frob *terminal-io*)
     (frob *standard-input*)
     (frob *standard-output*)
@@ -676,9 +609,7 @@
     (frob *query-io*)
     (frob *trace-output*))
   (setf *background-io* nil)
-  (format t "~2&Connection to editor died.~%")
-  #+NILGB
-  (ext:quit))
+  (format t "~2&Connection to editor died.~%"))
 
 ;;; *MASTER-MACHINE-AND-PORT* -- internal
 ;;;
@@ -714,8 +645,7 @@
   (assert agent)
   (let ((*connection-backend*
          (ecase backend-type
-           (:qt :qt)
-           ((:tty :clx :mini) :sb-sys)))
+           ((:tty :clx :webui :mini) :sb-sys)))
         (seperator (position #\: editor :test #'char=)))
     (unless seperator
       (error "Editor name ~S invalid. ~
@@ -774,38 +704,6 @@
         (apply #'%start-agent args)))))
 
 
-;;; PRINT-AGENT-STATUS  --  Internal
-;;;
-;;;    Print out some useful information about what the agent is up to.
-;;;
-#+NILGB
-(defun print-agent-status ()
-  (ignore-errors
-    (multiple-value-bind (sys user faults)
-                         (system:get-system-info)
-      (let* ((seconds (truncate (+ sys user) 1000000))
-             (minutes (truncate seconds 60))
-             (hours (truncate minutes 60))
-             (days (truncate hours 24)))
-        (format *error-output* "~&; Used ~D:~2,'0D:~2,'0D~V@{!~}, "
-                hours (rem minutes 60) (rem seconds 60) days))
-      (format *error-output* "~D fault~:P.  In: " faults)
-
-      (do ((i 0 (1+ i))
-           (frame (di:top-frame) (di:frame-down frame)))
-          (#-x86(= i 3)
-           #+x86
-           (and (> i 6)         ; get past extra cruft
-                (let ((name (di:debug-function-name
-                             (di:frame-debug-function frame))))
-                  (and (not (string= name "Bogus stack frame"))
-                       (not (string= name "Foreign function call land")))))
-           (prin1 (di:debug-function-name (di:frame-debug-function frame))
-                  *error-output*))
-        (unless frame (return)))
-      (terpri *error-output*)
-      (force-output *error-output*)))
-  (values))
 
 
 ;;; CONNECT-TO-EDITOR -- internal
@@ -861,12 +759,6 @@
 
 (defvar *eval-form-stream*
   (make-two-way-stream
-   #+NILGB
-   (lisp::make-lisp-stream
-    :in #'(lambda (&rest junk)
-            (declare (ignore junk))
-            (error "You cannot read when handling an eval_form request.")))
-   #-NILGB
    (make-concatenated-stream)
    (make-broadcast-stream)))
 
