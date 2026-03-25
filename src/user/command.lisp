@@ -7,6 +7,16 @@
 (in-package :hemlock)
 
 
+(defun array-element-from-mark (mark array)
+  "Return the element of ARRAY corresponding to the line MARK is on.
+   Counts lines from buffer start to MARK and uses that as the index."
+  (let ((index (1- (count-lines (region (buffer-start-mark
+                                         (line-buffer (mark-line mark)))
+                                        mark)))))
+    (when (and (>= index 0) (< index (length array)))
+      (aref array index))))
+
+
 ;;; Make a mark for buffers as they're consed:
 
 (defun hcmd-new-buffer-hook-fun (buff)
@@ -380,16 +390,16 @@
   "Prompts for and executes an extended command."
   "Prompts for and executes an extended command.  The prefix argument is
   passed to the command."
-  (let* ((name (prompt-for-keyword (list *command-names*)
-                                   :prompt "Extended Command: "
-                                   :help "Name of a Hemlock command"))
+  (let* ((name (prompt *command-names*
+                       :prompt "Extended Command: "
+                       :help "Name of a Hemlock command"))
          (function (command-function (getstring name *command-names*))))
     (funcall function p)))
 
 (defcommand "Eval Expresion" (p)
   "" ""
   (declare (ignore p))
-  (message "~S" (eval (prompt-for-expression))))
+  (message "~S" (eval (prompt :expression))))
 
 (defhvar "Universal Argument Default"
   "Default value for \"Universal Argument\" command."

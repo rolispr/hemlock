@@ -529,7 +529,7 @@ With prefix argument, always prompt even for a single match."
       ((and (null (cdr matches)) (not p))
        (insert-symbol-completion (first (first matches))))
       (t
-       (let ((result (prompt-for-symbol pkg
-                                        :default-string (string-downcase prefix))))
+       (let ((result (prompt (find-package pkg)
+                            :default-string (string-downcase prefix))))
          (when (and result (plusp (length result)))
            (insert-symbol-completion result)))))))

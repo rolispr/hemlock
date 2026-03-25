@@ -684,7 +684,7 @@
    set the editor's package variable, but changed the agent's *package*."
   "Prompt for a package to make into a buffer-local variable current-package."
   (declare (ignore p))
-  (let* ((name (string (prompt-for-expression
+  (let* ((name (string (prompt :expression
                         :prompt "Package name: "
                         :help "Name of package to associate with this buffer.")))
          (buffer (current-buffer))
@@ -850,7 +850,7 @@
            (message "Evaluate Expression in the editor Lisp ...")
            (editor-evaluate-expression-command nil))
           (t
-           (let ((exp (prompt-for-string
+           (let ((exp (prompt :string
                        :prompt "Eval: "
                        :help "Expression to evaluate.")))
              (message "=> ~{~#[~;~A~:;~A, ~]~}"
@@ -918,10 +918,8 @@
            (message "Load File in the editor Lisp ...")
            (editor-load-file-command nil))
           (t
-           (let ((name (truename (prompt-for-file
-                                  :default
-                                  (or (value load-pathname-defaults)
-                                      (buffer-default-pathname (current-buffer)))
+           (let ((name (truename (prompt (or (value load-pathname-defaults)
+                                              (buffer-default-pathname (current-buffer)))
                                   :prompt "File to load: "
                                   :help "The name of the file to load"))))
              (setv load-pathname-defaults name)
@@ -942,9 +940,8 @@
            (message "Compile File in the editor Lisp ...")
            (editor-compile-file-command nil))
           (t
-           (let ((pn (prompt-for-file :default
-                                      (buffer-default-pathname (current-buffer))
-                                      :prompt "File to compile: ")))
+           (let ((pn (prompt (buffer-default-pathname (current-buffer))
+                            :prompt "File to compile: ")))
              (file-compile pn))))))
 
 (defhvar "Compile Buffer File Confirm"
@@ -971,7 +968,7 @@
              (unless pn (editor-error "Buffer has no associated pathname."))
              (cond ((buffer-modified buf)
                     (when (or (not (value compile-buffer-file-confirm))
-                              (prompt-for-y-or-n
+                              (prompt :y-or-n
                                :default t :default-string "Y"
                                :prompt (list "Save and compile file ~A? "
                                              (namestring pn))))
@@ -979,12 +976,12 @@
                       (file-compile pn :buffer buf)))
                    ((older-or-non-existent-fasl-p pn p)
                     (when (or (not (value compile-buffer-file-confirm))
-                              (prompt-for-y-or-n
+                              (prompt :y-or-n
                                :default t :default-string "Y"
                                :prompt (list "Compile file ~A? " (namestring pn))))
                       (file-compile pn :buffer buf)))
                    ((or p
-                        (prompt-for-y-or-n
+                        (prompt :y-or-n
                          :default t :default-string "Y"
                          :prompt
                          "Fasl file up to date, compile source anyway? "))

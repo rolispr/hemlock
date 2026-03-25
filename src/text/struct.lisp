@@ -451,6 +451,14 @@
 (defgeneric device-finish-output (device window)
   (:documentation "force output and hand until done."))
 
+(defgeneric device-hide-cursor (device)
+  (:documentation "Hide the cursor during redisplay to prevent flicker.")
+  (:method (device) (declare (ignore device))))
+
+(defgeneric device-show-cursor (device)
+  (:documentation "Show the cursor after redisplay completes.")
+  (:method (device) (declare (ignore device))))
+
 (defgeneric device-put-cursor (device hunk x y)
   (:documentation "put the cursor at (x,y) or (column,line)."))
 

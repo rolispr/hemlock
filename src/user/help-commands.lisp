@@ -48,9 +48,9 @@
   "List places where a command is bound."
   (declare (ignore p))
   (multiple-value-bind (nam cmd)
-                       (prompt-for-keyword (list *command-names*)
-                                           :prompt "Command: "
-                                           :help "Name of command to look for.")
+                       (prompt *command-names*
+                              :prompt "Command: "
+                              :help "Name of command to look for.")
     (let ((bindings (command-bindings cmd)))
       (with-pop-up-display (s)
         (cond
@@ -68,10 +68,10 @@
   "List things whose names contain a keyword."
   "List things whose names contain a keyword."
   (declare (ignore p))
-  (let* ((str (prompt-for-string
-                :prompt "Apropos keyword: "
-                :help
-                "String to look for in command, variable and attribute names."))
+  (let* ((str (prompt :string
+                      :prompt "Apropos keyword: "
+                      :help
+                      "String to look for in command, variable and attribute names."))
          (coms (find-containing str *command-names*))
          (vars (mapcan #'(lambda (table)
                            (let ((res (find-containing str table)))
@@ -168,10 +168,9 @@
   "Print out the command documentation for a command which is prompted for."
   (declare (ignore p))
   (multiple-value-bind (nam com)
-                       (prompt-for-keyword
-                        (list *command-names*)
-                        :prompt "Describe command: "
-                        :help "Name of a command to document.")
+                       (prompt *command-names*
+                              :prompt "Describe command: "
+                              :help "Name of a command to document.")
     (let ((bindings (command-bindings com))
           (fun (command-function com)))
       (with-pop-up-display (s)
@@ -290,10 +289,10 @@
   "Prompt for some Hemlock thing to describe."
   (declare (ignore p))
   (multiple-value-bind (ignore kwd)
-                       (prompt-for-keyword *generic-describe-kinds*
-                                           :default "Variable"
-                                           :help "Kind of thing to describe."
-                                           :prompt "Kind: ")
+                       (prompt *generic-describe-kinds*
+                              :default "Variable"
+                              :help "Kind of thing to describe."
+                              :prompt "Kind: ")
     (declare (ignore ignore))
     (case kwd
       (:variable
@@ -302,10 +301,9 @@
       (:key (describe-key-command ()))
       (:attribute
        (multiple-value-bind (name attr)
-                            (prompt-for-keyword
-                             (list *character-attribute-names*)
-                             :help "Name of character attribute to describe."
-                             :prompt "Attribute: ")
+                            (prompt *character-attribute-names*
+                                   :help "Name of character attribute to describe."
+                                   :prompt "Attribute: ")
          (print-full-doc name (character-attribute-documentation attr)))))))
 
 ;;; PRINT-FULL-DOC displays whole documentation string in a pop-up window.
@@ -328,9 +326,9 @@
   "Display the values of a Hemlock variable."
   (declare (ignore p))
   (multiple-value-bind (name var)
-                       (prompt-for-variable
-                        :help "Name of variable to describe."
-                        :prompt "Variable: ")
+                       (prompt (current-variable-tables)
+                              :help "Name of variable to describe."
+                              :prompt "Variable: ")
     (let ((buffer (current-buffer)))
       (with-pop-up-display (s)
         (show-variable s name var buffer)))))
@@ -341,9 +339,9 @@
   "Describe in full and show all of variable's value."
   (declare (ignore p))
   (multiple-value-bind (name var)
-                       (prompt-for-variable
-                        :help "Name of variable to describe."
-                        :prompt "Variable: ")
+                       (prompt (current-variable-tables)
+                               :help "Name of variable to describe."
+                               :prompt "Variable: ")
     (let ((buffer (current-buffer)))
       (with-pop-up-display (s)
         (format s "Documentation for ~S:~%  ~A~&~%"
@@ -376,11 +374,11 @@
   "Describe a mode showing special bindings for that mode."
   (declare (ignore p))
   (let* ((name (or name
-                   (prompt-for-keyword (list *mode-names*)
-                                       :prompt "Mode: "
-                                       :help "Enter mode to describe."
-                                       :default
-                                       (car (buffer-modes (current-buffer))))))
+                   (prompt *mode-names*
+                          :prompt "Mode: "
+                          :help "Enter mode to describe."
+                          :default
+                          (car (buffer-modes (current-buffer))))))
          (doc (mode-documentation name))
          (bindings nil)
          (type (if (mode-major-p name) "major" "minor"))

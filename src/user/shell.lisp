@@ -267,12 +267,12 @@
                              first-old-shell)))
       (multiple-value-bind
           (new-buffer-name new-buffer)
-          (prompt-for-keyword (list *shell-names*)
-                              :must-exist t
-                              :default default-shell
-                              :default-string default-shell
-                              :prompt "Existing Shell: "
-                              :help "Enter the name of an existing shell.")
+          (prompt *shell-names*
+                  :must-exist t
+                  :default default-shell
+                  :default-string default-shell
+                  :prompt "Existing Shell: "
+                  :help "Enter the name of an existing shell.")
         (declare (ignore new-buffer-name))
         (setf (value current-shell) new-buffer)))))
 
@@ -315,13 +315,13 @@
                                  suppress-shell-executable)
   (let* ((command (or (and clp command-line)
                       (if prompt-for-command-p
-                          (prompt-for-string
+                          (prompt :string
                            :default command-line :trim t
                            :prompt "Command to execute: "
                            :help "Shell command line to execute.")
                           command-line)))
          (buffer-name (if prompt-for-command-p
-                          (prompt-for-string
+                          (prompt :string
                            :default
                            (concatenate 'simple-string command " process")
                            :trim t
@@ -504,10 +504,10 @@
   (unless (hemlock-bound-p 'process-connection :buffer (current-buffer))
     (editor-error "Not in a process buffer."))
   (when (or (not (value kill-process-confirm))
-            (prompt-for-y-or-n :default nil
-                               :prompt "Really blow away shell? "
-                               :default nil
-                               :default-string "no"))
+            (prompt :y-or-n :default nil
+                            :prompt "Really blow away shell? "
+                            :default nil
+                            :default-string "no"))
     (delete-connection (value process-connection))))
 
 (defcommand "Stop Main Process" (p)
@@ -588,7 +588,7 @@
   (process-kill process signal :pty-process-group))
 
 (defcommand "Shell Command"
-    (p &optional (command (prompt-for-string :prompt "Shell command: "))
+    (p &optional (command (prompt :string :prompt "Shell command: "))
                  (directory (default-directory)))
   "" ""
   (declare (ignore p))

@@ -7,9 +7,9 @@
   "Grep results")
 
 (defcommand "Grep"
-    (p &optional (command (prompt-for-string
-                           :prompt "Run grep (like this): "
-                           :default "grep -nH -e "))
+    (p &optional (command (prompt :string
+                                 :prompt "Run grep (like this): "
+                                 :default "grep -nH -e "))
                  (directory (default-directory)))
   "" ""
   (setf (buffer-major-mode (shell-command-command p command directory))

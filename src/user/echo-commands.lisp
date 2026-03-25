@@ -52,15 +52,15 @@
   "Display the *Parse-Help* and any possibly completions of the current
   input."
   (declare (ignore p))
-  (let ((help (typecase *parse-help*
-                (list (unless *parse-help* (error "There is no parse help."))
-                 (apply #'format nil *parse-help*))
-                (string *parse-help*)
-                (t (error "Parse help is not a string or list: ~S" *parse-help*))))
+  (let ((help (typecase (prompt-help)
+                (list (unless (prompt-help) (error "There is no parse help."))
+                 (apply #'format nil (prompt-help)))
+                (string (prompt-help))
+                (t (error "Parse help is not a string or list: ~S" (prompt-help)))))
         (input (region-to-string *parse-input-region*)))
     (cond
-      ((eq *parse-type* :keyword)
-       (let ((strings (find-all-completions input *parse-string-tables*)))
+      ((eq (prompt-type) :keyword)
+       (let ((strings (find-all-completions input (prompt-tables))))
          (with-pop-up-display (s :height (+ (length strings) 2))
            (write-line help s)
            (finish-output s)
@@ -71,9 +71,9 @@
                  (t
                   (write-line
                    "There are no possible completions of what you have typed." s))))))
-      ((and (eq *parse-type* :file) (not (zerop (length input))))
+      ((and (eq (prompt-type) :file) (not (zerop (length input))))
        (let ((pns (ambiguous-files (region-to-string *parse-input-region*)
-                                   *parse-default*)))
+                                   (prompt-default))))
          (declare (list pns))
          (with-pop-up-display(s :height (+ (length pns) 2))
            (write-line help s)
@@ -107,7 +107,7 @@
   (multiple-value-bind
         (result win)
       (complete-file typein
-                                 :defaults (directory-namestring *parse-default*)
+                                 :defaults (directory-namestring (prompt-default))
                                  :ignore-types (value ignore-file-types))
     (when result
       (delete-region *parse-input-region*)
@@ -124,7 +124,7 @@
     ((buffer-ui-tree *echo-area-buffer*)
      (let ((input (echo-confirm)))
        (multiple-value-bind (prefix key value fld ambig)
-           (complete-string input *parse-string-tables*)
+           (complete-string input (prompt-tables))
          (declare (ignore value fld ambig))
          (when prefix (echo-set-input prefix))
          (when (and (or (eq key :ambiguous) (eq key :none))
@@ -133,10 +133,10 @@
     (t
      (let ((typein (region-to-string *parse-input-region*)))
        (declare (simple-string typein))
-       (case *parse-type*
+       (case (prompt-type)
          (:keyword
           (multiple-value-bind (prefix key value field ambig)
-              (complete-string typein *parse-string-tables*)
+              (complete-string typein (prompt-tables))
             (declare (ignore value field))
             (when prefix
               (delete-region *parse-input-region*)
@@ -170,9 +170,9 @@
          ((and (>= sel 0) (< sel (length filtered)))
           (echo-set-input (nth sel filtered)))
          ;; space/tab for keyword: field completion
-         ((eq *parse-type* :keyword)
+         ((eq (prompt-type) :keyword)
           (multiple-value-bind (prefix key value field ambig)
-              (complete-string input *parse-string-tables*)
+              (complete-string input (prompt-tables))
             (declare (ignore value ambig))
             (cond
               ((eq key :none)
@@ -192,10 +192,10 @@
                             (eq key :ambiguous))
                    (echo-select 1)))))))
          ;; space/tab for file: file completion
-         ((eq *parse-type* :file)
+         ((eq (prompt-type) :file)
           (multiple-value-bind (result win)
               (complete-file input
-                             :defaults (directory-namestring *parse-default*)
+                             :defaults (directory-namestring (prompt-default))
                              :ignore-types (value ignore-file-types))
             (cond
               (result
@@ -213,7 +213,7 @@
               (spacep (echo-type-char #\space))
               (t (echo-set-message "No possible completion.")))))
          ;; tab for symbol: cycle to next match
-         ((eq *parse-type* :symbol)
+         ((eq (prompt-type) :symbol)
           (if (plusp (length filtered))
               (echo-select 1)
               (echo-set-message "No completions.")))
@@ -222,7 +222,7 @@
     (t
      (let ((typein (region-to-string *parse-input-region*)))
        (declare (simple-string typein))
-       (case *parse-type*
+       (case (prompt-type)
          (:string (self-insert-command p))
          (:file (file-completion-action typein))
          (:keyword
@@ -233,7 +233,7 @@
                 (unless (blank-after-p point)
                   (insert-character point #\space))))
             (multiple-value-bind (prefix key value field ambig)
-                (complete-string typein *parse-string-tables*)
+                (complete-string typein (prompt-tables))
               (declare (ignore value ambig))
               (when (eq key :none) (editor-error "No possible completion."))
               (delete-region *parse-input-region*)
@@ -265,7 +265,7 @@
     (unless (and *completion-base-input*
                  (string= typein *completion-base-input*))
       (setf *completion-base-input* typein
-            *completion-candidates* (find-all-completions typein *parse-string-tables*)
+            *completion-candidates* (find-all-completions typein (prompt-tables))
             *completion-index* -1))
     *completion-candidates*))
 
@@ -277,7 +277,7 @@
     ((buffer-ui-tree *echo-area-buffer*)
      (echo-select 1))
     (t
-     (unless (eq *parse-type* :keyword)
+     (unless (eq (prompt-type) :keyword)
        (editor-error "Cannot cycle completions for this prompt."))
      (let ((candidates (ensure-completion-candidates)))
        (unless candidates (editor-error "No completions."))
@@ -296,7 +296,7 @@
     ((buffer-ui-tree *echo-area-buffer*)
      (echo-select -1))
     (t
-     (unless (eq *parse-type* :keyword)
+     (unless (eq (prompt-type) :keyword)
        (editor-error "Cannot cycle completions for this prompt."))
      (let ((candidates (ensure-completion-candidates)))
        (unless candidates (editor-error "No completions."))
@@ -319,13 +319,13 @@
          (empty (zerop (length string))))
     (declare (simple-string string))
     (if empty
-        (when *parse-default* (setq string *parse-default*))
+        (when (prompt-default) (setq string (prompt-default)))
         (when (or (zerop (ring-length *echo-area-history*))
                   (string/= string (ring-ref *echo-area-history* 0)))
           (ring-push string *echo-area-history*)))
     ;; Verify FIRST — if it fails, the grid stays intact for retry
     (multiple-value-bind (res flag)
-        (funcall *parse-verification-function* string)
+        (funcall (prompt-verify) string)
       (unless (or res flag)
         (beep)
         (return-from confirm-parse-command nil))
@@ -448,12 +448,12 @@
 
 (defcommand "Insert Parse Default" (p)
   "Inserts the default for the parse in progress."
-  "Inserts *parse-default* into the input."
+  "Inserts (prompt-default) into the input."
   (declare (ignore p))
-  (unless *parse-default* (editor-error))
+  (unless (prompt-default) (editor-error))
   (if (buffer-ui-tree *echo-area-buffer*)
-      (echo-set-input *parse-default*)
-      (insert-string (buffer-point *echo-area-buffer*) *parse-default*)))
+      (echo-set-input (prompt-default))
+      (insert-string (buffer-point *echo-area-buffer*) (prompt-default))))
 
 (defcommand "Echo Area Forward Character" (p)
   "Go forward one character."

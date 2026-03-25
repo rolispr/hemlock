@@ -1127,10 +1127,14 @@ dimensions are correct before update-window-image runs."
 
 ;;; TTY-PUT-CURSOR makes sure the coordinates are mapped from the hunk's
 ;;; axis to the screen's and determines the minimal cost cursor motion
-;;; sequence.  Currently, it does no cost analysis of relative motion
-;;; compared to absolute motion but simply makes sure the cursor isn't
-;;; already where we want it.
-;;;
+(defmethod device-hide-cursor ((device tty-device))
+  (when hemlock.terminfo:cursor-invisible
+    (tty-write-cmd (hemlock.terminfo:tputs hemlock.terminfo:cursor-invisible))))
+
+(defmethod device-show-cursor ((device tty-device))
+  (when hemlock.terminfo:cursor-normal
+    (tty-write-cmd (hemlock.terminfo:tputs hemlock.terminfo:cursor-normal))))
+
 (defmethod device-put-cursor ((device tty-device) hunk x y)
   (declare (fixnum x y))
   (select-hunk hunk)

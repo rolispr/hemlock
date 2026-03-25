@@ -241,9 +241,9 @@
     (find-definitions
      (hemlock::parse-agent-symbol
       (if (or p (not default))
-          (prompt-for-string
-           :prompt "Name: "
-           :default default)
+          (prompt :string
+                  :prompt "Name: "
+                  :default default)
           default)))))
 
 (macrolet
@@ -257,9 +257,9 @@
               (,fun
                (hemlock::parse-agent-symbol
                 (if (or p (not default))
-                    (prompt-for-string
-                     :prompt "Name: "
-                     :default default)
+                    (prompt :string
+                            :prompt "Name: "
+                            :default default)
                     default)))))
           (defun ,fun (name)
             (hemlock::eval-in-agent

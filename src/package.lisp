@@ -386,6 +386,8 @@
    #:device-note-read-wait
    #:device-force-output
    #:device-finish-output
+   #:device-hide-cursor
+   #:device-show-cursor
    #:device-put-cursor
    #:device-show-mark
    #:device-next-window
@@ -613,6 +615,14 @@
    #:clear-echo-area
    #:message
    #:loud-message
+   ;; prompt system
+   #:prompt
+   #:prompt-state #:make-prompt-state #:prompt-state-p
+   #:*current-prompt*
+   #:prompt-type #:prompt-tables #:prompt-verify #:prompt-must-exist
+   #:prompt-default #:prompt-default-string #:prompt-text #:prompt-help
+   #:prompt-symbol-package
+   ;; legacy prompt functions
    #:prompt-for-buffer
    #:prompt-for-key-event
    #:prompt-for-key
@@ -718,6 +728,8 @@
    #:device-note-read-wait
    #:device-force-output
    #:device-finish-output
+   #:device-hide-cursor
+   #:device-show-cursor
    #:device-put-cursor
    #:device-show-mark
    #:device-next-window
@@ -1193,6 +1205,7 @@
    #:clear-echo-area
    #:message
    #:loud-message
+   #:prompt
    #:prompt-for-buffer
    #:prompt-for-key-event
    #:prompt-for-key

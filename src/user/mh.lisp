@@ -293,9 +293,10 @@
   (let* ((default (cond ((value headers-information) (current-buffer))
                         ((value message-information) (value headers-buffer))))
          (buffer (or buffer
-                     (prompt-for-buffer :default default
+                     (nth-value 1 (prompt *buffer-names*
+                                        :default (when default (buffer-name default))
                                         :default-string
-                                        (if default (buffer-name default))))))
+                                        (if default (buffer-name default))))))))
     (unless (hemlock-bound-p 'headers-information :buffer buffer)
       (editor-error "Not a headers buffer -- ~A" (buffer-name buffer)))
     (let* ((hinfo (variable-value 'headers-information :buffer buffer))
@@ -353,11 +354,11 @@
            (deleted-seq (mh-sequence-list folder "hemlockdeleted")))
       (when (and deleted-seq
                  (or (not (value expunge-messages-confirm))
-                     (prompt-for-y-or-n
-                      :prompt (list "Expunge messages and pack folder ~A? "
-                                    folder)
-                      :default t
-                      :default-string "Y")))
+                     (prompt :y-or-n
+                             :prompt (list "Expunge messages and pack folder ~A? "
+                                           folder)
+                             :default t
+                             :default-string "Y")))
         (message "Deleting messages ...")
         (mh "rmm" (list folder "hemlockdeleted"))
         (let ((*standard-output* *mh-utility-bit-bucket*))
@@ -715,9 +716,9 @@
             (setf abortp nil))
         (when (and (not abortp)
                    (buffer-modified mbuf)
-                   (prompt-for-y-or-n
-                    :prompt "Message buffer modified, save it? "
-                    :default t))
+                   (prompt :y-or-n
+                           :prompt "Message buffer modified, save it? "
+                           :default t))
           (save-file-command nil mbuf))
         (setf (buffer-modified mbuf) nil)
         ;; "Save File", which the user may have used, changes the buffer's name.
@@ -1092,7 +1093,7 @@
   (when (draft-info-delivered dinfo)
     (editor-error "This draft has already been delivered."))
   (when (or (not (value deliver-message-confirm))
-            (prompt-for-y-or-n :prompt "Deliver message? " :default t))
+            (prompt :y-or-n :prompt "Deliver message? " :default t))
     (let ((dbuffer (current-buffer)))
       (when (buffer-modified dbuffer)
         (write-buffer-file dbuffer (buffer-pathname dbuffer)))
@@ -1178,19 +1179,19 @@
              (unless cur-msg (editor-error "Not on a header line."))
              (delete-mark cur-mark)
              (remail-message (headers-info-folder hinfo) cur-msg
-                             (prompt-for-string :prompt "Resend To: ")
-                             (prompt-for-string :prompt "Resend Cc: "))))
+                             (prompt :string :prompt "Resend To: ")
+                             (prompt :string :prompt "Resend Cc: "))))
           (minfo
            (remail-message (message-info-folder minfo)
                            (message-info-msgs minfo)
-                           (prompt-for-string :prompt "Resend To: ")
-                           (prompt-for-string :prompt "Resend Cc: ")))
+                           (prompt :string :prompt "Resend To: ")
+                           (prompt :string :prompt "Resend Cc: ")))
           (t
            (let ((folder (prompt-for-folder)))
              (remail-message folder
                              (car (prompt-for-message :folder folder))
-                             (prompt-for-string :prompt "Resend To: ")
-                             (prompt-for-string :prompt "Resend Cc: "))))))
+                             (prompt :string :prompt "Resend To: ")
+                             (prompt :string :prompt "Resend Cc: "))))))
   (message "Message remailed."))
 
 
@@ -2016,11 +2017,11 @@
     ;; This deletes "hemlockdeleted" from sequence file; we don't have to.
     (when (and deleted-seq
                (or (not (value expunge-messages-confirm))
-                   (prompt-for-y-or-n
-                    :prompt (list "Expunge messages and pack folder ~A? "
-                                  folder)
-                    :default t
-                    :default-string "Y")))
+                   (prompt :y-or-n
+                           :prompt (list "Expunge messages and pack folder ~A? "
+                                         folder)
+                           :default t
+                           :default-string "Y")))
       (message "Deleting messages ...")
       (mh "rmm" (list folder "hemlockdeleted"))
       ;;
@@ -2236,9 +2237,9 @@
 ;;;
 (defun refile-message (src-folder msg dst-folder)
   (unless (folder-existsp dst-folder)
-    (cond ((prompt-for-y-or-n
-            :prompt "Destination folder doesn't exist.  Create it? "
-            :default t :default-string "Y")
+    (cond ((prompt :y-or-n
+                   :prompt "Destination folder doesn't exist.  Create it? "
+                   :default t :default-string "Y")
            (create-folder dst-folder))
           (t (editor-error "Not refiling message."))))
   (mh "refile" `(,@(if (listp msg) msg (list msg))
@@ -2271,8 +2272,8 @@
                                 (headers-current-message hinfo)
              (unless cur-msg (editor-error "Not on a header line."))
              (delete-mark cur-mark)
-             (let ((seq-name (prompt-for-string :prompt "Sequence name: "
-                                                :trim t)))
+             (let ((seq-name (prompt :string :prompt "Sequence name: "
+                                   :trim t)))
                (declare (simple-string seq-name))
                (when (string= "" seq-name)
                  (editor-error "Sequence name cannot be empty."))
@@ -2280,8 +2281,8 @@
                                  cur-msg seq-name (if p :delete :add)))))
           (minfo
            (let ((msgs (message-info-msgs minfo))
-                 (seq-name (prompt-for-string :prompt "Sequence name: "
-                                              :trim t)))
+                 (seq-name (prompt :string :prompt "Sequence name: "
+                                   :trim t)))
              (declare (simple-string seq-name))
              (when (string= "" seq-name)
                (editor-error "Sequence name cannot be empty."))
@@ -2290,8 +2291,8 @@
                                seq-name (if p :delete :add))))
           (t
            (let ((folder (prompt-for-folder))
-                 (seq-name (prompt-for-string :prompt "Sequence name: "
-                                              :trim t)))
+                 (seq-name (prompt :string :prompt "Sequence name: "
+                                   :trim t)))
              (declare (simple-string seq-name))
              (when (string= "" seq-name)
                (editor-error "Sequence name cannot be empty."))
@@ -2372,10 +2373,10 @@
   "Prompts for a folder, using MH's idea of the current folder as a default.
    The result will have a leading + in the name."
   (check-folder-name-table)
-  (let ((folder (prompt-for-keyword (list *folder-name-table*)
-                                    :must-exist must-exist :prompt prompt
-                                    :default default :default-string default
-                                    :help "Enter folder name.")))
+  (let ((folder (prompt *folder-name-table*
+                       :must-exist must-exist :prompt prompt
+                       :default default :default-string default
+                       :help "Enter folder name.")))
     (declare (simple-string folder))
     (when (string= folder "") (editor-error "Must supply folder!"))
     (let ((name (coerce-folder-name folder)))
@@ -2410,11 +2411,11 @@
                          (if (= (length (the list messages)) 1)
                              (car messages)
                              (format nil "~{~A~^ ~}" messages))))))
-    (breakup-message-spec (prompt-for-string :prompt prompt
-                                             :default cur-msg
-                                             :default-string cur-msg
-                                             :trim t
-                                             :help "Enter MH message id(s)."))))
+    (breakup-message-spec (prompt :string :prompt prompt
+                                        :default cur-msg
+                                        :default-string cur-msg
+                                        :trim t
+                                        :help "Enter MH message id(s)."))))
 
 (defun breakup-message-spec (msgs)
   (declare (simple-string msgs))
@@ -2447,9 +2448,9 @@
   "Prompts for an MH PICK-like expression that is converted to a list of
    strings suitable for EXT:RUN-PROGRAM.  As a second value, the user's
    expression is as typed in is returned."
-  (let ((exp (prompt-for-string :prompt "MH expression: "
-                                :help "Expression to PICK over mail messages."
-                                :trim t))
+  (let ((exp (prompt :string :prompt "MH expression: "
+                             :help "Expression to PICK over mail messages."
+                             :trim t))
         (*pick-expression-strings* nil))
     (if (value mh-lisp-expression)
         (let ((exp (let ((*package* *keyword-package*))

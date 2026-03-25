@@ -80,15 +80,14 @@
 (defun dired-guts (patternp dot-files-p directory)
   (let* ((dpn (value pathname-defaults))
          (directory (or directory
-                        (prompt-for-file
+                        (prompt (make-pathname
+                                :device (pathname-device dpn)
+                                :directory (pathname-directory dpn))
                          :prompt "Edit Directory: "
                          :help "Pathname to edit."
-                         :default (make-pathname
-                                   :device (pathname-device dpn)
-                                   :directory (pathname-directory dpn))
                          :must-exist nil)))
          (pattern (if patternp
-                      (prompt-for-string
+                      (prompt :string
                        :prompt "Filename pattern: "
                        :help "Type a filename with a single asterisk."
                        :trim t)))
@@ -235,7 +234,7 @@
            (del-files
             (if patternp
                 (dired:pathnames-from-pattern
-                 (prompt-for-string
+                 (prompt :string
                   :prompt "Filename pattern: "
                   :help "Type a filename with a single asterisk."
                   :trim t)
@@ -461,7 +460,7 @@
   (apply #'message string args))
 
 (defun dired-yesp-function (string &rest args)
-  (prompt-for-y-or-n :prompt (cons string args) :default t))
+  (prompt :y-or-n :prompt (cons string args) :default t))
 
 
 
@@ -506,7 +505,7 @@
           (we-did-something nil))
       (when (and marked-files
                  (or (not (value dired-file-expunge-confirm))
-                     (prompt-for-y-or-n :prompt "Really delete files? "
+                     (prompt :y-or-n :prompt "Really delete files? "
                                         :default t
                                         :must-exist t
                                         :default-string "Y")))
@@ -525,7 +524,7 @@
                 (write-date (cdr dir-info)))
             (if (= write-date (file-write-date dir))
                 (when (or (not (value dired-directory-expunge-confirm))
-                          (prompt-for-y-or-n
+                          (prompt :y-or-n
                            :prompt (list "~a is a directory. Delete it? "
                                          (directory-namestring dir))
                            :default t
@@ -560,12 +559,11 @@
          (source (dired-file-pathname
                   (array-element-from-mark
                    point (dired-info-files (value dired-information)))))
-         (dest (prompt-for-file
+         (dest (prompt source
                 :prompt (if (directoryp source)
                             "Destination Directory Name: "
                             "Destination Filename: ")
                 :help "Name of new file."
-                :default source
                 :must-exist nil))
          (dired:*error-function* #'dired-error-function)
          (dired:*report-function* #'dired-report-function)
@@ -583,10 +581,9 @@
                                 (array-element-from-mark
                                  point
                                  (dired-info-files (value dired-information))))))
-         (dest (prompt-for-file
+         (dest (prompt source
                 :prompt "New Filename: "
                 :help "The new name for this file."
-                :default source
                 :must-exist nil))
          (dired:*error-function* #'dired-error-function)
          (dired:*report-function* #'dired-report-function)
@@ -601,15 +598,14 @@
   (declare (ignore p))
   (let* ((dir-info (value dired-information))
          (confirm (value dired-copy-file-confirm))
-         (pattern (prompt-for-string
+         (pattern (prompt :string
                    :prompt "Filename pattern: "
                    :help "Type a filename with a single asterisk."
                    :trim t))
          (destination (namestring
-                       (prompt-for-file
+                       (prompt (dired-info-pathname dir-info)
                         :prompt "Destination Spec: "
                         :help "Destination spec.  May contain ONE asterisk."
-                        :default (dired-info-pathname dir-info)
                         :must-exist nil)))
          (dired:*error-function* #'dired-error-function)
          (dired:*yesp-function* #'dired-yesp-function)
@@ -624,15 +620,14 @@
   "Rename files that match a pattern containing ONE wildcard."
   (declare (ignore p))
   (let* ((dir-info (value dired-information))
-         (pattern (prompt-for-string
+         (pattern (prompt :string
                    :prompt "Filename pattern: "
                    :help "Type a filename with a single asterisk."
                    :trim t))
          (destination (namestring
-                       (prompt-for-file
+                       (prompt (dired-info-pathname dir-info)
                         :prompt "Destination Spec: "
                         :help "Destination spec.  May contain ONE asterisk."
-                        :default (dired-info-pathname dir-info)
                         :must-exist nil)))
          (dired:*error-function* #'dired-error-function)
          (dired:*yesp-function* #'dired-yesp-function)
@@ -647,7 +642,7 @@
   "Delete a file.  Specify directories with a trailing slash."
   (declare (ignore p))
   (let* ((spec (namestring
-                (prompt-for-file
+                (prompt (default-directory)
                  :prompt "Delete File: "
                  :help '("Name of File or Directory to delete.  ~
                           One wildcard is permitted.")
@@ -658,7 +653,7 @@
          (dired:*yesp-function* #'dired-yesp-function))
     (when (or (not directoryp)
               (not (value dired-directory-expunge-confirm))
-              (prompt-for-y-or-n
+              (prompt :y-or-n
                :prompt (list "~A is a directory. Delete it? "
                              (directory-namestring spec))
                :default t :must-exist t :default-string "Y")))
@@ -673,17 +668,16 @@
   (declare (ignore p))
   (let* ((confirm (value dired-copy-file-confirm))
          (source (namestring
-                  (prompt-for-file
+                  (prompt (default-directory)
                    :prompt "Source Filename: "
                    :help "Name of File to copy.  One wildcard is permitted."
                    :must-exist nil)))
          (dest (namestring
-                (prompt-for-file
+                (prompt (pathname source)
                  :prompt (if (directoryp source)
                              "Destination Directory Name: "
                              "Destination Filename: ")
                  :help "Name of new file."
-                 :default source
                  :must-exist nil)))
          (dired:*error-function* #'dired-error-function)
          (dired:*report-function* #'dired-report-function)
@@ -697,17 +691,16 @@
   "Rename a file, allowing ONE wildcard."
   (declare (ignore p))
   (let* ((source (namestring
-                  (prompt-for-file
+                  (prompt (default-directory)
                    :prompt "Source Filename: "
                    :help "Name of file to rename.  One wildcard is permitted."
                    :must-exist nil)))
          (dest (namestring
-                (prompt-for-file
+                (prompt (pathname source)
                  :prompt (if (directoryp source)
                              "Destination Directory Name: "
                              "Destination Filename: ")
                  :help "Name of new file."
-                 :default source
                  :must-exist nil)))
          (dired:*error-function* #'dired-error-function)
          (dired:*report-function* #'dired-report-function)
@@ -794,10 +787,9 @@
    for scrolling convenience."
   (declare (ignore p))
   (let* ((pn (or pathname
-                 (prompt-for-file
+                 (prompt (buffer-default-pathname (current-buffer))
                   :prompt "View File: " :must-exist t
-                  :help "Name of existing file to read into its own buffer."
-                  :default (buffer-default-pathname (current-buffer)))))
+                  :help "Name of existing file to read into its own buffer.")))
          (buffer (make-buffer (format nil "View File ~A" (gensym)))))
     (visit-file-command nil pn buffer)
     (setf (buffer-minor-mode buffer "View") t)

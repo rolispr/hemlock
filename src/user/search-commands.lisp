@@ -35,7 +35,7 @@
 
 (defun vanilla-search (string direction)
   (unless string
-    (setq string (prompt-for-string :prompt (ecase direction
+    (setq string (prompt :string :prompt (ecase direction
                                               (:forward "Search: ")
                                               (:backward "Reverse Search: "))
                                     :default *last-search-string*
@@ -308,11 +308,11 @@
 ;;;; Replacement commands:
 
 (defcommand "Replace String" (p &optional
-                                (target (prompt-for-string
+                                (target (prompt :string
                                          :prompt "Replace String: "
                                          :help "Target string"
                                          :default *last-search-string*))
-                                (replacement (prompt-for-string
+                                (replacement (prompt :string
                                               :prompt "With: "
                                               :help "Replacement string")))
   "Replaces the specified Target string with the specified Replacement
@@ -329,11 +329,11 @@
     (message "~D Occurrences replaced." count)))
 
 (defcommand "Query Replace" (p &optional
-                               (target (prompt-for-string
+                               (target (prompt :string
                                         :prompt "Query Replace: "
                                         :help "Target string"
                                         :default *last-search-string*))
-                               (replacement (prompt-for-string
+                               (replacement (prompt :string
                                              :prompt "With: "
                                              :help "Replacement string")))
   "Replaces the Target string with the Replacement string if confirmation
@@ -503,7 +503,7 @@
    within the current-region, depending on whether it is active or not.
    With an argument, lists p lines before and after each matching line."
   (unless string
-    (setf string (prompt-for-string :prompt "List Matching: "
+    (setf string (prompt :string :prompt "List Matching: "
                                     :default *last-search-string*
                                     :help "String to search for")))
   (let ((pattern (get-search-pattern string :forward))
@@ -552,7 +552,7 @@
    ignored."
   (declare (ignore p))
   (unless string
-    (setf string (prompt-for-string :prompt "Delete Matching: "
+    (setf string (prompt :string :prompt "Delete Matching: "
                                     :default *last-search-string*
                                     :help "String to search for")))
   (let* ((region (get-count-region))
@@ -579,7 +579,7 @@
    ignored."
   (declare (ignore p))
   (unless string
-    (setf string (prompt-for-string :prompt "Delete Non-Matching:"
+    (setf string (prompt :string :prompt "Delete Non-Matching:"
                                     :default *last-search-string*
                                     :help "String to search for")))
   (let* ((region (get-count-region))
@@ -608,7 +608,7 @@
    argument is ignored."
   (declare (ignore p))
   (unless string
-    (setf string (prompt-for-string
+    (setf string (prompt :string
                   :prompt "Count Occurrences: "
                   :default *last-search-string*
                   :help "String to search for")))

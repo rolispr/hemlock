@@ -41,12 +41,12 @@
   "Prompts for two directory namestrings and causes the first to be mapped to
    the second for definition editing commands."
   (declare (ignore p))
-  (let* ((dir1 (prompt-for-file :prompt "Preimage dir1: "
-                                :help "directory namestring."
-                                :must-exist nil))
-         (dir2 (prompt-for-file :prompt "Postimage dir2: "
-                                :help "directory namestring."
-                                :must-exist nil)))
+  (let* ((dir1 (prompt (default-directory) :prompt "Preimage dir1: "
+                                          :help "directory namestring."
+                                          :must-exist nil))
+         (dir2 (prompt (default-directory) :prompt "Postimage dir2: "
+                                          :help "directory namestring."
+                                          :must-exist nil)))
     (add-definition-dir-translation dir1 dir2)))
 
 (defcommand "Delete Definition Directory Translation" (p)
@@ -56,9 +56,9 @@
    translation table for the definition editing commands."
   (declare (ignore p))
   (delete-definition-dir-translation
-   (prompt-for-file :prompt "Directory: "
-                    :help "directory namestring."
-                    :must-exist nil)))
+   (prompt (default-directory) :prompt "Directory: "
+                              :help "directory namestring."
+                              :must-exist nil)))
 
 
 
@@ -140,9 +140,9 @@
   "Prompts for function/macro's definition name and goes to it for editing."
   "Prompts for function/macro's definition name and goes to it for editing."
   (declare (ignore p))
-  (let ((fun-name (prompt-for-string
-                   :prompt "Name: "
-                   :help "Symbol name of function.")))
+  (let ((fun-name (prompt :string
+                         :prompt "Name: "
+                         :help "Symbol name of function.")))
     (get-def-info-and-go-to-it fun-name)))
 
 (defun get-def-info-and-go-to-it (fun-name)
@@ -179,11 +179,11 @@
       (name command)
       (if p
           (multiple-value-bind (key cmd)
-                               (prompt-for-key :prompt "Edit command bound to: ")
+                               (prompt :key :prompt "Edit command bound to: ")
             (declare (ignore key))
             (values (command-name cmd) cmd))
-          (prompt-for-keyword (list *command-names*)
-                              :prompt "Command to edit: "))
+          (prompt *command-names*
+                  :prompt "Command to edit: "))
     (go-to-definition (fun-defined-from-pathname (command-function command))
                       :function
                       (concatenate 'simple-string name "-COMMAND"))))

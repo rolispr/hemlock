@@ -1159,7 +1159,7 @@
         (when (zerop (length s)) (editor-error))
         (if p
             (defindent s nil)
-            (let ((i (prompt-for-integer
+            (let ((i (prompt :integer
                       :prompt (format nil "Indentation for ~A: " s)
                       :help "Number of special arguments.")))
               (when (minusp i)
@@ -1596,7 +1596,7 @@
                         :string-quote))
                (fill-lisp-string m))
               ((or (not (value fill-lisp-comment-paragraph-confirm))
-                   (prompt-for-y-or-n
+                   (prompt :y-or-n
                     :prompt '("Not in a comment or string.  Fill contiguous ~
                                lines with the same initial whitespace? ")))
                (fill-lisp-comment-or-indented-text start end)))))))

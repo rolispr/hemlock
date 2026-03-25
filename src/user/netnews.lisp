@@ -228,11 +228,11 @@
    ((and *nn-headers-buffer* (not p) (not group-name))
     (change-to-buffer *nn-headers-buffer*))
    (t
-    (let* ((single-group (if p (prompt-for-string :prompt "Group to read: "
-                                                  :help "Type the name of ~
-                                                  the group you want ~
-                                                  to scan."
-                                                  :trim t)))
+    (let* ((single-group (if p (prompt :string :prompt "Group to read: "
+                                              :help "Type the name of ~
+                                              the group you want ~
+                                              to scan."
+                                              :trim t)))
            (groups (cond
                     (group-name (list group-name))
                     (single-group (list single-group))
@@ -365,11 +365,11 @@
   "Prompts for the name of a newsgroup and reads it, regardless of what is
    in and not modifying the \"Netnews Database File\"."
   (declare (ignore p))
-  (netnews-command nil (prompt-for-string :prompt "Group to look at: "
-                                          :help "Type the name of ~
-                                          the group you want ~
-                                          to look at."
-                                          :trim t)
+  (netnews-command nil (prompt :string :prompt "Group to look at: "
+                                      :help "Type the name of ~
+                                      the group you want ~
+                                      to look at."
+                                      :trim t)
                    nil nil nil))
 
 ;;; SETUP-GROUP is the guts of this group reader.  It sets up a headers
@@ -424,13 +424,13 @@
                                     (and (> (- last latest)
                                             (value
                                              netnews-start-over-threshold))
-                                         (prompt-for-y-or-n
-                                          :prompt
-                                          `("There are ~D new messages.  ~
-                                             Read from the end of this ~
-                                             group? " ,(- last latest))
-                                          :default "Y"
-                                          :default-string "Y"
+                                         (prompt :y-or-n
+                                                :prompt
+                                                `("There are ~D new messages.  ~
+                                                   Read from the end of this ~
+                                                   group? " ,(- last latest))
+                                                :default "Y"
+                                                :default-string "Y"
                                           :help "Y starts reading from the ~
                                                  end.  N starts reading where ~
                                                  you left off many messages ~
@@ -1507,10 +1507,10 @@
     (when (or browse-buffer
               no-prompt-p
               (not (value netnews-exit-confirm))
-              (prompt-for-y-or-n :prompt "Exit Netnews? "
-                                 :default "Y"
-                                 :default-string "Y"
-                                 :help "Yes exits netnews mode."))
+              (prompt :y-or-n :prompt "Exit Netnews? "
+                              :default "Y"
+                              :default-string "Y"
+                              :help "Yes exits netnews mode."))
       (let* ((nn-info (variable-value 'netnews-info :buffer headers-buf))
              (message-buffer (nn-info-buffer nn-info))
              (headers-window (nn-info-headers-window nn-info))
@@ -1539,10 +1539,10 @@
    appends the message in the current buffer to the same file."
   (let* ((filename (merge-pathnames (value netnews-message-file)
                                     (user-homedir-pathname)))
-         (file (prompt-for-file :prompt "Append to what file: "
-                                :must-exist nil
-                                :default filename
-                                :default-string (namestring filename))))
+         (file (prompt (pathname filename)
+                      :prompt "Append to what file: "
+                      :must-exist nil
+                      :default-string (namestring filename))))
     (when (and p (probe-file file))
       (delete-file file))
     (message "Appending message to ~S" (namestring file))
@@ -1595,10 +1595,11 @@
                                                  "No header under point."))
         (folder (prompt-for-folder :prompt "MH Folder: "
                                    :must-exist nil)))
+
     (unless (folder-existsp folder)
-      (if (prompt-for-y-or-n
-           :prompt "Destination folder doesn't exist.  Create it? "
-           :default t :default-string "Y")
+      (if (prompt :y-or-n
+                   :prompt "Destination folder doesn't exist.  Create it? "
+                   :default t :default-string "Y")
           (create-folder folder)
           (editor-error "Not filing message.")))
     (message "Filing message into ~A" folder)
@@ -1989,7 +1990,7 @@
    we need and landing us in the headers buffer if this was a reply."
   (declare (ignore p))
   (when (or (not (value netnews-deliver-post-confirm))
-            (prompt-for-y-or-n :prompt "Post message? " :default t))
+            (prompt :y-or-n :prompt "Post message? " :default t))
     (let* ((*nntp-timeout-handler* #'nn-recover-from-posting-timeout)
            (stream (post-info-stream (value post-info))))
       (nntp-post stream)

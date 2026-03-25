@@ -393,10 +393,10 @@
    \"Completion Database Filename\".  With an argument, prompts for a
    filename."
   (let ((filename (or (and (not p) (value completion-database-filename))
-                      (prompt-for-file
-                       :must-exist nil
-                       :default *completion-default-default-database-filename*
-                       :prompt "File to write completions to: "))))
+                      (prompt (or *completion-default-default-database-filename*
+                                  (default-directory))
+                             :must-exist nil
+                             :prompt "File to write completions to: "))))
     (with-open-file (s filename
                        :direction :output
                        :if-exists :rename-and-delete
@@ -418,10 +418,10 @@
   "Reads some completions from a file, defaultly the value of \"Completion
    Database File\".  With an argument, prompts for a filename."
   (let ((filename (or (and (not p) (value completion-database-filename))
-                      (prompt-for-file
-                       :must-exist nil
-                       :default *completion-default-default-database-filename*
-                       :prompt "File to read completions from: ")))
+                      (prompt (or *completion-default-default-database-filename*
+                                  (default-directory))
+                             :must-exist nil
+                             :prompt "File to read completions from: ")))
         (index nil)
         (completion nil))
     (with-open-file (s filename :if-does-not-exist :error)
@@ -454,11 +454,11 @@
   "Zips over a buffer slamming everything that is a valid completion word
    into the completion hashtable."
   (declare (ignore p))
-  (let ((buffer (prompt-for-buffer :prompt "Buffer to parse: "
-                                   :must-exist t
-                                   :default (current-buffer)
-                                   :default-string (buffer-name
-                                                    (current-buffer)))))
+  (let ((buffer (nth-value 1 (prompt *buffer-names* :prompt "Buffer to parse: "
+                                                    :must-exist t
+                                                    :default (buffer-name (current-buffer))
+                                                    :default-string (buffer-name
+                                                                     (current-buffer))))))
     (with-mark ((word-start (buffer-start-mark buffer) :right-inserting)
                 (word-end (buffer-start-mark buffer) :left-inserting)
                 (buffer-end-mark (buffer-start-mark buffer)))

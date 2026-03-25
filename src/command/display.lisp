@@ -65,6 +65,8 @@
     (catch 'redisplay-catcher
       (when (listen-editor-input *real-editor-input*)
         (throw 'redisplay-catcher :editor-input))
+      (let ((device (device-hunk-device (window-hunk *current-window*))))
+        (device-hide-cursor device))
       (when (fboundp 'ts-ensure-colors-for-windows)
         (funcall 'ts-ensure-colors-for-windows))
       (let ((win *current-window*))
@@ -88,6 +90,7 @@
           (if x
               (device-put-cursor device hunk x y)
               (setf n-res t)))
+        (device-show-cursor device)
         (device-force-output device)
         (when afterp
           (device-after-redisplay device)

@@ -285,7 +285,7 @@
         input-region))
      ((value unwedge-interactive-input-confirm)
       (beep)
-      (when (prompt-for-y-or-n
+      (when (prompt :y-or-n
              :prompt (concatenate 'simple-string
                                   "Point not past input mark.  "
                                   (value unwedge-interactive-input-string))
@@ -596,7 +596,7 @@
          (*query-io*        *echo-area-stream*)
          (*terminal-io*     *echo-area-stream*))
      (multiple-value-call #'message "=> ~@{~#[~;~S~:;~S, ~]~}"
-       (eval (prompt-for-expression
+       (eval (prompt :expression
               :prompt "Editor Eval: "
               :help "Expression to evaluate"))))))
 
@@ -648,9 +648,8 @@
    whether the buffer needs to be saved."
   "Prompts for file to compile."
   (declare (ignore p))
-  (let ((pn (prompt-for-file :default
-                             (buffer-default-pathname (current-buffer))
-                             :prompt "File to compile: ")))
+  (let ((pn (prompt (buffer-default-pathname (current-buffer))
+                    :prompt "File to compile: ")))
     (with-output-to-window (*error-output* "Compiler Warnings")
       (in-lisp (compile-file (namestring pn))))))
 
@@ -676,7 +675,7 @@
     (unless pn (editor-error "Buffer has no associated pathname."))
     (cond ((buffer-modified buf)
            (when (or (not (value compile-buffer-file-confirm))
-                     (prompt-for-y-or-n
+                     (prompt :y-or-n
                       :default t :default-string "Y"
                       :prompt (list "Save and compile file ~A? "
                                     (namestring pn))))
@@ -685,13 +684,13 @@
                (in-lisp (compile-file (namestring pn))))))
           ((older-or-non-existent-fasl-p pn p)
            (when (or (not (value compile-buffer-file-confirm))
-                     (prompt-for-y-or-n
+                     (prompt :y-or-n
                       :default t :default-string "Y"
                       :prompt (list "Compile file ~A? " (namestring pn))))
              (with-output-to-window (*error-output* "Compiler Warnings")
                (in-lisp (compile-file (namestring pn))))))
           (t (when (or p
-                       (prompt-for-y-or-n
+                       (prompt :y-or-n
                         :default t :default-string "Y"
                         :prompt
                         "Fasl file up to date, compile source anyway? "))
@@ -744,10 +743,8 @@
   "Prompt for a file to load into Editor Lisp."
   "Prompt for a file to load into the Editor Lisp."
   (declare (ignore p))
-  (let ((name (truename (prompt-for-file
-                         :default
-                         (or (value load-pathname-defaults)
-                             (buffer-default-pathname (current-buffer)))
+  (let ((name (truename (prompt (or (value load-pathname-defaults)
+                                    (buffer-default-pathname (current-buffer)))
                          :prompt "Editor file to load: "
                          :help "The name of the file to load"))))
     (setv load-pathname-defaults name)
@@ -844,7 +841,7 @@
   "Prompt for an object to describe."
   (declare (ignore p))
   (in-lisp
-   (let* ((exp (prompt-for-expression
+   (let* ((exp (prompt :expression
                 :prompt "Object: "
                 :help "Expression to evaluate to get object to describe."))
           (obj (eval exp)))
@@ -858,7 +855,7 @@
   nor modify the return value after it is returned."
   "Call prompt for a function, then call Filter-Region with it and the region."
   (declare (ignore p))
-  (let* ((exp (prompt-for-expression
+  (let* ((exp (prompt :expression
                :prompt "Function: "
                :help "Expression to evaluate to get function to use as filter."))
          (fun (in-lisp (eval exp)))

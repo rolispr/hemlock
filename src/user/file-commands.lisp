@@ -215,9 +215,9 @@
   "Inserts the file named by Pathname into Buffer at the point."
   (declare (ignore p))
   (let* ((pn (or pathname
-                 (prompt-for-file :default (buffer-default-pathname buffer)
-                                  :prompt "Insert File: "
-                                  :help "Name of file to insert")))
+                 (prompt (buffer-default-pathname buffer)
+                        :prompt "Insert File: "
+                        :help "Name of file to insert")))
          (point (buffer-point buffer))
          ;; start and end will be deleted by undo stuff
          (start (copy-mark point :right-inserting))
@@ -234,11 +234,10 @@
   (declare (ignore p))
   (let ((region (current-region))
         (pn (or pathname
-                (prompt-for-file :prompt "File to Write: "
-                                 :help "The name of the file to write the region to. "
-                                 :default (buffer-default-pathname
-                                           (current-buffer))
-                                 :must-exist nil))))
+                (prompt (buffer-default-pathname (current-buffer))
+                       :prompt "File to Write: "
+                       :help "The name of the file to write the region to. "
+                       :must-exist nil))))
     (write-file region pn)
     (message "~A written." (namestring (truename pn)))))
 
@@ -254,13 +253,13 @@
    which is prompted for.  The prefix argument is, of course, ignored p times."
   (declare (ignore p))
   (when (and (buffer-modified buffer)
-             (prompt-for-y-or-n :prompt "Buffer is modified, save it? "))
+             (prompt :y-or-n :prompt "Buffer is modified, save it? "))
     (save-file-command () buffer))
   (let ((pn (or pathname
-                (prompt-for-file :prompt "Visit File: "
-                                 :must-exist nil
-                                 :help "Name of file to visit."
-                                 :default (buffer-default-pathname buffer)))))
+                (prompt (buffer-default-pathname buffer)
+                       :prompt "Visit File: "
+                       :must-exist nil
+                       :help "Name of file to visit."))))
     (setf (buffer-writable buffer) t)
     (read-buffer-file pn buffer)
     (let ((n (pathname-to-buffer-name (buffer-pathname buffer))))
@@ -304,7 +303,7 @@
         (editor-error "No file associated with buffer to revert to!"))
       (when (or (not (value revert-file-confirm))
                 (not (buffer-modified buffer))
-                (prompt-for-y-or-n
+                (prompt :y-or-n
                  :prompt
                  "Buffer contains changes, are you sure you want to revert? "
                  :help (list
@@ -351,11 +350,10 @@
    if necessary.  The buffer is returned."
   (declare (ignore p))
   (let* ((pn (or pathname
-                 (prompt-for-file
+                 (prompt (default-directory)
                   :prompt "Find File: "
                   :must-exist nil
-                  :help "Name of file to read into its own buffer."
-                  :default (default-directory))))
+                  :help "Name of file to read into its own buffer.")))
          (buffer (find-file-buffer pn)))
     (change-to-buffer buffer)
     buffer))
@@ -381,23 +379,25 @@
                ((:regular-file nil)
                 (let* ((name (pathname-to-buffer-name trial-pathname))
                        (found (getstring name *buffer-names*))
-                       (use (if found
-                                (prompt-for-buffer
-                                 :prompt "Buffer to use: "
-                                 :help
-                                 "Buffer name in use; give another buffer name, or confirm to reuse."
-                                 :default found
-                                 :must-exist nil)
-                                (make-buffer name)))
-                       (buffer (if (stringp use) (make-buffer use) use)))
+                       (input (if found
+                                  (prompt *buffer-names*
+                                   :prompt "Buffer to use: "
+                                   :help
+                                   "Buffer name in use; give another buffer name, or confirm to reuse."
+                                   :default (buffer-name found)
+                                   :must-exist nil)))
+                       (buffer (cond ((not found) (make-buffer name))
+                                     ((getstring input *buffer-names*))
+                                     (t (make-buffer input))))
+                       (newp (not (and found (getstring input *buffer-names*)))))
                   (when (and (buffer-modified buffer)
-                             (prompt-for-y-or-n :prompt
+                             (prompt :y-or-n :prompt
                                                 "Buffer is modified, save it? "))
                     (save-file-command () buffer))
                   (when (eq kind :regular-file)
                     (read-buffer-file pathname buffer))
                   (setf (buffer-pathname buffer) trial-pathname)
-                  (values buffer (stringp use)))))))
+                  (values buffer newp))))))
           ((check-disk-version-consistent pathname found)
            (values found nil))
           (t
@@ -434,12 +434,11 @@
                           "Prompt for a file to write the buffer out to, then read in the disk version."
                           (write-buffer-file
                            buffer
-                           (prompt-for-file
+                           (prompt (buffer-default-pathname buffer)
                             :prompt "File to save changes in: "
                             :help (list "Save buffer ~S to this file before reading ~A."
                                         (buffer-name buffer) (namestring pathname))
-                            :must-exist nil
-                            :default (buffer-default-pathname buffer)))
+                            :must-exist nil))
                           nil)
                          (:no
                           "Change to the buffer without reading the new version."
@@ -448,7 +447,7 @@
                           "Read in the new version, clobbering the changes in the buffer."
                           nil)))
           (t
-           (not (prompt-for-yes-or-no :prompt
+           (not (prompt :yes-or-no :prompt
                                       (list
                                        "File has been changed on disk since it was read.~
  ~%Read in the disk version of ~A? "
@@ -525,7 +524,7 @@
                  (equal (make-pathname :version nil :defaults buffer-pn)
                         (make-pathname :version nil :defaults pathname))
                  (/= date file-date))
-        (unless (prompt-for-yes-or-no :prompt (list
+        (unless (prompt :yes-or-no :prompt (list
                                                "File has been changed on disk since it was read.~%Overwrite ~A anyway? "
                                                (namestring buffer-pn))
                                       :help
@@ -537,7 +536,7 @@
         (let ((end (buffer-end-mark buffer)))
           (unless (start-line-p end)
             (when (if (eq val :ask-user)
-                      (prompt-for-y-or-n
+                      (prompt :y-or-n
                        :prompt
                        (list "~A~%File does not have a newline at EOF, add one? "
                              (buffer-name buffer))
@@ -567,10 +566,10 @@
   (write-buffer-file
    buffer
    (or pathname
-       (prompt-for-file :prompt "Write File: "
-                        :must-exist nil
-                        :help "Name of file to write to"
-                        :default (buffer-default-pathname buffer)))))
+       (prompt (buffer-default-pathname buffer)
+               :prompt "Write File: "
+               :must-exist nil
+               :help "Name of file to write to"))))
 
 (defcommand "Save File" (p &optional (buffer (current-buffer)))
   "Writes the contents of the current buffer to the associated file.  If there
@@ -578,16 +577,16 @@
   "Writes the contents of the current buffer to the associated file."
   (declare (ignore p))
   (when (or (buffer-modified buffer)
-            (prompt-for-y-or-n
+            (prompt :y-or-n
              :prompt "Buffer is unmodified, write it anyway? "
              :default t))
     (write-buffer-file
      buffer
      (or (buffer-pathname buffer)
-         (prompt-for-file :prompt "Save File: "
-                          :help "Name of file to write to"
-                          :default (buffer-default-pathname buffer)
-                          :must-exist nil)))))
+         (prompt (buffer-default-pathname buffer)
+                :prompt "Save File: "
+                :help "Name of file to write to"
+                :must-exist nil)))))
 
 (defhvar "Save All Files Confirm"
   "When non-nil, prompts for confirmation before writing each modified buffer."
@@ -606,7 +605,7 @@
             (and (buffer-modified b)
                  pn
                  (or (not (value save-all-files-confirm))
-                     (prompt-for-y-or-n
+                     (prompt :y-or-n
                       :prompt (list
                                "Write ~:[buffer ~A as file ~S~;file ~*~S~], ~
                                Y or N: "
@@ -631,11 +630,11 @@
   "Write the buffer to a file without changing the associated name."
   "Write the buffer to a file without changing the associated name."
   (declare (ignore p))
-  (let ((file (prompt-for-file :prompt "Backup to File: "
-                               :help
-                               "Name of a file to backup the current buffer in."
-                               :default (buffer-default-pathname (current-buffer))
-                               :must-exist nil)))
+  (let ((file (prompt (buffer-default-pathname (current-buffer))
+                      :prompt "Backup to File: "
+                      :help
+                      "Name of a file to backup the current buffer in."
+                      :must-exist nil)))
     (write-file (buffer-region (current-buffer)) file)
     (message "~A written." (namestring (truename file)))))
 
@@ -709,7 +708,7 @@
   "Create or go to the buffer with the specifed name."
   (declare (ignore p))
   (let ((name (or buffer-name
-                  (prompt-for-buffer :prompt "Create Buffer: "
+                  (prompt *buffer-names* :prompt "Create Buffer: "
                                      :default-string
                                      (format nil "Buffer ~D"
                                              (incf *create-buffer-count*))
@@ -725,11 +724,11 @@
   "Select a different buffer.
    The buffer to go to is prompted for."
   (declare (ignore p))
-  (let ((buf (prompt-for-buffer :prompt "Select Buffer: "
-                                :must-exist nil
-                                :default (previous-buffer))))
-    (when (stringp buf)
-      (setf buf (make-buffer buf)))
+  (let* ((name (prompt *buffer-names* :prompt "Select Buffer: "
+                                 :must-exist nil
+                                 :default (when (previous-buffer)
+                                            (buffer-name (previous-buffer)))))
+         (buf (or (getstring name *buffer-names*) (make-buffer name))))
     (when (eq buf *echo-area-buffer*)
       (editor-error "Cannot select Echo Area buffer."))
     (change-to-buffer buf)))
@@ -825,22 +824,22 @@
   (declare (ignore p))
   (let ((buffer (if buffer-name
                     (getstring buffer-name *buffer-names*)
-                    (prompt-for-buffer :prompt "Kill Buffer: "
-                                       :default (current-buffer)))))
+                    (nth-value 1 (prompt *buffer-names* :prompt "Kill Buffer: "
+                                       :default (buffer-name (current-buffer)))))))
     (unless buffer
       (editor-error "No buffer named ~S" buffer-name))
     (when (and (buffer-modified buffer)
                (buffer-pathname buffer)
-               (prompt-for-y-or-n :prompt "Save it first? "))
+               (prompt :y-or-n :prompt "Save it first? "))
       (save-file-command nil buffer))
     (if (eq buffer (current-buffer))
         (let* ((previous (or (previous-buffer)
                              (editor-error "Cannot kill last buffer.")))
                (new (if (value ask-for-new-buffer)
-                        (prompt-for-buffer
+                        (nth-value 1 (prompt *buffer-names*
                          :prompt "New Buffer: "
-                         :default previous
-                         :help "Buffer to change to after the current one is killed.")
+                         :default (buffer-name previous)
+                         :help "Buffer to change to after the current one is killed."))
                         previous)))
           (when (eq new buffer)
             (editor-error "You must select a different buffer."))
@@ -861,7 +860,7 @@
   (let* ((buf (current-buffer))
          (pn (buffer-pathname buf))
          (name (if pn (pathname-to-buffer-name pn) (buffer-name buf)))
-         (new (prompt-for-string :prompt "New Name: "
+         (new (prompt :string :prompt "New Name: "
                                  :help "Give a new name for the current buffer"
                                  :default name)))
     (multiple-value-bind (entry foundp) (getstring new *buffer-names*)
@@ -876,10 +875,11 @@
   "Prompt for a buffer to insert at the point."
   (declare (ignore p))
   (let ((point (current-point))
-        (region (buffer-region (prompt-for-buffer
-                                :default (previous-buffer)
+        (region (buffer-region (nth-value 1 (prompt *buffer-names*
+                                :default (when (previous-buffer)
+                                           (buffer-name (previous-buffer)))
                                 :help
-                                "Type the name of a buffer to insert."))))
+                                "Type the name of a buffer to insert.")))))
     ;;
     ;; start and end will be deleted by undo stuff
     (let ((save (region (copy-mark point :right-inserting)
@@ -1074,11 +1074,10 @@
    may contain wildcards in the name and type."
   "Do a directory into a pop-up window."
   (let* ((dpn (value pathname-defaults))
-         (pn (prompt-for-file
+         (pn (prompt (make-pathname :device (pathname-device dpn)
+                                    :directory (pathname-directory dpn))
               :prompt "Directory: "
               :help "Pathname to do directory on."
-              :default (make-pathname :device (pathname-device dpn)
-                                      :directory (pathname-directory dpn))
               :must-exist nil)))
     (setf (value pathname-defaults) (merge-pathnames pn dpn))
     (with-pop-up-display (s)
@@ -1090,11 +1089,10 @@
    may contain wildcards in the name and type."
   "Do a directory into a pop-up window."
   (let* ((dpn (value pathname-defaults))
-         (pn (prompt-for-file
+         (pn (prompt (make-pathname :device (pathname-device dpn)
+                                    :directory (pathname-directory dpn))
               :prompt "Verbose Directory: "
               :help "Pathname to do directory on."
-              :default (make-pathname :device (pathname-device dpn)
-                                      :directory (pathname-directory dpn))
               :must-exist nil)))
     (setf (value pathname-defaults) (merge-pathnames pn dpn))
     (with-pop-up-display (s)

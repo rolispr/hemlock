@@ -132,23 +132,22 @@
   (declare (ignore p))
   (unless mode
     (setq mode
-          (prompt-for-keyword
-           (list *mode-names* *global-abbrev-string-table*)
-           :prompt "Mode of abbrev to add: "
-           :default "Global"
-           :help
-           "Type the mode of the Abbrev you want to add, or confirm for Global.")))
+          (prompt (list *mode-names* *global-abbrev-string-table*)
+                 :prompt "Mode of abbrev to add: "
+                 :default "Global"
+                 :help
+                 "Type the mode of the Abbrev you want to add, or confirm for Global.")))
   (let ((globalp (string-equal mode "Global")))
     (unless (or globalp (mode-major-p mode))
       (editor-error "~A is not a major mode." mode))
     (unless abbrev
       (setq abbrev
-            (prompt-for-string
-             :trim t
-             :prompt
-             (list "~A abbreviation~@[ of ~S~]: " mode expansion)
-             :help
-             (list "Define a ~A word abbrev." mode))))
+            (prompt :string
+                    :trim t
+                    :prompt
+                    (list "~A abbreviation~@[ of ~S~]: " mode expansion)
+                    :help
+                    (list "Define a ~A word abbrev." mode))))
     (when (zerop (length abbrev))
       (editor-error "Abbreviation must be at least one character long."))
     (unless (every #'(lambda (ch)
@@ -157,9 +156,9 @@
       (editor-error "Word Abbrevs must be a single word."))
     (unless expansion
       (setq expansion
-            (prompt-for-string
-             :prompt (list "~A expansion for ~S: " mode abbrev)
-             :help (list "Define the ~A expansion of ~S." mode abbrev))))
+            (prompt :string
+                    :prompt (list "~A expansion for ~S: " mode abbrev)
+                    :help (list "Define the ~A expansion of ~S." mode abbrev))))
     (setq abbrev (string-downcase abbrev))
     (let* ((table (cond (globalp *global-abbrev-table*)
                         ((hemlock-bound-p 'mode-abbrev-table :mode mode)
@@ -172,12 +171,12 @@
                            new))))
            (old (gethash abbrev table)))
       (when (or (not old)
-                (prompt-for-y-or-n
-                 :prompt
-                 (list "Current ~A definition of ~S is ~S.~%Redefine?"
-                       mode abbrev old)
-                 :default t
-                 :help (list "Redefine the expansion of ~S." abbrev)))
+                (prompt :y-or-n
+                        :prompt
+                        (list "Current ~A definition of ~S is ~S.~%Redefine?"
+                              mode abbrev old)
+                        :default t
+                        :help (list "Redefine the expansion of ~S." abbrev)))
         (setf (gethash abbrev table) expansion)
         (push (list abbrev expansion (if globalp nil mode))
               *new-abbrevs*)))))
@@ -299,11 +298,11 @@
         (let ((down
                (string-downcase
                 (or abbrev
-                    (prompt-for-string
-                     :prompt (list "~A abbrev to delete: " mode)
-                     :help
+                    (prompt :string
+                            :prompt (list "~A abbrev to delete: " mode)
+                            :help
  (list "Give the name of a ~A mode word abbrev to delete." mode)
-                     :trim t))))
+                            :trim t))))
               (table (and boundp (variable-value 'mode-abbrev-table :mode mode))))
           (unless (and table (gethash down table))
             (editor-error "~S is not the name of an abbrev in ~A mode."
@@ -323,10 +322,10 @@
       (let ((down
              (string-downcase
               (or abbrev
-                  (prompt-for-string
-                   :prompt "Global abbrev to delete: "
-                   :help "Give the name of a global word abbrev to delete."
-                   :trim t)))))
+                  (prompt :string
+                          :prompt "Global abbrev to delete: "
+                          :help "Give the name of a global word abbrev to delete."
+                          :trim t)))))
         (unless (gethash down *global-abbrev-table*)
           (editor-error "~S is not the name of a global word abbrev." down))
         (remhash down *global-abbrev-table*))))
@@ -363,9 +362,9 @@
   (unless search-string
     (setq search-string
           (string-downcase
-           (prompt-for-string
-            :prompt "Apropos string: "
-            :help "The string to search word abbrevs and definitions for."))))
+           (prompt :string
+                   :prompt "Apropos string: "
+                   :help "The string to search word abbrevs and definitions for."))))
   (multiple-value-bind (count mode-tables) (count-abbrevs)
     (with-pop-up-display (s :height (min (1+ count) 30))
       (unless (zerop (hash-table-count *global-abbrev-table*))
@@ -496,11 +495,10 @@
   (setf (value abbrev-pathname-defaults)
         (if filename
             filename
-            (prompt-for-file
-             :prompt "Name of abbrev file: "
-             :help "The name of the abbrev file to load."
-             :default (value abbrev-pathname-defaults)
-             :must-exist nil)))
+            (prompt (value abbrev-pathname-defaults)
+                   :prompt "Name of abbrev file: "
+                   :help "The name of the abbrev file to load."
+                   :must-exist nil)))
   (with-open-file (file (value abbrev-pathname-defaults) :direction :input
                         :element-type 'base-char :if-does-not-exist :error)
     (read-abbrevs file)))
@@ -570,11 +568,10 @@
   (declare (ignore p))
   (unless filename
     (setq filename
-          (prompt-for-file
-           :prompt "Write abbrevs to file: "
-           :default (value abbrev-pathname-defaults)
-           :help "Name of the file to write current abbrevs to."
-           :must-exist nil)))
+          (prompt (value abbrev-pathname-defaults)
+                 :prompt "Write abbrevs to file: "
+                 :help "Name of the file to write current abbrevs to."
+                 :must-exist nil)))
   (with-open-file (file filename :direction :output
                         :element-type 'base-char :if-exists :supersede
                         :if-does-not-exist :create)
@@ -606,12 +603,11 @@
    (*new-abbrevs*
     (unless filename
       (setq filename
-            (prompt-for-file
-             :prompt
-             "Append incremental abbrevs to file: "
-             :default (value abbrev-pathname-defaults)
-             :must-exist nil
-             :help "Filename to append recently defined Abbrevs to.")))
+            (prompt (value abbrev-pathname-defaults)
+                   :prompt
+                   "Append incremental abbrevs to file: "
+                   :must-exist nil
+                   :help "Filename to append recently defined Abbrevs to.")))
     (write-incremental :append filename))
    (t
     (message "No Abbrev definitions have been changed since the last write."))))

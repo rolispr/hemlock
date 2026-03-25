@@ -181,8 +181,8 @@
         (when item
           (if (not (value virtual-connection-deletion))
               (when (or (not (value coned-delete-confirm))
-                        (prompt-for-y-or-n :prompt "Delete connection? "
-                                           :default t :must-exist t :default-string "Y"))
+                        (prompt :y-or-n :prompt "Delete connection? "
+                                       :default t :must-exist t :default-string "Y"))
                 (delete-coned-connection (coned-connection-connection item))
                 (coned-open-or-refresh))
               (progn
@@ -212,8 +212,8 @@
                                    (getf (ui-tree-state tree) :connections))))
         (when (and marked
                    (or (not (value coned-delete-confirm))
-                       (prompt-for-y-or-n :prompt "Delete connections? "
-                                          :default t :must-exist t :default-string "Y")))
+                       (prompt :y-or-n :prompt "Delete connections? "
+                                      :default t :must-exist t :default-string "Y")))
           (dolist (item marked)
             (delete-coned-connection (coned-connection-connection item)))
           (coned-open-or-refresh))))))

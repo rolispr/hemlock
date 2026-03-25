@@ -25,21 +25,43 @@
   (region *parse-starting-mark* (region-end *echo-area-region*))
   "Region that contains the text typed in.")
 
-
 
-;;;; Variables that control parsing:
+;;;; Prompt state — replaces the old special variables (*parse-type*, etc.)
 
-(defvar *parse-verification-function* '%not-inside-a-parse
-  "Function that verifies what's being parsed.")
+(defstruct prompt-state
+  "Holds all state for the current prompt session."
+  (source nil)              ; dispatch object passed to the prompt generic
+  (type :string)            ; :keyword, :file, :symbol, :string, :integer, :expression
+  (tables nil)              ; list of string-tables (for keyword completion)
+  (verify nil)              ; verification function: (lambda (string) → (list result) or nil)
+  (must-exist t)            ; whether input must match an existing entry
+  (default nil)             ; default value string
+  (default-string nil)      ; display override for default
+  (prompt-text nil)         ; prompt directive string
+  (help-text nil)           ; help text for Help on Parse
+  (symbol-package nil))     ; package name for symbol completion
 
-;;; %Not-Inside-A-Parse  --  Internal
-;;;
-;;;    This function is called if someone does stuff in the echo area when
-;;; we aren't inside a parse.  It tries to put them back in a reasonable place.
-;;;
+(defvar *current-prompt* nil
+  "The active prompt-state during a prompt session, or NIL if not prompting.")
+
+;;; Accessors for echo-commands and echo-completion to use instead of specials.
+;;; These return safe defaults when not in a prompt session.
+(declaim (inline prompt-type prompt-tables prompt-verify prompt-must-exist
+                 prompt-default prompt-default-string prompt-text prompt-help
+                 prompt-symbol-package))
+
+(defun prompt-type ()          (if *current-prompt* (prompt-state-type *current-prompt*) :string))
+(defun prompt-tables ()        (if *current-prompt* (prompt-state-tables *current-prompt*)))
+(defun prompt-verify ()        (if *current-prompt* (prompt-state-verify *current-prompt*) #'%not-inside-a-parse))
+(defun prompt-must-exist ()    (if *current-prompt* (prompt-state-must-exist *current-prompt*)))
+(defun prompt-default ()       (if *current-prompt* (prompt-state-default *current-prompt*)))
+(defun prompt-default-string () (if *current-prompt* (prompt-state-default-string *current-prompt*)))
+(defun prompt-text ()          (if *current-prompt* (prompt-state-prompt-text *current-prompt*)))
+(defun prompt-help ()          (if *current-prompt* (prompt-state-help-text *current-prompt*)))
+(defun prompt-symbol-package () (if *current-prompt* (prompt-state-symbol-package *current-prompt*)))
+
 (defun %not-inside-a-parse (quaz)
-  "Thing that's called when somehow we get called to confirm a parse that's
-  not in progress."
+  "Called when a parse confirmation happens outside a prompt session."
   (declare (ignore quaz))
   (let* ((bufs (remove *echo-area-buffer* *buffer-list*))
          (buf (or (find-if #'buffer-windows bufs)
@@ -54,35 +76,6 @@
           (or (car (buffer-windows buf))
               (make-window (buffer-start-mark buf)))))
   (editor-error "Wham!  We tried to confirm a parse that wasn't in progress?"))
-
-(defvar *parse-string-tables* ()
-  "String tables being used in the current parse.")
-
-(defvar *parse-value-must-exist* ()
-  "You know.")
-
-(defvar *parse-default* ()
-  "When the user attempts to default a parse, we call the verification function
-  on this string.  This is not the :Default argument to the prompting function,
-  but rather a string representation of it.")
-
-(defvar *parse-default-string* ()
-  "String that we show the user to inform him of the default.  If this
-  is NIL then we just use *Parse-Default*.")
-
-(defvar *parse-prompt* ()
-  "Prompt for the current parse.")
-
-(defvar *parse-help* ()
-  "Help string for the current parse.")
-
-(defvar *parse-type* :string "A hack. :String, :File, :Keyword, or :Symbol.")
-
-(defvar *parse-symbol-package* nil
-  "Package name string for :symbol parses.  Bound by Complete Symbol.")
-
-
-
 
 
 ;;;; MESSAGE and CLEAR-ECHO-AREA:
@@ -134,7 +127,6 @@
   (setq *last-message-time* (get-internal-real-time))
   nil)
 
-
 ;;; LOUD-MESSAGE -- Public.
 ;;;
 ;;; Like message, only more provocative.
@@ -146,11 +138,10 @@
   (clear-echo-area)
   (apply #'message args))
 
-
 
 ;;;; DISPLAY-PROMPT-NICELY and PARSE-FOR-SOMETHING.
 
-(defun display-prompt-nicely (&optional (prompt *parse-prompt*) default)
+(defun display-prompt-nicely (&optional (prompt (prompt-text)) default)
   (declare (ignore default))
   (clear-echo-area)
   (let ((point (buffer-point *echo-area-buffer*)))
@@ -165,122 +156,216 @@
       (insert-string point default)
       (insert-string point "] "))))
 
+(defun parse-for-something (state)
+  "Run the echo area command loop for a prompt session.
+   STATE is a prompt-state holding all prompt configuration."
+  (let ((*current-prompt* state))
+    (display-prompt-nicely)
+    (let ((start-window (current-window))
+          (start-buffer (current-buffer))
+          (point (buffer-point *echo-area-buffer*)))
+      (move-mark *parse-starting-mark* point)
+      (insert-string point (or (prompt-default-string) (prompt-default)))
+      (when (or (prompt-tables)
+                (eq (prompt-type) :file)
+                (eq (prompt-type) :symbol))
+        (make-echo-completions))
+      (setf (current-window) *echo-area-window*)
+      (unwind-protect
+          (use-buffer *echo-area-buffer*
+            (recursive-edit nil))
+        (when (buffer-ui-tree *echo-area-buffer*)
+          (cleanup-echo-completions))
+        (setf (current-window) start-window)
+        (change-to-buffer start-buffer)))))
 
-(defun parse-for-something ()
-  (display-prompt-nicely)
-  (let ((start-window (current-window))
-        (start-buffer (current-buffer))
-        (point (buffer-point *echo-area-buffer*)))
-    (move-mark *parse-starting-mark* point)
-    (insert-string point (or *parse-default-string* *parse-default*))
-    ;; create completion display if we have string tables or file prompt
-    (when (or *parse-string-tables*
-              (eq *parse-type* :file)
-              (eq *parse-type* :symbol))
-      (make-echo-completions))
-    (setf (current-window) *echo-area-window*)
+
+;;;; ─── prompt generic ──────────────────────────────────────────────────────────
+
+(defgeneric prompt (source &key prompt help default default-string must-exist)
+  (:documentation "Prompt the user, completing against SOURCE.
+   Dispatches on the type of SOURCE to determine completion behavior.
+   Returns the selected/validated result."))
+
+(defmethod prompt ((source string-table) &key
+                   (prompt "Keyword: ") (help "Type a keyword.")
+                   default default-string (must-exist t))
+  (parse-for-something
+   (make-prompt-state :source source :type :keyword
+                      :tables (list source)
+                      :verify #'keyword-verification-function
+                      :must-exist must-exist
+                      :default default :default-string default-string
+                      :prompt-text prompt :help-text help)))
+
+(defmethod prompt ((source cons) &key
+                   (prompt "Keyword: ") (help "Type a keyword.")
+                   default default-string (must-exist t))
+  (parse-for-something
+   (make-prompt-state :source source :type :keyword
+                      :tables source
+                      :verify #'keyword-verification-function
+                      :must-exist must-exist
+                      :default default :default-string default-string
+                      :prompt-text prompt :help-text help)))
+
+(defmethod prompt ((source pathname) &key
+                   (prompt "Filename: ") (help "Type a file name.")
+                   default default-string (must-exist t))
+  (parse-for-something
+   (make-prompt-state :source source :type :file
+                      :verify #'file-verification-function
+                      :must-exist must-exist
+                      :default (namestring (or default source))
+                      :default-string default-string
+                      :prompt-text prompt :help-text help)))
+
+(defmethod prompt ((source string) &key
+                   (prompt "Filename: ") (help "Type a file name.")
+                   default default-string (must-exist t))
+  "Coerce string to pathname and delegate to the pathname method."
+  (prompt (pathname source) :prompt prompt :help help
+          :default default :default-string default-string
+          :must-exist must-exist))
+
+(defmethod prompt ((source package) &key
+                   (prompt "Symbol: ") (help "Complete a symbol.")
+                   default default-string must-exist)
+  (declare (ignore must-exist))
+  (parse-for-something
+   (make-prompt-state :source source :type :symbol
+                      :verify (lambda (string) (list string))
+                      :default-string (or default-string default)
+                      :prompt-text prompt :help-text help
+                      :symbol-package (package-name source))))
+
+(defmethod prompt ((source (eql :string)) &key
+                   (prompt "String: ") (help "Type a string.")
+                   default default-string must-exist trim)
+  (declare (ignore must-exist))
+  (parse-for-something
+   (make-prompt-state :source source :type :string
+                      :verify (lambda (string)
+                                (list (string-trim
+                                       (if (eq trim t) '(#\space #\tab)
+                                           (or trim '()))
+                                       string)))
+                      :default default :default-string default-string
+                      :prompt-text prompt :help-text help)))
+
+(defmethod prompt ((source (eql :integer)) &key
+                   (prompt "Integer: ") (help "Type an integer.")
+                   default default-string (must-exist t))
+  (parse-for-something
+   (make-prompt-state :source source :type :integer
+                      :verify (lambda (string)
+                                (let ((number (parse-integer string :junk-allowed t)))
+                                  (if must-exist
+                                      (if number (list number))
+                                      (list (or number string)))))
+                      :must-exist must-exist
+                      :default (if default (write-to-string default :base 10))
+                      :default-string default-string
+                      :prompt-text prompt :help-text help)))
+
+(defmethod prompt ((source (eql :expression)) &key
+                   (prompt "Expression: ") (help "Type a Lisp expression.")
+                   (default nil defaultp) default-string (must-exist t))
+  (parse-for-something
+   (make-prompt-state :source source :type :expression
+                      :verify (lambda (string)
+                                (declare (ignore string))
+                                (let ((expr (with-input-from-region
+                                                (stream *parse-input-region*)
+                                              (handler-case (read stream nil hemlock-eof)
+                                                (error () hemlock-eof)))))
+                                  (if must-exist
+                                      (if (not (eq expr hemlock-eof))
+                                          (values (list expr) t))
+                                      (if (eq expr hemlock-eof)
+                                          (list (region-to-string *parse-input-region*))
+                                          (values (list expr) t)))))
+                      :must-exist must-exist
+                      :default (if defaultp (prin1-to-string default))
+                      :default-string default-string
+                      :prompt-text prompt :help-text help)))
+
+(defmethod prompt ((source (eql :yes-or-no)) &key
+                   (prompt "Yes or No? ") (help "Type Yes or No.")
+                   (default nil defaultp) default-string (must-exist t))
+  (parse-for-something
+   (make-prompt-state :source source :type :keyword
+                      :tables (list *yes-or-no-string-table*)
+                      :verify (lambda (string)
+                                (multiple-value-bind (prefix key value field ambig)
+                                    (complete-string string
+                                                     (list *yes-or-no-string-table*))
+                                  (declare (ignore prefix field ambig))
+                                  (let ((won (or (eq key :complete) (eq key :unique))))
+                                    (if must-exist
+                                        (if won (values (list value) t))
+                                        (list (if won (values value t) string))))))
+                      :must-exist must-exist
+                      :default (if defaultp (if default "Yes" "No"))
+                      :default-string default-string
+                      :prompt-text prompt :help-text help)))
+
+(defmethod prompt ((source (eql :y-or-n)) &key
+                   (prompt "Y or N? ") (help "Type Y or N.")
+                   (default nil defaultp) default-string (must-exist t))
+  (declare (ignore default-string))
+  (let ((*current-prompt* (make-prompt-state :type :y-or-n
+                                             :help-text help
+                                             :prompt-text prompt))
+        (old-window (current-window)))
     (unwind-protect
-        (use-buffer *echo-area-buffer*
-          (recursive-edit nil))
-      (when (buffer-ui-tree *echo-area-buffer*)
-        (cleanup-echo-completions))
-      (setf (current-window) start-window)
-      (change-to-buffer start-buffer))))
+        (progn
+          (setf (current-window) *echo-area-window*)
+          (display-prompt-nicely prompt (if defaultp (if default "Y" "N")))
+          (loop
+            (let ((key-event (get-key-event *editor-input*)))
+              (cond ((or (eq key-event #k"y") (eq key-event #k"Y"))
+                     (return t))
+                    ((or (eq key-event #k"n") (eq key-event #k"N"))
+                     (return nil))
+                    ((logical-key-event-p key-event :confirm)
+                     (if defaultp (return default) (beep)))
+                    ((logical-key-event-p key-event :help)
+                     (hemlock::help-on-parse-command ()))
+                    (t
+                     (unless must-exist (return key-event))
+                     (beep))))))
+      (setf (current-window) old-window))))
 
+(defmethod prompt ((source (eql :key-event)) &key
+                   (prompt "Key-event: ") help default default-string
+                   must-exist (change-window t))
+  (declare (ignore help default default-string must-exist))
+  (prompt-for-key-event* prompt change-window))
 
-
-;;;; Buffer prompting.
-
-(defun prompt-for-buffer (&key ((:must-exist *parse-value-must-exist*) t)
-                               default
-                               ((:default-string *parse-default-string*))
-                               ((:prompt *parse-prompt*) "Buffer: ")
-                               ((:help *parse-help*) "Type a buffer name."))
-  "Prompts for a buffer name and returns the corresponding buffer.  If
-   :must-exist is nil, then return the input string.  This refuses to accept
-   the empty string as input when no default is supplied.  :default-string
-   may be used to supply a default buffer name even when :default is nil, but
-   when :must-exist is non-nil, :default-string must be the name of an existing
-   buffer."
-    (let ((*parse-string-tables* (list *buffer-names*))
-          (*parse-type* :keyword)
-          (*parse-default* (cond
-                            (default (buffer-name default))
-                            (*parse-default-string*
-                             (when (and *parse-value-must-exist*
-                                        (not (getstring *parse-default-string*
-                                                        *buffer-names*)))
-                               (error "Default-string must name an existing ~
-                                       buffer when must-exist is non-nil -- ~S."
-                                      *parse-default-string*))
-                             *parse-default-string*)
-                            (t nil)))
-          (*parse-verification-function* #'buffer-verification-function))
-      (parse-for-something)))
-
-(defun buffer-verification-function (string)
-  (declare (simple-string string))
-  (cond ((string= string "") nil)
-        (;; fixme: this probably isn't the right place for this check,
-         ;; but COMPLETE-STRING, called below, does something weird on
-         ;; strings tokenized into words, and misses exact matches for
-         ;; some strings.  So let's check for correct buffer names first,
-         ;; before wandering off into the land of incorrect completion
-         ;; functions.  The right place to fix things is _probably_ in
-         ;; COMPLETE-STRING.
-         (let ((buffer (getstring string *buffer-names*)))
-           (when buffer
-             (list buffer))))
-        (*parse-value-must-exist*
-         (multiple-value-bind
-             (prefix key value field ambig)
-             (complete-string string *parse-string-tables*)
-           (declare (ignore field))
-           (ecase key
-             (:none nil)
-             ((:unique :complete)
-              (list value))
-             (:ambiguous
-              (delete-region *parse-input-region*)
-              (insert-string (region-start *parse-input-region*) prefix)
-              (let ((point (current-point)))
-                (move-mark point (region-start *parse-input-region*))
-                (unless (character-offset point ambig)
-                  (buffer-end point)))
-              nil))))
-        (t
-         (list (or (getstring string *buffer-names*) string)))))
-
+(defmethod prompt ((source (eql :key)) &key
+                   (prompt "Key: ") (help "Type a key.")
+                   default default-string (must-exist t))
+  (prompt-for-key :prompt prompt :help help
+                  :default default :default-string default-string
+                  :must-exist must-exist))
 
 
-;;;; File Prompting.
-
-(defun prompt-for-file (&key ((:must-exist *parse-value-must-exist*) t)
-                             default
-                             ((:default-string *parse-default-string*))
-                             ((:prompt *parse-prompt*) "Filename: ")
-                             ((:help *parse-help*) "Type a file name."))
-  "Prompts for a filename."
-  (let ((*parse-verification-function* #'file-verification-function)
-        (*parse-default* (if default (namestring default)))
-        (*parse-type* :file))
-    (parse-for-something)))
-
 (defun file-verification-function (string)
   (let ((pn (pathname-or-lose string)))
     (if pn
         (let ((merge
-               (cond ((not *parse-default*) nil)
+               (cond ((not (prompt-default)) nil)
                      ((directoryp pn)
-                      (merge-pathnames pn *parse-default*))
+                      (merge-pathnames pn (prompt-default)))
                      (t
                       (merge-pathnames pn
                                        (or (directory-namestring
-                                            *parse-default*)
+                                            (prompt-default))
                                            ""))))))
           (cond ((probe-file pn) (list pn))
                 ((and merge (probe-file merge)) (list merge))
-                ((not *parse-value-must-exist*) (list (or merge pn)))
+                ((not (prompt-must-exist)) (list (or merge pn)))
                 (t nil))))))
 
 ;;; PATHNAME-OR-LOSE tries to convert string to a pathname using
@@ -298,34 +383,7 @@
                                 (- idx (length string)))
              nil))))
 
-
 
-;;;; Keyword and variable prompting.
-
-(defun prompt-for-keyword (*parse-string-tables*
-                           &key
-                           ((:must-exist *parse-value-must-exist*) t)
-                           ((:default *parse-default*))
-                           ((:default-string *parse-default-string*))
-                           ((:prompt *parse-prompt*) "Keyword: ")
-                           ((:help *parse-help*) "Type a keyword."))
-  "Prompts for a keyword using the String Tables."
-  (let ((*parse-verification-function* #'keyword-verification-function)
-        (*parse-type* :keyword))
-    (parse-for-something)))
-
-(defun prompt-for-variable (&key ((:must-exist *parse-value-must-exist*) t)
-                                 ((:default *parse-default*))
-                                 ((:default-string *parse-default-string*))
-                                 ((:prompt *parse-prompt*) "Variable: ")
-                                 ((:help *parse-help*)
-                                  "Type the name of a variable."))
-  "Prompts for a variable defined in the current scheme of things."
-  (let ((*parse-string-tables* (current-variable-tables))
-        (*parse-verification-function* #'keyword-verification-function)
-        (*parse-type* :keyword))
-    (parse-for-something)))
-
 (defun current-variable-tables ()
   "Returns a list of all the variable tables currently established globally,
    by the current buffer, and by any modes for the current buffer."
@@ -339,9 +397,9 @@
   (declare (simple-string string))
   (multiple-value-bind
       (prefix key value field ambig)
-      (complete-string string *parse-string-tables*)
+      (complete-string string (prompt-tables))
     (declare (ignore field))
-    (cond (*parse-value-must-exist*
+    (cond ((prompt-must-exist)
            (ecase key
              (:none nil)
              ((:unique :complete)
@@ -360,116 +418,13 @@
            ;; instead of the user's input.
            (list (if (= (length string) (length prefix)) prefix string))))))
 
-
 
-;;;; Integer, expression, and string prompting.
-
-(defun prompt-for-integer (&key ((:must-exist *parse-value-must-exist*) t)
-                                default
-                                ((:default-string *parse-default-string*))
-                                ((:prompt *parse-prompt*) "Integer: ")
-                                ((:help *parse-help*) "Type an integer."))
-  "Prompt for an integer.  If :must-exist is Nil, then we return as a string
-  whatever was input if it is not a valid integer."
-  (let ((*parse-verification-function*
-         #'(lambda (string)
-             (let ((number (parse-integer string  :junk-allowed t)))
-               (if *parse-value-must-exist*
-                   (if number (list number))
-                   (list (or number string))))))
-        (*parse-default* (if default (write-to-string default :base 10))))
-    (parse-for-something)))
-
-
 (defvar hemlock-eof '(())
   "An object that won't be EQ to anything read.")
 
-(defun prompt-for-expression (&key ((:must-exist *parse-value-must-exist*) t)
-                                   (default nil defaultp)
-                                   ((:default-string *parse-default-string*))
-                                   ((:prompt *parse-prompt*) "Expression: ")
-                                   ((:help *parse-help*)
-                                    "Type a Lisp expression."))
-  "Prompts for a Lisp expression."
-  (let ((*parse-verification-function*
-         #'(lambda (string)
-             (let ((expr (with-input-from-region (stream *parse-input-region*)
-                           (handler-case (read stream nil hemlock-eof)
-                             (error () hemlock-eof)))))
-               (if *parse-value-must-exist*
-                   (if (not (eq expr hemlock-eof)) (values (list expr) t))
-                   (if (eq expr hemlock-eof)
-                       (list string) (values (list expr) t))))))
-        (*parse-default* (if defaultp (prin1-to-string default))))
-      (parse-for-something)))
-
-
-(defun prompt-for-symbol (package-name &key ((:default-string *parse-default-string*))
-                                            ((:prompt *parse-prompt*) "Symbol: ")
-                                            ((:help *parse-help*) "Complete a symbol."))
-  "Prompt for a symbol name using the echo-area ranked completion popup.
-PACKAGE-NAME is the default package for completion.
-Returns the completed symbol name string."
-  (let ((*parse-type* :symbol)
-        (*parse-symbol-package* package-name)
-        (*parse-verification-function* (lambda (string) (list string))))
-    (parse-for-something)))
-
-(defun prompt-for-string (&key ((:default *parse-default*))
-                               ((:default-string *parse-default-string*))
-                               (trim ())
-                               ((:prompt *parse-prompt*) "String: ")
-                               ((:help *parse-help*) "Type a string."))
-  "Prompts for a string.  If :trim is t, then leading and trailing whitespace
-   is removed from input, otherwise it is interpreted as a Char-Bag argument
-   to String-Trim."
-  (let ((*parse-verification-function*
-         #'(lambda (string)
-             (list (string-trim (if (eq trim t) '(#\space #\tab) trim)
-                                string)))))
-    (parse-for-something)))
-
-(defun prompt-for-url (&key ((:default *parse-default*))
-                       ((:default-string *parse-default-string*))
-                       (trim ())
-                       ((:prompt *parse-prompt*) "URL: ")
-                       ((:help *parse-help*) "Type a URL."))
-  "Prompts for a URL.  If :trim is t, then leading and trailing whitespace
-   is removed from input, otherwise it is interpreted as a Char-Bag argument
-   to String-Trim.  Since URL syntax is hard to validate, any input is
-   accepted as if by PROMPT-FOR-STRING.  The prompt is different, however."
-  (let ((*parse-verification-function*
-         #'(lambda (string)
-             (list (string-trim (if (eq trim t) '(#\space #\tab) trim)
-                                string)))))
-    (parse-for-something)))
-
 
-;;;; Yes-or-no and y-or-n prompting.
-
 (defvar *yes-or-no-string-table*
   (make-string-table :initial-contents '(("Yes" . t) ("No" . nil))))
-
-(defun prompt-for-yes-or-no (&key ((:must-exist *parse-value-must-exist*) t)
-                                  (default nil defaultp)
-                                  ((:default-string *parse-default-string*))
-                                  ((:prompt *parse-prompt*) "Yes or No? ")
-                                  ((:help *parse-help*) "Type Yes or No."))
-  "Prompts for Yes or No."
-  (let* ((*parse-string-tables* (list *yes-or-no-string-table*))
-         (*parse-default* (if defaultp (if default "Yes" "No")))
-         (*parse-verification-function*
-          #'(lambda (string)
-              (multiple-value-bind
-                  (prefix key value field ambig)
-                  (complete-string string *parse-string-tables*)
-                (declare (ignore prefix field ambig))
-                (let ((won (or (eq key :complete) (eq key :unique))))
-                  (if *parse-value-must-exist*
-                      (if won (values (list value) t))
-                      (list (if won (values value t) string)))))))
-         (*parse-type* :keyword))
-    (parse-for-something)))
 
 (defun listify (x) (if (listp x) x (list x)))
 
@@ -484,45 +439,6 @@ Returns the completed symbol name string."
     ,@(loop for (keys . body) in clauses
             collect (if (eq keys t) t `(list ,@keys))
             collect `(lambda () ,@body))))
-
-(defun prompt-for-y-or-n (&key ((:must-exist must-exist) t)
-                               (default nil defaultp)
-                               default-string
-                               ((:prompt prompt) "Y or N? ")
-                               ((:help *parse-help*) "Type Y or N."))
-  "Prompts for Y or N."
-  (let ((old-window (current-window)))
-    (unwind-protect
-        (progn
-          (setf (current-window) *echo-area-window*)
-          (display-prompt-nicely prompt (or default-string
-                                            (if defaultp (if default "Y" "N"))))
-          (loop
-            (let ((key-event (get-key-event *editor-input*)))
-              (cond ((or (eq key-event #k"y")
-                         (eq key-event #k"Y"))
-                     (return t))
-                    ((or (eq key-event #k"n")
-                         (eq key-event #k"N"))
-                     (return nil))
-                    ((logical-key-event-p key-event :confirm)
-                     (if defaultp
-                         (return default)
-                         (beep)))
-                    ((logical-key-event-p key-event :help)
-                     (hemlock::help-on-parse-command ()))
-                    (t
-                     (unless must-exist (return key-event))
-                     (beep))))))
-      (setf (current-window) old-window))))
-
-
-
-;;;; Key-event and key prompting.
-
-(defun prompt-for-key-event (&key (prompt "Key-event: ") (change-window t))
-  "Prompts for a key-event."
-  (prompt-for-key-event* prompt change-window))
 
 (defun prompt-for-key-event* (prompt change-window)
   (let ((old-window (current-window)))
@@ -590,7 +506,6 @@ Returns the completed symbol name string."
                 (go TOP)))
       (force-output *echo-area-stream*)
       (setf (current-window) old-window))))
-
 
 
 ;;;; Logical key-event stuff.
@@ -700,7 +615,6 @@ Returns the completed symbol name string."
   "This key-event is used to quote the next key-event of input.")
 (define-logical-key-event "Keep"
   "This key-event means exit but keep something around.")
-
 
 
 ;;;; COMMAND-CASE help message printing.

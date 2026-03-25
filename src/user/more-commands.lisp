@@ -16,7 +16,7 @@
   (let ((threshold (or (value region-query-size) 0)))
     (if (and (plusp threshold)
              (>= (count-lines region) threshold)
-             (not (prompt-for-y-or-n
+             (not (prompt :y-or-n
                    :prompt "Region size exceeds \"Region Query Size\".  Confirm: "
                    :must-exist t)))
         (editor-error))))
@@ -153,16 +153,15 @@
 
 (defun prompt-for-place (prompt help)
   (multiple-value-bind (word val)
-                       (prompt-for-keyword *scope-table* :prompt prompt
+                       (prompt *scope-table* :prompt prompt
                                            :help help :default "Global")
     (declare (ignore word))
     (case val
       (:buffer
-       (values :buffer (prompt-for-buffer :help "Buffer to be local to."
-                                          :default (current-buffer))))
+       (values :buffer (nth-value 1 (prompt *buffer-names* :help "Buffer to be local to."
+                                          :default (buffer-name (current-buffer))))))
       (:mode
-       (values :mode (prompt-for-keyword
-                      (list *mode-names*)
+       (values :mode (prompt *mode-names*
                       :prompt "Mode: "
                       :help "Mode to be local to."
                       :default (buffer-major-mode (current-buffer)))))
@@ -174,11 +173,10 @@
   "Prompt for stuff to do a bind-key."
   (declare (ignore p))
   (multiple-value-call #'bind-key
-    (values (prompt-for-keyword
-             (list *command-names*)
+    (values (prompt *command-names*
              :prompt "Command to bind: "
              :help "Name of command to bind to a key."))
-    (values (prompt-for-key
+    (values (prompt :key
              :prompt "Bind to: "  :must-exist nil
              :help "Key to bind command to, confirm to complete."))
     (prompt-for-place "Kind of binding: "
@@ -189,7 +187,7 @@
   The key and place to remove the binding are prompted for."
   "Prompt for stuff to do a delete-key-binding."
   (declare (ignore p))
-  (let ((key (prompt-for-key
+  (let ((key (prompt :key
               :prompt "Delete binding: " :must-exist nil
               :help "Key to delete binding from.")))
     (multiple-value-bind (kind where)
@@ -205,13 +203,13 @@
   "Prompt for a Hemlock variable and a new value."
   (declare (ignore p))
   (multiple-value-bind (name var)
-                       (prompt-for-variable
+                       (prompt (current-variable-tables)
                         :prompt "Variable: "
                         :help "The name of a variable to set.")
     (declare (ignore name))
     (setf (variable-value var)
           (handle-lisp-errors
-           (eval (prompt-for-expression
+           (eval (prompt :expression
                   :prompt "Value: "
                   :help "Expression to evaluate for new value."))))))
 
@@ -221,13 +219,13 @@
    never prompts for documentation."
   "Define a hemlock variable in some location."
   (declare (ignore p))
-  (let* ((name (nstring-capitalize (prompt-for-variable :must-exist nil)))
+  (let* ((name (nstring-capitalize (prompt (current-variable-tables) :must-exist nil)))
          (var (string-to-variable name))
          (doc (if (hemlock-bound-p var)
                   (variable-documentation var)
                   ""))
          (hooks (if (hemlock-bound-p var) (variable-hooks var)))
-         (val (prompt-for-expression :prompt "Variable value: "
+         (val (prompt :expression :prompt "Variable value: "
                                      :help "Value for the variable.")))
     (multiple-value-bind
         (kind where)
@@ -386,7 +384,7 @@
    of the buffer with the number one.  If a prefix argument is supplied, that
    is the line numbe; otherwise, the user is prompted."
   "Go to a user perceived line number."
-  (let ((p (or p (prompt-for-expression
+  (let ((p (or p (prompt :expression
                   :prompt "Line number: "
                   :help "Enter an absolute line number to goto."))))
     (unless (and (integerp p) (plusp p))
@@ -570,7 +568,7 @@
            (page-offset point 1))
           ((zerop p)
            (let* ((againp (eq (last-command-type) :goto-page-zero))
-                  (name (prompt-for-string :prompt "Substring of page title: "
+                  (name (prompt :string :prompt "Substring of page title: "
                                            :default (if againp
                                                         *goto-page-last-string*
                                                         *parse-default*)))

@@ -351,29 +351,29 @@
 ;;; where) of the binding.
 ;;;
 (defun get-keyboard-macro-key ()
-  (let* ((key (prompt-for-key :prompt "Bind keyboard macro to key: "
-                              :must-exist nil)))
+  (let* ((key (prompt :key :prompt "Bind keyboard macro to key: "
+                             :must-exist nil)))
     (multiple-value-bind (kind where)
                          (prompt-for-place "Kind of binding: "
                                            "The kind of binding to make.")
       (let* ((cmd (get-command key kind where)))
         (cond ((not cmd) (values key kind where))
               ((commandp cmd)
-               (if (prompt-for-y-or-n
-                    :prompt `("~A is bound to ~A.  Rebind it? "
-                              ,(with-output-to-string (s)
-                                 (print-pretty-key key s))
-                              ,(command-name cmd))
-                    :default nil)
+               (if (prompt :y-or-n
+                           :prompt `("~A is bound to ~A.  Rebind it? "
+                                     ,(with-output-to-string (s)
+                                        (print-pretty-key key s))
+                                     ,(command-name cmd))
+                           :default nil)
                    (values key kind where)
                    nil))
               ((eq cmd :prefix)
-               (if (prompt-for-y-or-n
-                    :prompt `("~A is a prefix for more than one command.  ~
-                               Clobber it? "
-                              ,(with-output-to-string (s)
-                                 (print-pretty-key key s)))
-                    :default nil)
+               (if (prompt :y-or-n
+                           :prompt `("~A is a prefix for more than one command.  ~
+                                      Clobber it? "
+                                     ,(with-output-to-string (s)
+                                        (print-pretty-key key s)))
+                           :default nil)
                    (values key kind where)
                    nil)))))))
 
@@ -420,9 +420,9 @@
   "Make the \"Last Keyboard Macro\" a named command."
   (declare (ignore p))
   (unless name
-    (setq name (prompt-for-string
-                :prompt "Macro name: "
-                :help "String name of command to make from keyboard macro.")))
+    (setq name (prompt :string
+                       :prompt "Macro name: "
+                       :help "String name of command to make from keyboard macro.")))
   (make-command
     name "This is a named keyboard macro."
    (command-function (getstring "Last Keyboard Macro" *command-names*))))

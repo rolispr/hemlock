@@ -228,11 +228,9 @@
        "Don't check it out after all.")
       ((#\r #\R)
        "Rename the file before checking it out."
-       (let ((new-pathname (prompt-for-file
-                            :prompt "New Filename: "
-                            :default (buffer-default-pathname
-                                      (current-buffer))
-                            :must-exist nil)))
+       (let ((new-pathname (prompt (buffer-default-pathname (current-buffer))
+                                  :prompt "New Filename: "
+                                  :must-exist nil)))
          (rename-file pathname new-pathname)
          (rcs-check-out-file buffer pathname lock)))))
    (t
@@ -300,10 +298,9 @@
   "Prompt for a file, and attempt to lock it."
   "Prompt for a file, and attempt to lock it."
   (declare (ignore p))
-  (rcs-lock-file nil (prompt-for-file :prompt "File to lock: "
-                                      :default (buffer-default-pathname
-                                                (current-buffer))
-                                      :must-exist nil)))
+  (rcs-lock-file nil (prompt (buffer-default-pathname (current-buffer))
+                            :prompt "File to lock: "
+                            :must-exist nil)))
 
 (defcommand "RCS Unlock Buffer File" (p)
   "Unlock the file in the current buffer."
@@ -317,10 +314,9 @@
   "Prompt for a file, and attempt to unlock it."
   "Prompt for a file, and attempt to unlock it."
   (declare (ignore p))
-  (rcs-unlock-file nil (prompt-for-file :prompt "File to unlock: "
-                                        :default (buffer-default-pathname
-                                                  (current-buffer))
-                                        :must-exist nil)))
+  (rcs-unlock-file nil (prompt (buffer-default-pathname (current-buffer))
+                              :prompt "File to unlock: "
+                              :must-exist nil)))
 
 (defcommand "RCS Check In Buffer File" (p)
   "Checkin the file in the current buffer.  With an argument, do not
@@ -342,11 +338,9 @@
   not release the lock."
   "Prompt for a file, and attempt to check it in.  With an argument, do
   not release the lock."
-  (rcs-check-in-file nil (prompt-for-file :prompt "File to lock: "
-                                          :default
-                                          (buffer-default-pathname
-                                           (current-buffer))
-                                          :must-exist nil)
+  (rcs-check-in-file nil (prompt (buffer-default-pathname (current-buffer))
+                                :prompt "File to lock: "
+                                :must-exist nil)
                      p))
 
 (defcommand "RCS Check Out Buffer File" (p)
@@ -359,7 +353,7 @@
          (point (current-point))
          (lines (1- (count-lines (region (buffer-start-mark buffer) point)))))
     (when (buffer-modified buffer)
-      (when (not (prompt-for-y-or-n :prompt "Buffer is modified, overwrite? "))
+      (when (not (prompt :y-or-n :prompt "Buffer is modified, overwrite? "))
         (editor-error "Aborted.")))
     (setf (buffer-modified buffer) nil)
     (setf pathname (maybe-rcs-check-out-file buffer pathname p nil))
@@ -375,10 +369,9 @@
   lock the file."
   "Prompt for a file and attempt to check it out.  With an argument,
   lock the file."
-  (let ((pathname (prompt-for-file :prompt "File to check out: "
-                                   :default (buffer-default-pathname
-                                             (current-buffer))
-                                   :must-exist nil)))
+  (let ((pathname (prompt (buffer-default-pathname (current-buffer))
+                         :prompt "File to check out: "
+                         :must-exist nil)))
     (setf pathname (maybe-rcs-check-out-file nil pathname p nil))
     (find-file-command nil pathname)))
 
@@ -421,10 +414,9 @@
   "Prompt for a file and get its RCS log entry in a buffer."
   "Prompt for a file and get its RCS log entry in a buffer."
   (declare (ignore p))
-  (let ((file (prompt-for-file :prompt "File to get log of: "
-                               :default (buffer-default-pathname
-                                         (current-buffer))
-                               :must-exist nil))
+  (let ((file (prompt (buffer-default-pathname (current-buffer))
+                      :prompt "File to get log of: "
+                      :must-exist nil))
         (buffer (get-log-buffer)))
     (delete-region (buffer-region buffer))
     (message "Extracing log info ...")

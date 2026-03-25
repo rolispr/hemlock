@@ -25,8 +25,8 @@
   "Save BUF if modified and has a pathname, then delete it."
   (when (and (buffer-modified buf)
              (buffer-pathname buf)
-             (prompt-for-y-or-n :prompt (list "~A is modified.  Save it first? "
-                                              (buffer-name buf))))
+             (prompt :y-or-n :prompt (list "~A is modified.  Save it first? "
+                                          (buffer-name buf))))
     (save-file-command nil buf))
   (delete-buffer-if-possible buf))
 
@@ -129,8 +129,8 @@
       (let ((marked (getf (ui-tree-state tree) :deleted)))
         (when (and marked
                    (or (not (value bufed-delete-confirm))
-                       (prompt-for-y-or-n :prompt "Delete buffers? "
-                                          :default t :must-exist t :default-string "Y")))
+                       (prompt :y-or-n :prompt "Delete buffers? "
+                                      :default t :must-exist t :default-string "Y")))
           (dolist (b marked) (delete-bufed-buffer b))
           (bufed-open-or-refresh))))))
 
@@ -204,8 +204,8 @@
         (when buf
           (if (not (value virtual-buffer-deletion))
               (when (or (not (value bufed-delete-confirm))
-                        (prompt-for-y-or-n :prompt "Delete buffer? "
-                                           :default t :must-exist t :default-string "Y"))
+                        (prompt :y-or-n :prompt "Delete buffer? "
+                                       :default t :must-exist t :default-string "Y"))
                 (delete-bufed-buffer buf)
                 (bufed-open-or-refresh))
               (let ((state (ui-tree-state tree)))

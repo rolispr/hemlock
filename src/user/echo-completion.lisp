@@ -44,8 +44,8 @@ The prefix may contain * wildcards for glob-style matching."
   (when (plusp (length input))
     (let* ((ends-with-slash (char= (char input (1- (length input))) #\/))
            (merged (merge-pathnames input
-                     (or (and *parse-default*
-                              (directory-namestring *parse-default*))
+                     (or (and (prompt-default)
+                              (directory-namestring (prompt-default)))
                          (default-directory))))
            (namestring (namestring merged)))
       (cond
@@ -76,15 +76,15 @@ The prefix may contain * wildcards for glob-style matching."
 (defun completion-candidates ()
   "Return the initial candidate list for the current parse type."
   (cond
-    ((eq *parse-type* :file)
-     (file-completion-filter (or *parse-default-string* *parse-default* "")))
-    ((eq *parse-type* :symbol)
+    ((eq (prompt-type) :file)
+     (file-completion-filter (or (prompt-default-string) (prompt-default) "")))
+    ((eq (prompt-type) :symbol)
      (let ((matches (hemlock::fuzzy-completions
-                     (or *parse-default-string* "")
-                     (or *parse-symbol-package* "cl"))))
+                     (or (prompt-default-string) "")
+                     (or (prompt-symbol-package) "cl"))))
        (mapcar #'first (first matches))))
     (t
-     (hemlock::string-table-candidates *parse-string-tables*))))
+     (hemlock::string-table-candidates (prompt-tables)))))
 
 (defun file-display-name (namestring)
   "Return a short display name for a file path.
@@ -102,7 +102,7 @@ For files, returns the filename."
 
 (defun completion-display-name (candidate)
   "Return the display name for a completion candidate."
-  (if (eq *parse-type* :file)
+  (if (eq (prompt-type) :file)
       (file-display-name candidate)
       candidate))
 
@@ -117,7 +117,7 @@ For files, returns the filename."
          (w0 (floor width 2))
          (w1 (floor width 4))
          (w2 (- width w0 w1 1))
-         (default (or *parse-default-string* *parse-default* "")))
+         (default (or (prompt-default-string) (prompt-default) "")))
     (let ((tree (make-ui-tree
                  :buffer *echo-area-buffer*
                  :width width
@@ -128,7 +128,7 @@ For files, returns the filename."
                               :input default
                               :cursor-offset (length default)
                               :message ""
-                              :prompt (or *parse-prompt* "")
+                              :prompt (or (prompt-text) "")
                               :height height
                               :col-widths (list w0 w1 w2)))))
       (install-tree tree)
@@ -179,11 +179,11 @@ CHUNKS is a list of (offset substring) pairs from fuzzy-completions."
          (all (getf state :candidates))
          (filtered
           (cond
-            ((eq *parse-type* :file)
+            ((eq (prompt-type) :file)
              (file-completion-filter input))
-            ((eq *parse-type* :symbol)
+            ((eq (prompt-type) :symbol)
              (let* ((raw (hemlock::fuzzy-completions
-                          input (or *parse-symbol-package* "cl")))
+                          input (or (prompt-symbol-package) "cl")))
                     (matches (first raw)))
                (setf (getf (ui-tree-state tree) :symbol-matches) matches)
                (mapcar #'first matches)))
@@ -223,7 +223,7 @@ CHUNKS is a list of (offset substring) pairs from fuzzy-completions."
       (loop for row from 1 below height
             for idx = (+ offset (1- row))
             do (if (< idx n)
-                   (if (eq *parse-type* :symbol)
+                   (if (eq (prompt-type) :symbol)
                        (let* ((match    (nth idx (getf (ui-tree-state tree) :symbol-matches)))
                               (completed (first match))
                               (chunks   (third match))
@@ -300,7 +300,7 @@ CHUNKS is a list of (offset substring) pairs from fuzzy-completions."
   (when (buffer-ui-tree *echo-area-buffer*)
     (let* ((tree (buffer-ui-tree *echo-area-buffer*))
            (did-something
-            (if (and (eq *parse-type* :file)
+            (if (and (eq (prompt-type) :file)
                      (let ((off (cursor-offset tree)))
                        (and (plusp off)
                             (char= (char (input-string tree) (1- off)) #\/))))
@@ -322,7 +322,7 @@ CHUNKS is a list of (offset substring) pairs from fuzzy-completions."
 (defun echo-kill-word ()
   (when (buffer-ui-tree *echo-area-buffer*)
     (kill-word-before-cursor (buffer-ui-tree *echo-area-buffer*)
-                             (if (eq *parse-type* :file) #\/ #\space))
+                             (if (eq (prompt-type) :file) #\/ #\space))
     (echo-refilter (buffer-ui-tree *echo-area-buffer*))))
 
 (defun echo-set-input (text)
@@ -365,7 +365,7 @@ CHUNKS is a list of (offset substring) pairs from fuzzy-completions."
 (defun echo-backward-word ()
   (when (buffer-ui-tree *echo-area-buffer*)
     (move-cursor-backward-word (buffer-ui-tree *echo-area-buffer*)
-                               (if (eq *parse-type* :file) #\/ #\space))
+                               (if (eq (prompt-type) :file) #\/ #\space))
     (echo-render (buffer-ui-tree *echo-area-buffer*))))
 
 (defun echo-set-message (text)

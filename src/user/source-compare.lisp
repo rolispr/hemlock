@@ -175,19 +175,20 @@
 
 (defun get-srccom-buffers (first-prompt buffer-a buffer-b dest-buffer p)
   (unless buffer-a
-    (setf buffer-a (prompt-for-buffer :prompt first-prompt
-                                      :must-exist t
-                                      :default (current-buffer))))
+    (setf buffer-a (nth-value 1 (prompt *buffer-names* :prompt first-prompt
+                                                       :must-exist t
+                                                       :default (buffer-name (current-buffer))))))
   (unless buffer-b
-    (setf buffer-b (prompt-for-buffer :prompt "With buffer: "
-                                      :must-exist t
-                                      :default (previous-buffer))))
+    (setf buffer-b (nth-value 1 (prompt *buffer-names* :prompt "With buffer: "
+                                                        :must-exist t
+                                                        :default (when (previous-buffer)
+                                                                   (buffer-name (previous-buffer)))))))
   (unless dest-buffer
     (setf dest-buffer
-          (prompt-for-buffer :prompt "Putting results in buffer: "
-                             :must-exist nil
-                             :default-string
-                             (value source-compare-default-destination))))
+          (prompt *buffer-names* :prompt "Putting results in buffer: "
+                                 :must-exist nil
+                                 :default-string
+                                 (value source-compare-default-destination))))
   (if (stringp dest-buffer)
       (setf dest-buffer (make-buffer dest-buffer))
       (buffer-end (buffer-point dest-buffer)))

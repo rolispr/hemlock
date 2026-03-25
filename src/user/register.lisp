@@ -33,7 +33,7 @@
        (setf (gethash ,name *registers*) ,value))))
 
 (defun prompt-for-register (&optional (prompt "Register: ") must-exist)
-  (let ((reg-name (prompt-for-key-event :prompt prompt)))
+  (let ((reg-name (prompt :key-event :prompt prompt)))
     (unless (or (not must-exist) (gethash reg-name *registers*))
       (editor-error "Register ~A is empty." reg-name))
     reg-name))

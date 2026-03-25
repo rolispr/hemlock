@@ -213,8 +213,8 @@
           (push folded (spell-info-insertions info))
           (message "~A inserted in the dictionary." word))
          (#\r "Prompt for a word to replace this word with."
-          (let ((s (prompt-for-string :prompt "Replace with: "
-                                      :default word
+          (let ((s (prompt :string :prompt "Replace with: "
+                                   :default word
  :help "Type a string to replace occurrences of this word with.")))
             (delete-region region)
             (insert-string point s)
@@ -274,10 +274,10 @@
       (insert-string mark old)
       (setf (value last-spelling-correction-words) nil)
       (when (or (not (value spelling-un-correct-prompt-for-insert))
-                (prompt-for-y-or-n
-                 :prompt (list "Insert ~A into spelling dictionary? " folded)
-                 :default t
-                 :default-string "Y"))
+                (prompt :y-or-n
+                        :prompt (list "Insert ~A into spelling dictionary? " folded)
+                        :default t
+                        :default-string "Y"))
         (push folded (spell-info-insertions (value spell-information)))
         (spell:maybe-read-spell-dictionary)
         (spell:spell-add-entry folded)
@@ -320,8 +320,8 @@
               ((null words))
             (format s "~36R=~A " i (car words)))
           (finish-output s)
-          (let* ((key-event (prompt-for-key-event
-                             :prompt "Correction choice: "))
+          (let* ((key-event (prompt :key-event
+                                   :prompt "Correction choice: "))
                  (num (digit-char-p (key-event-char key-event) 36)))
             (cond ((not num) (return-from get-word-correction nil))
                   ((> num (length close-words))
@@ -531,8 +531,8 @@
            (reprompt))
          (let ((num (if (= close-words-len 1) 0
                         (digit-char-p (key-event-char
-                                       (prompt-for-key-event
-                                        :prompt "Correction choice: "))
+                                       (prompt :key-event
+                                               :prompt "Correction choice: "))
                                       36))))
            (unless num (reprompt))
            (when (> num close-words-len)
@@ -560,10 +560,10 @@
       (#\a "Accept the word as correct (that is, ignore it)."
          (character-offset mark wordlen))
       (#\r "Replace the unknown word with a supplied replacement."
-         (let ((s (prompt-for-string
-                   :prompt "Replacement Word: "
-                   :default unfolded-word
-                   :help "String to replace the unknown word with.")))
+         (let ((s (prompt :string
+                        :prompt "Replacement Word: "
+                        :default unfolded-word
+                        :help "String to replace the unknown word with.")))
            (setf (gethash word *spelling-corrections*) s)
            (spell-replace-word mark unfolded-word s))
          (terpri))
@@ -631,24 +631,24 @@
   (let* ((info (value spell-information))
          (file (or (spell-info-pathname info)
                    (value default-user-spelling-dictionary)
-                   (prompt-for-file
-                    :prompt "Dictionary File: "
-                    :default (dictionary-name-default)
-                    :must-exist nil
-                    :help
+                   (prompt (dictionary-name-default)
+                          :prompt "Dictionary File: "
+                          :must-exist nil
+                          :help
  "Name of the dictionary file to append dictionary insertions to."))))
     (save-spelling-insertions info file)
     (let* ((ginfo (variable-value 'spell-information :global))
            (insertions (spell-info-insertions ginfo)))
       (when (and insertions
-                 (prompt-for-y-or-n
-                  :prompt
-                  `("Global spelling insertions exist.~%~
-                     Save these to ~A also? "
-                    ,(namestring file)
-                  :default t
-                  :default-string "Y"))
-        (save-spelling-insertions ginfo file))))))
+                 (prompt :y-or-n
+                         :prompt
+                         `("Global spelling insertions exist.~%~
+                            Save these to ~A also? "
+                           ,(namestring file))
+                         :default t
+                         :default-string "Y"))
+        (save-spelling-insertions ginfo file))))
+)
 
 (defun save-spelling-insertions (info &optional
                                       (name (spell-info-pathname info)))
@@ -671,10 +671,9 @@
   (declare (ignore p))
   (maybe-read-default-user-spelling-dictionary)
   (let* ((file (truename (or file
-                             (prompt-for-file
-                              :prompt "Dictionary File: "
-                              :default (dictionary-name-default)
-                              :help
+                             (prompt (dictionary-name-default)
+                                    :prompt "Dictionary File: "
+                                    :help
  "Name of the dictionary file to add into the current dictionary."))))
          (file-name (namestring file))
          (spell-info-p (gethash file-name *pathname-to-spell-info*))
@@ -705,11 +704,10 @@
   (spell:maybe-read-spell-dictionary)
   (spell:spell-read-dictionary
    (or file
-       (prompt-for-file
-        :prompt "Dictionary File: "
-        :default (dictionary-name-default)
-        :help
-        "Name of the dictionary file to add into the current dictionary."))))
+       (prompt (dictionary-name-default)
+               :prompt "Dictionary File: "
+               :help
+               "Name of the dictionary file to add into the current dictionary."))))
 
 (defun dictionary-name-default ()
   (make-pathname :defaults (buffer-default-pathname (current-buffer))
@@ -732,9 +730,9 @@
   "Prompts for word to remove from the spelling dictionary."
    (declare (ignore p))
   (spell:maybe-read-spell-dictionary)
-  (let* ((word (prompt-for-string
-                :prompt "Word to remove from spelling dictionary: "
-                :trim t))
+  (let* ((word (prompt :string
+                       :prompt "Word to remove from spelling dictionary: "
+                       :trim t))
          (upword (string-upcase word)))
     (declare (simple-string word))
     (multiple-value-bind (index flagp)
@@ -745,14 +743,14 @@
           (remove-spelling-word upword)
           (let ((flags (spell:spell-root-flags index)))
             (when (or (not flags)
-                      (prompt-for-y-or-n
-                       :prompt
+                      (prompt :y-or-n
+                              :prompt
  `("Deleting ~A also removes words formed from this root and these flags: ~%  ~
     ~S.~%~
     Delete word anyway? "
    ,word ,flags)
-                       :default t
-                       :default-string "Y"))
+                              :default t
+                              :default-string "Y"))
               (remove-spelling-word upword)))))))
 
 ;;; REMOVE-SPELLING-WORD removes the uppercase word word from the spelling

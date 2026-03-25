@@ -81,10 +81,10 @@
    Utility Options\".  Errors appear in the echo area."
   "Prints a file."
   (declare (ignore p))
-  (let* ((pn (prompt-for-file :prompt "File to print: "
-                              :help "Name of file to print."
-                              :default (buffer-default-pathname (current-buffer))
-                              :must-exist t))
+  (let* ((pn (prompt (buffer-default-pathname (current-buffer))
+                     :prompt "File to print: "
+                     :help "Name of file to print."
+                     :must-exist t))
          (ns (namestring (truename pn))))
     (message "Printing file...~%")
     (print-something () (value print-utility)
@@ -101,9 +101,8 @@
   "Scribe a file with the default directory set to the directory of the
    specified file."
   (declare (ignore p))
-  (scribe-file (prompt-for-file :prompt "Scribe file: "
-                                :default
-                                (buffer-default-pathname (current-buffer)))))
+  (scribe-file (prompt (buffer-default-pathname (current-buffer))
+                       :prompt "Scribe file: ")))
 
 (defhvar "Scribe Buffer File Confirm"
   "When set, \"Scribe Buffer File\" prompts for confirmation before doing
@@ -124,10 +123,10 @@
          (pathname (buffer-pathname buffer))
          (modified (buffer-modified buffer)))
     (when (or (not (value scribe-buffer-file-confirm))
-              (prompt-for-y-or-n
-               :default t :default-string "Y"
-               :prompt (list "~:[S~;Save and s~]cribe file ~A? "
-                             modified (namestring pathname))))
+              (prompt :y-or-n
+                      :default t :default-string "Y"
+                      :prompt (list "~:[S~;Save and s~]cribe file ~A? "
+                                    modified (namestring pathname))))
       (when modified (write-buffer-file buffer pathname))
       (scribe-file pathname))))
 
@@ -171,9 +170,9 @@
   Hemlock commands; use UNIX-FILTER-REGION instead."
   (declare (ignore p))
   (let* ((region (current-region))
-         (filter-and-args (prompt-for-string
-                           :prompt "Filter: "
-                           :help "Unix program to filter the region through."))
+         (filter-and-args (prompt :string
+                                 :prompt "Filter: "
+                                 :help "Unix program to filter the region through."))
          (filter-and-args-list (listify-unix-filter-string filter-and-args))
          (filter (car filter-and-args-list))
          (args (cdr filter-and-args-list))
@@ -219,7 +218,7 @@
    If given an argument, this will put the man page in a Pop-up display."
   "Read the Unix manual pages in a View buffer.
    If given an argument, this will put the man page in a Pop-up display."
-  (let ((topic (prompt-for-string :prompt "Man topic: ")))
+  (let ((topic (prompt :string :prompt "Man topic: ")))
     (if p
         (with-pop-up-display (stream)
           (execute-man topic stream))

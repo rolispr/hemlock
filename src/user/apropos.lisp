@@ -111,8 +111,8 @@
 
 (defcommand "Agent Apropos Ignoring Point"
             (p &optional (str
-                          (prompt-for-string
-                           :prompt "Apropos string: ")))
+                          (prompt :string
+                                  :prompt "Apropos string: ")))
   "" ""
   (declare (ignore p))
   (agent-apropos str))
@@ -128,9 +128,9 @@
     (when (find #\newline default)
       (setf default nil))
     (agent-apropos
-     (prompt-for-string
-      :prompt "Apropos string: "
-      :default default))))
+     (prompt :string
+             :prompt "Apropos string: "
+             :default default))))
 
 (defun agent-apropos (str)
   (hemlock::eval-in-agent `(%apropos ',str)))

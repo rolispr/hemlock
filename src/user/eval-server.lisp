@@ -313,11 +313,11 @@
           (values name (format nil "Compilation ~A" name))
           (pick-agent-buffer-names))
     (when (value confirm-agent-creation)
-      (setf agent (prompt-for-string
-                   :prompt "New agent name? "
-                   :help "Enter the name to use for the newly created agent."
-                   :default agent
-                   :default-string agent))
+      (setf agent (prompt :string
+                        :prompt "New agent name? "
+                        :help "Enter the name to use for the newly created agent."
+                        :default agent
+                        :default-string agent))
       (setf background (format nil "Compilation ~A" agent))
       (when (getstring agent *buffer-names*)
         (editor-error "Buffer ~A is already in use." agent))
@@ -347,11 +347,11 @@
           (values name (format nil "Compilation ~A" name))
           (pick-agent-buffer-names))
     (when (value confirm-agent-creation)
-      (setf agent (prompt-for-string
-                   :prompt "New agent name? "
-                   :help "Enter the name to use for the newly created agent."
-                   :default agent
-                   :default-string agent))
+      (setf agent (prompt :string
+                          :prompt "New agent name? "
+                          :help "Enter the name to use for the newly created agent."
+                          :default agent
+                          :default-string agent))
       (setf background (format nil "Compilation ~A" agent))
       (when (getstring agent *buffer-names*)
         (editor-error "Buffer ~A is already in use." agent))
@@ -381,13 +381,13 @@
         (if first-server-info
             (multiple-value-bind
                 (name info)
-                (prompt-for-keyword (list *server-names*)
-                                    :prompt "Existing server name: "
-                                    :default first-server-name
-                                    :default-string first-server-name
-                                    :help
-                                    "Enter the name of an existing eval agent."
-                                    :must-exist t)
+                (prompt *server-names*
+                       :prompt "Existing server name: "
+                       :default first-server-name
+                       :default-string first-server-name
+                       :help
+                       "Enter the name of an existing eval agent."
+                       :must-exist t)
               (declare (ignore name))
               (or info (create-local-eval)))
             (create-local-eval)))
@@ -999,9 +999,9 @@
 ;;;;
 
 (defcommand "Start Swank Server"
-    (p &optional (port (prompt-for-integer
-                        :prompt "Port: "
-                        :default-string "4005")))
+    (p &optional (port (prompt :integer
+                              :prompt "Port: "
+                              :default-string "4005")))
   "" ""
   (declare (ignore p))
   (asdf:operate 'asdf:load-op :swank)

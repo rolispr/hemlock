@@ -36,23 +36,22 @@
   definition file associated with the group."
   "Makes a group the active group."
   (let* ((group-name
-          (prompt-for-keyword
-           (list *file-groups*)
-           :must-exist nil
-           :prompt "Select Group: "
-           :help
-           "Type the name of the file group you wish to become the active group."))
+          (prompt *file-groups*
+                 :must-exist nil
+                 :prompt "Select Group: "
+                 :help
+                 "Type the name of the file group you wish to become the active group."))
          (old (getstring group-name *file-groups*))
          (pathname
           (if (and old (not p))
               old
-              (prompt-for-file :must-exist t
-                               :prompt "From File: "
-                               :default (merge-pathnames
-                                         (make-pathname
-                                          :name group-name
-                                          :type "upd")
-                                         (value pathname-defaults))))))
+              (prompt (merge-pathnames
+                       (make-pathname
+                        :name group-name
+                        :type "upd")
+                       (value pathname-defaults))
+                      :must-exist t
+                      :prompt "From File: "))))
     (setq *active-file-group-name* group-name)
     (setq *active-file-group* (nreverse (read-file-group pathname nil)))
     (setf (getstring group-name *file-groups*) pathname)))
@@ -158,9 +157,9 @@
          (name (namestring pn)))
     (when (and (buffer-modified buffer)
                (or (not (value group-save-file-confirm))
-                   (prompt-for-y-or-n
-                    :prompt (list "Save changes in ~A? " name)
-                    :default t)))
+                   (prompt :y-or-n
+                           :prompt (list "Save changes in ~A? " name)
+                           :default t)))
       (save-file-command ()))))
 
 
@@ -171,9 +170,9 @@
   "Searches the active group for a specified string, which is prompted for."
   "Searches the active group for a specified string."
   (declare (ignore p))
-  (let ((string (prompt-for-string :prompt "Group Search: "
-                                   :help "String to search for in active file group"
-                                   :default *last-search-string*)))
+  (let ((string (prompt :string :prompt "Group Search: "
+                                :help "String to search for in active file group"
+                                :default *last-search-string*)))
     (get-search-pattern string :forward)
     (do-active-group
      (do ((won (find-pattern (current-point) *last-search-pattern*)
@@ -198,11 +197,11 @@
   "Replaces one string with another in the active file group."
   "Replaces one string with another in the active file group."
   (declare (ignore p))
-  (let* ((target (prompt-for-string :prompt "Group Replace: "
-                                    :help "Target string"
-                                    :default *last-search-string*))
-         (replacement (prompt-for-string :prompt "With: "
-                                         :help "Replacement string")))
+  (let* ((target (prompt :string :prompt "Group Replace: "
+                                 :help "Target string"
+                                 :default *last-search-string*))
+         (replacement (prompt :string :prompt "With: "
+                                      :help "Replacement string")))
     (do-active-group
      (query-replace-function nil target replacement
                              "Group Replace on previous file" t))
@@ -213,11 +212,11 @@
   "Query Replace for the active file group."
   "Query Replace for the active file group."
   (declare (ignore p))
-  (let ((target (prompt-for-string :prompt "Group Query Replace: "
-                                   :help "Target string"
-                                   :default *last-search-string*)))
-    (let ((replacement (prompt-for-string :prompt "With: "
-                                          :help "Replacement string")))
+  (let ((target (prompt :string :prompt "Group Query Replace: "
+                                :help "Target string"
+                                :default *last-search-string*)))
+    (let ((replacement (prompt :string :prompt "With: "
+                                       :help "Replacement string")))
       (do-active-group
        (unless (query-replace-function
                 nil target replacement "Group Query Replace on previous file")
