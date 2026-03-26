@@ -75,46 +75,6 @@
 (defvar *ts-dirty-buffers* nil)
 
 ;;; Self-pipe: actor thread writes a byte here when a parse completes,
-;;; waking up sb-sys:serve-event so the main loop picks up pending highlights
-;;; without waiting for the next keypress.
-(defvar *ts-wakeup-read-fd*  nil)
-(defvar *ts-wakeup-write-fd* nil)
-(defvar *ts-wakeup-handler*  nil)
-
-(defun ts-setup-wakeup-pipe ()
-  "Create a self-pipe and register the read end with sb-sys:add-fd-handler."
-  (when *ts-wakeup-handler*
-    (ignore-errors (sb-sys:remove-fd-handler *ts-wakeup-handler*))
-    (setf *ts-wakeup-handler* nil))
-  (when *ts-wakeup-read-fd*
-    (ignore-errors (sb-posix:close *ts-wakeup-read-fd*))
-    (ignore-errors (sb-posix:close *ts-wakeup-write-fd*))
-    (setf *ts-wakeup-read-fd* nil *ts-wakeup-write-fd* nil))
-  (multiple-value-bind (rfd wfd) (sb-posix:pipe)
-    (setf *ts-wakeup-read-fd* rfd
-          *ts-wakeup-write-fd* wfd)
-    (setf *ts-wakeup-handler*
-          (sb-sys:add-fd-handler
-           rfd :input
-           (let ((drain-buf (make-array 64 :element-type '(unsigned-byte 8))))
-             (lambda (fd)
-               (declare (ignore fd))
-               ;; Drain all pending bytes; content doesn't matter.
-               (ignore-errors
-                 (sb-sys:with-pinned-objects (drain-buf)
-                   (sb-unix:unix-read *ts-wakeup-read-fd*
-                                      (sb-sys:vector-sap drain-buf) 64)))))))))
-
-(defvar *ts-wakeup-buf* (make-array 1 :element-type '(unsigned-byte 8) :initial-element 0)
-  "Reusable byte buffer for wakeup pipe writes.")
-
-(defun ts-wake-up-main-thread ()
-  "Write a byte to the wakeup pipe from the actor thread, unblocking serve-event."
-  (when *ts-wakeup-write-fd*
-    (ignore-errors
-      (sb-sys:with-pinned-objects (*ts-wakeup-buf*)
-        (sb-unix:unix-write *ts-wakeup-write-fd*
-                            (sb-sys:vector-sap *ts-wakeup-buf*) 0 1)))))
 
 
 (defun ts-capture-name-to-font (name)
@@ -191,8 +151,6 @@ Returns NIL for unrecognised captures (no color applied)."
                         :name "hemlock-ts"
                         :dispatcher :pinned
                         :receive #'ts-actor-receive))
-        ;; Self-pipe for waking up the main event loop on parse completion.
-        (ts-setup-wakeup-pipe)
         ;; Only true when actor is fully ready.
         (setf *ts-initialized* t)
         ;; Wire modification hook so buffer changes trigger parse scheduling.
@@ -399,8 +357,7 @@ Returns NIL for unrecognised captures (no color applied)."
                   (setf (ts-buffer-state-stable-tree state)
                         (when (and new-tree-ptr (not (cffi:null-pointer-p new-tree-ptr)))
                           (tree-sitter/ffi:ts-tree-copy new-tree-ptr)))
-                  ;; Wake up the main thread so it applies highlights immediately.
-                  (ts-wake-up-main-thread))
+                  (hemlock.io:wake-event-loop))
                 (when (and (not (ts-buffer-state-alive-p state))
                            new-tree-ptr
                            (not (cffi:null-pointer-p new-tree-ptr)))

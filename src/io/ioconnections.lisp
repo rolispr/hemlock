@@ -62,6 +62,15 @@
   (loop while *pending-invocations*
         do (funcall (pop *pending-invocations*))))
 
+(defun wake-event-loop ()
+  "Write a byte to the wakeup pipe, unblocking serve-event.
+   Use this when no callback is needed — just need the main loop to cycle
+   (e.g. to pick up redisplay changes from another thread)."
+  (when *wakeup-write-fd*
+    (cffi:with-foreign-object (byte :char 1)
+      (setf (cffi:mem-ref byte :char) 1)
+      (cffi:foreign-funcall "write" :int *wakeup-write-fd* :pointer byte :size 1 :long))))
+
 
 ;;;;
 ;;;; fd-readable-p — poll(2) with timeout 0

@@ -885,6 +885,9 @@
    #:device-enlarge-window
    #:*background-image*
 
+   ;; tree-sitter
+   #:ts-stable-tree-for-buffer
+
    ;; parse/echo variables
    #:*echo-area-stream*
    #:*echo-area-window*
@@ -1709,7 +1712,8 @@
    ;; fd utilities
    #:fd-readable-p
    #:drain-pending-invocations
-   #:setup-wakeup-pipe))
+   #:setup-wakeup-pipe
+   #:wake-event-loop))
 
 (defpackage :hemlock.terminfo
   (:use :common-lisp)

@@ -121,6 +121,30 @@
       current)))
 
 
+;;;; ─── Expand/shrink selection history ─────────────────────────────────────
+;;;
+;;; Like Helix, Alt-o pushes the previous span before expanding; Alt-i pops.
+;;; The stack is buffer-local and clears on any non-expand/shrink command.
+
+(defvar *expand-selection-stack* nil
+  "Stack of (start-byte . end-byte) pairs for the current buffer's expand history.")
+(defvar *expand-selection-buffer* nil
+  "Buffer the expand stack belongs to. Cleared when switching buffers.")
+
+(defun expand-stack-push (start-byte end-byte)
+  "Push a span onto the expand history."
+  (push (cons start-byte end-byte) *expand-selection-stack*))
+
+(defun expand-stack-pop ()
+  "Pop and return (start-byte . end-byte) or NIL if empty."
+  (pop *expand-selection-stack*))
+
+(defun expand-stack-ensure-buffer (buffer)
+  "Clear the expand stack if we've switched buffers."
+  (unless (eq buffer *expand-selection-buffer*)
+    (setf *expand-selection-stack* nil
+          *expand-selection-buffer* buffer)))
+
 ;;;; ─── Selection helper ────────────────────────────────────────────────────
 
 (defun %select-node-bytes (start-byte end-byte buffer)
@@ -144,16 +168,17 @@ Point moves to end; mark anchors at start. Enters Select mode."
 (defcommand "Expand Selection" (p)
   "Expand selection to the enclosing syntax node (Alt-o).
 If no selection: select the node at point.
-If selection already covers the node exactly: expand to its parent."
+If selection already covers the node exactly: expand to its parent.
+Pushes the current span onto the expand stack so Alt-i can shrink back."
   "Helix Alt-o — tree-sitter expand."
   (declare (ignore p))
   (let* ((buffer   (current-buffer))
          (tree-ptr (ts-stable-tree-for-buffer buffer)))
     (unless tree-ptr
       (editor-error "Tree-sitter unavailable for this buffer"))
+    (expand-stack-ensure-buffer buffer)
     (let* ((point (current-point))
            (node  (if (region-active-p)
-                      ;; Find node covering the full selection.
                       (let* ((mark  (buffer-mark buffer))
                              (sb    (min (%mark-to-byte-offset point)
                                         (%mark-to-byte-offset mark)))
@@ -174,29 +199,50 @@ If selection already covers the node exactly: expand to its parent."
                         (nsb   (tree-sitter/node:node-start-byte node))
                         (neb   (tree-sitter/node:node-end-byte   node)))
                    (if (and (= sb nsb) (= eb neb))
-                       (or (tree-sitter/node:node-parent node) node)
+                       (let ((parent (tree-sitter/node:node-parent node)))
+                         (if (or (null parent)
+                                 (null (tree-sitter/node:node-parent parent)))
+                             ;; Already at root or one below — stop.
+                             (progn (message "Already at top-level node")
+                                    (return-from expand-selection-command nil))
+                             parent))
                        node))
                  node)))
+        ;; Push current span before expanding.
+        (when (region-active-p)
+          (let* ((mark (buffer-mark buffer))
+                 (sb   (min (%mark-to-byte-offset point)
+                            (%mark-to-byte-offset mark)))
+                 (eb   (max (%mark-to-byte-offset point)
+                            (%mark-to-byte-offset mark))))
+            (expand-stack-push sb eb)))
         (%select-node-bytes (tree-sitter/node:node-start-byte target)
                             (tree-sitter/node:node-end-byte   target)
                             buffer)))))
 
 (defcommand "Shrink Selection" (p)
-  "Shrink selection to the first named child node (Alt-i)."
+  "Shrink selection to the previous expand level (Alt-i).
+Pops the expand-selection stack. If stack is empty, falls back to
+selecting the first named child node."
   "Helix Alt-i — tree-sitter shrink."
   (declare (ignore p))
-  (let* ((buffer   (current-buffer))
-         (tree-ptr (ts-stable-tree-for-buffer buffer)))
-    (unless tree-ptr
-      (editor-error "Tree-sitter unavailable for this buffer"))
-    (let* ((point (current-point))
-           (node  (%node-at-mark point tree-ptr))
-           (child (when node (tree-sitter/node:node-named-child node 0))))
-      (if child
-          (%select-node-bytes (tree-sitter/node:node-start-byte child)
-                              (tree-sitter/node:node-end-byte   child)
-                              buffer)
-          (editor-error "No child node to shrink to")))))
+  (let ((buffer (current-buffer)))
+    (expand-stack-ensure-buffer buffer)
+    (let ((prev (expand-stack-pop)))
+      (if prev
+          (%select-node-bytes (car prev) (cdr prev) buffer)
+          ;; Stack empty — try child descent as fallback.
+          (let ((tree-ptr (ts-stable-tree-for-buffer buffer)))
+            (unless tree-ptr
+              (editor-error "Tree-sitter unavailable for this buffer"))
+            (let* ((point (current-point))
+                   (node  (%node-at-mark point tree-ptr))
+                   (child (when node (tree-sitter/node:node-named-child node 0))))
+              (if child
+                  (%select-node-bytes (tree-sitter/node:node-start-byte child)
+                                      (tree-sitter/node:node-end-byte   child)
+                                      buffer)
+                  (editor-error "No child node to shrink to"))))))))
 
 (defcommand "Select Next Sibling" (p)
   "Select the next named sibling AST node (Alt-n)."

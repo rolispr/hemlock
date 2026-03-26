@@ -144,7 +144,11 @@
      (:ctrl-_  (string (code-char 31))) ; 31
      (:escape  (string #\Escape))       ; 27
      (:return  (string #\Return))       ; 13
-     (:backspace (string (code-char 127))))))
+     (:backspace (string (code-char 127)))))
+
+(defun send-alt (char)
+  "Send Alt+CHAR as ESC followed by CHAR in a single write (meta key)."
+  (%fd-write *fd* (coerce (list #\Escape char) 'string))))
 
 
 ;; ─── Assertions ──────────────────────────────────────────────────────────────
@@ -155,6 +159,33 @@
       (progn (format t "  FAIL: ~A  (expected: ~S)~%" label pattern)
              (format t "  --- screen ---~%~A~%  ---~%" (screen))
              (incf *fail*))))
+
+(defun drain-with-timeout (&optional (timeout-sec 5))
+  "Drain PTY output. If hemlock keeps producing output past TIMEOUT-SEC,
+return :hung instead of blocking forever."
+  (let ((deadline (+ (get-internal-real-time)
+                     (* timeout-sec internal-time-units-per-second))))
+    (loop while (< (get-internal-real-time) deadline)
+          do (if (%fd-readable-p *fd* 100)
+                 (let ((chunk (%fd-read-chunk *fd*)))
+                   (when chunk
+                     (hemlock.term:term-process-output *vterm* chunk))
+                   ;; Reset deadline on new output — give it more time.
+                   (setf deadline (+ (get-internal-real-time)
+                                     (* timeout-sec internal-time-units-per-second))))
+                 ;; No output for 100ms — hemlock is quiescent.
+                 (return :ok)))
+    ;; If we got here, we timed out — hemlock is still producing output.
+    :hung))
+
+(defun check-not-hung (label)
+  "Drain with timeout and fail if hemlock appears hung."
+  (let ((result (drain-with-timeout 5)))
+    (if (eq result :ok)
+        (progn (format t "  PASS: ~A~%" label) (incf *pass*))
+        (progn (format t "  FAIL: ~A  (hemlock hung — no quiescence in 5s)~%" label)
+               (format t "  --- screen ---~%~A~%  ---~%" (screen))
+               (incf *fail*)))))
 
 (defun check-absent (label pattern)
   (if (not (search pattern (screen)))
@@ -304,7 +335,65 @@
   (send-key :ctrl-k) (drain)          ; kill "undotest" into kill ring
   (send-key :ctrl-y) (drain)          ; yank back
   (check        "yank restores text"     "undotest")
-  (check-absent "no debugger after yank" "Debugger"))
+  (check-absent "no debugger after yank" "Debugger")
+
+  ;; ── Test 13: Alt key (Meta) via send-alt ───────────────────────────────
+  (format t "~%--- Test 13: Alt key (Meta) ---~%")
+  (send-key :ctrl-g) (drain)
+  (send-alt #\x) (drain)
+  (check        "Alt-x opens extended command" "Extended Command:")
+  (check-absent "no debugger on Alt-x"         "Debugger")
+  (send-key :ctrl-g) (drain)
+
+  ;; ── Test 14: Alt-o single expand ─────────────────────────────────────
+  (format t "~%--- Test 14: Alt-o single expand ---~%")
+  (send-key :ctrl-g) (drain)
+  (send-alt #\o) (drain)
+  (check-absent "no UNDEFINED-FUNCTION on Alt-o" "UNDEFINED-FUNCTION")
+  (check-absent "no debugger on Alt-o"           "Debugger")
+
+  ;; ── Test 15: Alt-o repeated expand until top-level ──────────────────
+  (format t "~%--- Test 15: Alt-o repeated expand to top-level ---~%")
+  ;; Open a Lisp file so tree-sitter has something to parse.
+  (send-key :ctrl-x) (sleep 0.15)
+  (send-key :ctrl-f) (drain)
+  ;; Open a file we know exists.
+  (send-string "src/user/modal.lisp") (drain)
+  (send-key :return) (drain 2)  ; give tree-sitter time to parse
+  ;; Navigate into some code.
+  (send-string "5j") (drain)    ; move down a few lines in Normal mode
+  ;; Expand repeatedly — should hit top-level and stop.
+  (dotimes (i 10)
+    (send-alt #\o) (drain 0.2))
+  (check-not-hung "not hung after 10x Alt-o")
+  (check-absent "no debugger after repeated expand" "Debugger")
+  (check-absent "no UNDEFINED-FUNCTION after expand" "UNDEFINED-FUNCTION")
+
+  ;; ── Test 16: Alt-i shrink after expand ──────────────────────────────
+  (format t "~%--- Test 16: Alt-i shrink after expand ---~%")
+  (send-alt #\i) (drain 0.3)
+  (check-not-hung "not hung after Alt-i shrink")
+  (check-absent "no debugger after shrink" "Debugger")
+
+  ;; ── Test 17: Escape after expand, then type ─────────────────────────
+  (format t "~%--- Test 17: Escape after expand, then normal use ---~%")
+  (send-key :escape) (drain 0.3)
+  (send-string "j") (drain 0.3)
+  (send-string "j") (drain 0.3)
+  (check-not-hung "not hung after Escape+navigation post-expand")
+  (check-absent "no debugger after Escape+navigation" "Debugger")
+
+  ;; ── Test 18: Expand/shrink cycle ────────────────────────────────────
+  (format t "~%--- Test 18: Expand/shrink cycle ---~%")
+  ;; Alt-o 5x, Alt-i 5x, Alt-o 3x, Escape, type
+  (dotimes (i 5) (send-alt #\o) (drain 0.2))
+  (dotimes (i 5) (send-alt #\i) (drain 0.2))
+  (dotimes (i 3) (send-alt #\o) (drain 0.2))
+  (send-key :escape) (drain 0.3)
+  (send-string "itest") (drain 0.3)  ; enter insert mode and type
+  (send-key :escape) (drain 0.3)     ; back to normal
+  (check-not-hung "not hung after expand/shrink cycling")
+  (check-absent "no debugger after expand/shrink cycle" "Debugger"))
 
 
 ;; ─── Main ────────────────────────────────────────────────────────────────────
