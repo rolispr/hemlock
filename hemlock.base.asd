@@ -26,7 +26,8 @@
                   :trivial-garbage
                   :cl-ppcre
                   :command-line-arguments
-                  :sento)
+                  :sento
+                  :sento-remoting)
     :components
     ((:module wire
               :pathname "src/wire/"

@@ -216,8 +216,6 @@
     ;;
     (reg #\tab #k"Tab")
     (reg #\escape #k"Escape")
-    ;; Kludge: This shouldn't be needed, but otherwise C-c M-i doesn't work.
-    (reg '(#\Esc #\i) #k"meta-i")
 
     ;; Xterm Shift+F1-F12 sequences (modifier code 2).
     ;; Modern terminals send these for Shift+Fn; not in terminfo.
@@ -238,6 +236,12 @@
 (defun translate-tty-event (data)
   (let ((string (coerce data 'string)))
     (or (gethash string *tty-translations*)
+        (when (and (= 2 (length string))
+                   (char= (char string 0) #\Escape))
+          ;; ESC+key is necessary for tty's to understand meta/alt+key...
+          (let ((base (char-key-event (char string 1))))
+            (when base
+              (make-key-event base (key-event-modifier-mask "Meta")))))
         (when (= 1 (length string))
           (char-key-event (char string 0))))))
 
