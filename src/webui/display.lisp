@@ -294,13 +294,14 @@
                                   (json-escape dom-id) point-idx))
                         (setf (gethash window *prev-point-idx*) point-idx)))))
               (error (c)
-                (ignore-errors
-                  (with-open-file (f "/tmp/hemlock-webui-error.log"
-                                     :direction :output
-                                     :if-exists :append
-                                     :if-does-not-exist :create)
-                    (format f "~&[~A] ~A~%" (get-universal-time) c)
-                    (sb-debug:print-backtrace :stream f :count 10)))
+                (handler-case
+                    (with-open-file (f "/tmp/hemlock-webui-error.log"
+                                       :direction :output
+                                       :if-exists :append
+                                       :if-does-not-exist :create)
+                      (format f "~&[~A] ~A~%" (get-universal-time) c)
+                      (sb-debug:print-backtrace :stream f :count 10))
+                  (error () nil))  ; log I/O failed; nothing more we can do
                 nil))))
         (when (and *echo-area-buffer* *echo-area-window*)
           (handler-case

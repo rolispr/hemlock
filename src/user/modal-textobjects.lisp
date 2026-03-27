@@ -6,15 +6,15 @@
 ;;;             ts-highlight.lisp (ts-stable-tree-for-buffer)
 ;;;
 ;;; Commands defined here:
-;;;   "Expand Selection"   (Alt-o) — grow to enclosing AST node
-;;;   "Shrink Selection"   (Alt-i) — shrink to first named child
-;;;   "Select Next Sibling" (Alt-n) — jump to next named sibling
-;;;   "Select Prev Sibling" (Alt-p) — jump to previous named sibling
+;;;   "Expand Selection"   (Alt-o) -- grow to enclosing AST node
+;;;   "Shrink Selection"   (Alt-i) -- shrink to first named child
+;;;   "Select Next Sibling" (Alt-n) -- jump to next named sibling
+;;;   "Select Prev Sibling" (Alt-p) -- jump to previous named sibling
 
 (in-package :hemlock)
 
 
-;;;; ─── Byte ↔ mark conversion ──────────────────────────────────────────────
+;;;; Byte <-> mark conversion.
 ;;;
 ;;; Tree-sitter works in UTF-8 byte offsets; hemlock uses (line, charpos) marks.
 
@@ -62,7 +62,7 @@
                 (mark-charpos mark) char-idx))))))
 
 
-;;;; ─── AST node lookup ─────────────────────────────────────────────────────
+;;;; AST node lookup.
 
 (defun %node-at-mark (mark tree-ptr)
   "Return the deepest named AST node in TREE-PTR that covers MARK, or NIL."
@@ -121,7 +121,7 @@
       current)))
 
 
-;;;; ─── Expand/shrink selection history ─────────────────────────────────────
+;;;; Expand/shrink selection history.
 ;;;
 ;;; Like Helix, Alt-o pushes the previous span before expanding; Alt-i pops.
 ;;; The stack is buffer-local and clears on any non-expand/shrink command.
@@ -145,7 +145,7 @@
     (setf *expand-selection-stack* nil
           *expand-selection-buffer* buffer)))
 
-;;;; ─── Selection helper ────────────────────────────────────────────────────
+;;;; Selection helper.
 
 (defun %select-node-bytes (start-byte end-byte buffer)
   "Set the active selection to cover [START-BYTE, END-BYTE) in BUFFER.
@@ -163,14 +163,14 @@ Point moves to end; mark anchors at start. Enters Select mode."
     (update-modeline-fields buffer (current-window))))
 
 
-;;;; ─── Structural selection commands ──────────────────────────────────────
+;;;; Structural selection commands.
 
 (defcommand "Expand Selection" (p)
   "Expand selection to the enclosing syntax node (Alt-o).
 If no selection: select the node at point.
 If selection already covers the node exactly: expand to its parent.
 Pushes the current span onto the expand stack so Alt-i can shrink back."
-  "Helix Alt-o — tree-sitter expand."
+  "Helix Alt-o -- tree-sitter expand."
   (declare (ignore p))
   (let* ((buffer   (current-buffer))
          (tree-ptr (ts-stable-tree-for-buffer buffer)))
@@ -202,7 +202,7 @@ Pushes the current span onto the expand stack so Alt-i can shrink back."
                        (let ((parent (tree-sitter/node:node-parent node)))
                          (if (or (null parent)
                                  (null (tree-sitter/node:node-parent parent)))
-                             ;; Already at root or one below — stop.
+                             ;; Already at root or one below -- stop.
                              (progn (message "Already at top-level node")
                                     (return-from expand-selection-command nil))
                              parent))
@@ -224,14 +224,14 @@ Pushes the current span onto the expand stack so Alt-i can shrink back."
   "Shrink selection to the previous expand level (Alt-i).
 Pops the expand-selection stack. If stack is empty, falls back to
 selecting the first named child node."
-  "Helix Alt-i — tree-sitter shrink."
+  "Helix Alt-i -- tree-sitter shrink."
   (declare (ignore p))
   (let ((buffer (current-buffer)))
     (expand-stack-ensure-buffer buffer)
     (let ((prev (expand-stack-pop)))
       (if prev
           (%select-node-bytes (car prev) (cdr prev) buffer)
-          ;; Stack empty — try child descent as fallback.
+          ;; Stack empty -- try child descent as fallback.
           (let ((tree-ptr (ts-stable-tree-for-buffer buffer)))
             (unless tree-ptr
               (editor-error "Tree-sitter unavailable for this buffer"))
@@ -246,7 +246,7 @@ selecting the first named child node."
 
 (defcommand "Select Next Sibling" (p)
   "Select the next named sibling AST node (Alt-n)."
-  "Helix Alt-n — tree-sitter next sibling."
+  "Helix Alt-n -- tree-sitter next sibling."
   (declare (ignore p))
   (let* ((buffer   (current-buffer))
          (tree-ptr (ts-stable-tree-for-buffer buffer)))
@@ -263,7 +263,7 @@ selecting the first named child node."
 
 (defcommand "Select Prev Sibling" (p)
   "Select the previous named sibling AST node (Alt-p)."
-  "Helix Alt-p — tree-sitter prev sibling."
+  "Helix Alt-p -- tree-sitter prev sibling."
   (declare (ignore p))
   (let* ((buffer   (current-buffer))
          (tree-ptr (ts-stable-tree-for-buffer buffer)))

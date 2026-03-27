@@ -4,8 +4,8 @@
 ;;; Helix-style modal editing for Hemlock.
 ;;;
 ;;; Two minor modes:
-;;;   "Normal"  (precedence 5.0) — navigation + operators; motions collapse selection
-;;;   "Select"  (precedence 10.0) — shadows Normal motions with raw equivalents;
+;;;   "Normal"  (precedence 5.0) --navigation + operators; motions collapse selection
+;;;   "Select"  (precedence 10.0) --shadows Normal motions with raw equivalents;
 ;;;                                  moving point extends the active region naturally
 ;;;
 ;;; Insert mode = neither Normal nor Select is active (hemlock default state).
@@ -15,7 +15,7 @@
 (in-package :hemlock)
 
 
-;;;; ─── Mode Definitions ──────────────────────────────────────────────────────
+;;;; Mode Definitions.
 
 (defmode "Normal"
   :major-p nil
@@ -32,7 +32,7 @@
    Press v or Escape to return to normal mode.")
 
 
-;;;; ─── Hemlock Variables ─────────────────────────────────────────────────────
+;;;; Hemlock Variables.
 
 (defhvar "Default Editing Style"
   "Global default editing style.
@@ -42,13 +42,13 @@
 
 (defhvar "Modal Buffer"
   "Per-buffer modal editing state.
-   :on    — this buffer is in modal editing mode.
-   :off   — modal editing suppressed for this buffer (user opted out).
-   :unset — follows the Default Editing Style global setting."
+   :on    --this buffer is in modal editing mode.
+   :off   --modal editing suppressed for this buffer (user opted out).
+   :unset --follows the Default Editing Style global setting."
   :value :unset)
 
 
-;;;; ─── Variable Helpers ──────────────────────────────────────────────────────
+;;;; Variable Helpers.
 ;;;
 ;;; variable-value :buffer only works when a buffer-local binding exists (created
 ;;; via defhvar :buffer).  The global default does NOT fall through automatically.
@@ -72,7 +72,7 @@
   (setf (variable-value 'modal-buffer :buffer buffer) value))
 
 
-;;;; ─── Modeline Field ─────────────────────────────────────────────────────────
+;;;; Modeline Field.
 
 (make-modeline-field
  :name :modal-indicator
@@ -94,7 +94,7 @@
       *default-modeline-fields*)
 
 
-;;;; ─── Internal Helper ────────────────────────────────────────────────────────
+;;;; Internal Helper.
 
 (defmacro %leave-modal-modes (buf)
   "Remove Normal and Select minor modes from BUF and deactivate region."
@@ -119,7 +119,7 @@
             (push-buffer-mark after t))))))
 
 
-;;;; ─── Mode-Switch Commands ───────────────────────────────────────────────────
+;;;; Mode-Switch Commands.
 
 (defcommand "Normal Mode" (p)
   "Enter Normal mode: disable Select mode, activate Normal mode, deactivate region."
@@ -190,7 +190,7 @@
           (message "Modal editing on.")))))
 
 
-;;;; ─── Insert Mode Transitions ───────────────────────────────────────────────
+;;;; Insert Mode Transitions.
 
 (defcommand "Helix Insert Before" (p)
   "Enter insert mode before the cursor (i)."
@@ -246,7 +246,7 @@
     (line-offset point -1 0)))
 
 
-;;;; ─── Normal Mode Motions ────────────────────────────────────────────────────
+;;;; Normal Mode Motions.
 ;;;
 ;;; Each motion deactivates the region before moving, collapsing any selection.
 ;;; In Select mode these keys are shadowed by raw hemlock commands that naturally
@@ -254,7 +254,7 @@
 
 (defmacro define-helix-motion (name doc &body body)
   "Define a Normal-mode motion. Anchors selection at current position before
-   moving, spanning from here to the destination — the Kakoune/Helix model.
+   moving, spanning from here to the destination --the Kakoune/Helix model.
    Reuses the top mark via move-mark (no ring growth per keypress).
    Falls back to push-buffer-mark only on first use per buffer.
    BODY may reference P (the prefix argument)."
@@ -347,7 +347,7 @@
   (backward-paragraph-command p))
 
 
-;;;; ─── WORD Motion Helpers (W / B / E) ──────────────────────────────────────
+;;;; WORD Motion Helpers (W / B / E).
 ;;;
 ;;; Helix W/B/E treat any run of non-whitespace as one WORD, unlike w/b/e which
 ;;; respect hemlock :word-delimiter character attributes.
@@ -394,7 +394,7 @@
       (mark-before point))))
 
 
-;;;; ─── Scroll Motions (collapse selection before scrolling) ─────────────────
+;;;; Scroll Motions (collapse selection before scrolling).
 
 (define-helix-motion "Helix Scroll Down"
   "Scroll window down, collapsing selection."
@@ -405,7 +405,7 @@
   (scroll-window-up-command p))
 
 
-;;;; ─── Goto Mode Commands (g submap) ────────────────────────────────────────
+;;;; Goto Mode Commands (g submap).
 
 (defcommand "Helix Goto Window Top" (p)
   "Move cursor to the top line of the window (g t)."
@@ -502,7 +502,7 @@
       (buffer-end (current-point))))
 
 
-;;;; ─── Find-Char Commands (f / F / t / T) ────────────────────────────────────
+;;;; Find-Char Commands (f / F / t / T).
 
 (defun helix-find-char-on-line (point char forwardp tillp)
   "Scan from POINT for CHAR on the same line.
@@ -573,7 +573,7 @@
         (editor-error "Character ~C not found on line." char)))))
 
 
-;;;; ─── Operators ─────────────────────────────────────────────────────────────
+;;;; Operators.
 
 (defcommand "Helix Delete" (p)
   "Delete the current selection into the kill ring.
@@ -631,7 +631,7 @@
 
 (defcommand "Helix Select Line" (p)
   "Select current line; on repeated presses extend selection down one line (x).
-   Helix extend_line_below — anchor stays, head grows down."
+   Helix extend_line_below --anchor stays, head grows down."
   "Helix x."
   (declare (ignore p))
   (let ((buffer (current-buffer))
@@ -768,7 +768,7 @@
             (setf (next-character point) (toggle c)))))))
 
 
-;;;; ─── Additional Helix Operators ───────────────────────────────────────────
+;;;; Additional Helix Operators.
 
 (defcommand "Helix Replace Char" (p)
   "Replace the character at point with the next typed key (r)."
@@ -993,7 +993,7 @@
     (line-offset point -1 0)))
 
 
-;;;; ─── Buffer Creation Hook ───────────────────────────────────────────────────
+;;;; Buffer Creation Hook.
 
 (defvar *non-modal-major-modes*
   '("Dired" "Bufed" "Debugger" "Debug" "Apropos" "Xref" "Coned"
@@ -1026,7 +1026,7 @@
 (add-hook buffer-major-mode-hook #'%maybe-deactivate-normal-on-mode-change)
 
 ;;; The "Main" buffer is created by setup-initial-buffer during %init-hemlock,
-;;; which runs when main.lisp is loaded — before this (user-1) module loads.
+;;; which runs when main.lisp is loaded --before this (user-1) module loads.
 ;;; setup-initial-buffer temporarily installs a fake make-buffer-hook that it
 ;;; removes immediately, so our hook never fires for "Main".  Iterate over all
 ;;; buffers that already exist and activate Normal mode on them now.

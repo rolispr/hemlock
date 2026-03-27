@@ -57,6 +57,8 @@ an error on timeout."
   "Kill a process agent by name."
   (let ((process (gethash name *agent-process-table*)))
     (when process
-      (ignore-errors (sb-ext:process-kill process sb-posix:sigterm))
+      (handler-case (sb-ext:process-kill process sb-posix:sigterm)
+        (error () nil))  ; process may already be dead
       (remhash name *agent-process-table*)))
-  (ignore-errors (unregister-agent name)))
+  (handler-case (unregister-agent name)
+    (error () nil)))

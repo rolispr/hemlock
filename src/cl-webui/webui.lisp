@@ -174,8 +174,8 @@
 (in-package :webui)
 
 (define-foreign-library libwebui
-  (:darwin (:or "webui-2.dylib" "libwebui-2.dylib"))
-  (:unix (:or "webui-2.so" "libwebui.so")))
+  (:darwin (:or "libwebui-2.dylib" "webui-2.dylib"))
+  (:unix (:or "libwebui-2.so" "webui-2.so" "libwebui.so")))
 
 (use-foreign-library libwebui)
 

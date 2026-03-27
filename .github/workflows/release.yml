@@ -66,6 +66,7 @@ jobs:
           curl -fsSL -o webui.zip \
             "https://github.com/webui-dev/webui/releases/download/nightly/${{ matrix.webui-zip }}"
           unzip -q webui.zip
+          sudo mkdir -p /usr/local/lib
           sudo cp ${{ matrix.webui-dir }}/${{ matrix.webui-lib }} /usr/local/lib/
 
       - name: Install dependencies

@@ -8,7 +8,7 @@
 (in-package :hemlock)
 
 
-;;;; ─── Global: Escape ────────────────────────────────────────────────────────
+;;;; Global: Escape.
 
 ;;; Single global Escape binding.  "Helix Escape" is context-sensitive:
 ;;; Select → collapse, Normal → deactivate region, Insert(modal) → Normal Mode,
@@ -16,7 +16,7 @@
 (bind-key "Helix Escape" #k"escape")
 
 
-;;;; ─── Normal mode — motions (collapse selection before moving) ──────────────
+;;;; Normal mode -- motions (collapse selection before moving).
 
 ;;; h / j / k / l
 (bind-key "Helix Forward Character"  #k"l" :mode "Normal")
@@ -76,7 +76,7 @@
 (bind-key "Helix Goto Line" #k"G" :mode "Normal")
 
 
-;;;; ─── Normal mode — operators ───────────────────────────────────────────────
+;;;; Normal mode -- operators.
 
 (bind-key "Helix Delete"            #k"d" :mode "Normal")
 (bind-key "Helix Change"            #k"c" :mode "Normal")
@@ -115,7 +115,7 @@
 (bind-key "Unindent Region" #k"\<" :mode "Normal")
 
 
-;;;; ─── Normal mode — undo / redo ─────────────────────────────────────────────
+;;;; Normal mode -- undo / redo.
 
 (bind-key "Undo" #k"u"       :mode "Normal")
 (bind-key "Redo" #k"U"       :mode "Normal")
@@ -123,7 +123,7 @@
 (bind-key "Redo" #k"meta-U"  :mode "Normal")   ; Alt-U = later
 
 
-;;;; ─── Normal mode — mode transitions ───────────────────────────────────────
+;;;; Normal mode -- mode transitions.
 
 (bind-key "Enter Select Mode"       #k"v" :mode "Normal")
 (bind-key "Helix Insert Before"     #k"i" :mode "Normal")
@@ -134,7 +134,7 @@
 (bind-key "Helix Open Above"        #k"O" :mode "Normal")
 
 
-;;;; ─── Normal mode — command palette ───────────────────────────────────────
+;;;; Normal mode -- command palette.
 
 ;;; : opens the extended command prompt (helix-style command mode).
 (bind-key "Extended Command" #k":" :mode "Normal")
@@ -143,7 +143,7 @@
 (bind-key "Toggle Modal Editing" #k"control-x T")
 
 
-;;;; ─── Normal mode — space leader ──────────────────────────────────────────
+;;;; Normal mode -- space leader.
 
 (bind-key "Find File"          #k"space f" :mode "Normal")
 (bind-key "Select Buffer"      #k"space b" :mode "Normal")
@@ -158,7 +158,7 @@
 (bind-key "Exit Hemlock"       #k"space q" :mode "Normal")
 
 
-;;;; ─── Normal mode — search ──────────────────────────────────────────────────
+;;;; Normal mode -- search.
 
 (bind-key "Incremental Search"         #k"/" :mode "Normal")
 (bind-key "Reverse Incremental Search" #k"?" :mode "Normal")
@@ -166,11 +166,11 @@
 (bind-key "Search Previous"            #k"N" :mode "Normal")
 
 
-;;;; ─── Normal mode — count prefix (digits 1-9) ──────────────────────────────
+;;;; Normal mode -- count prefix (digits 1-9).
 
 ;;; Digit keys feed the prefix count.  "Argument Digit" already handles this.
 ;;; 0 = beginning of line (helix default; prefix-0 is handled by "Argument Digit"
-;;; which ignores 0 as the first digit and falls through — so we just bind 0 here
+;;; which ignores 0 as the first digit and falls through -- so we just bind 0 here
 ;;; and leave the existing Argument Digit binding for 0 via meta-0 in global mode).
 (bind-key "Argument Digit" #k"1" :mode "Normal")
 (bind-key "Argument Digit" #k"2" :mode "Normal")
@@ -183,7 +183,7 @@
 (bind-key "Argument Digit" #k"9" :mode "Normal")
 
 
-;;;; ─── Normal mode — page scroll ─────────────────────────────────────────────
+;;;; Normal mode -- page scroll.
 
 (bind-key "Helix Scroll Up"   #k"control-b" :mode "Normal")
 (bind-key "Helix Scroll Down" #k"control-f" :mode "Normal")
@@ -193,7 +193,7 @@
 (bind-key "Helix Scroll Down" #k"control-d" :mode "Normal")
 
 
-;;;; ─── Normal mode — scrolling (z prefix) ────────────────────────────────────
+;;;; Normal mode -- scrolling (z prefix).
 
 (bind-key "Scroll Window Recenter"   #k"z z"    :mode "Normal")
 (bind-key "Scroll Window Recenter"   #k"z c"    :mode "Normal")
@@ -205,7 +205,7 @@
 (bind-key "Scroll Window Up"         #k"z uparrow"   :mode "Normal")
 
 
-;;;; ─── Normal mode — window management ──────────────────────────────────────
+;;;; Normal mode -- window management.
 
 ;;; C-w prefix is already global in hemlock (window commands).
 ;;; These just provide convenient aliases within Normal mode.
@@ -213,11 +213,11 @@
 (bind-key "Next Window"   #k"control-w w"         :mode "Normal")
 
 
-;;;; ─── Select mode — raw motions (extend selection naturally) ────────────────
+;;;; Select mode -- raw motions (extend selection naturally).
 ;;;
 ;;; In Select mode, motions move point WITHOUT collapsing the region.
 ;;; Since hemlock region = [mark, point], moving point with a live mark
-;;; automatically extends the selection — no special logic needed.
+;;; automatically extends the selection -- no special logic needed.
 
 ;;; h / j / k / l
 (bind-key "Forward Character"  #k"l" :mode "Select")
@@ -252,7 +252,7 @@
 (bind-key "Buffer Start" #k"g g" :mode "Select")
 (bind-key "Buffer End"   #k"G"   :mode "Select")
 
-;;; g submap — extend variants (raw hemlock commands keep region active)
+;;; g submap -- extend variants (raw hemlock commands keep region active)
 (bind-key "Buffer End"                   #k"g e" :mode "Select")
 (bind-key "Beginning of Line"            #k"g h" :mode "Select")
 (bind-key "End of Line"                  #k"g l" :mode "Select")
@@ -281,9 +281,9 @@
 (bind-key "Exit Select Mode" #k"escape" :mode "Select")  ; handled by Helix Escape globally, but explicit here too
 
 
-;;;; ─── Tree-sitter structural selection (Normal + Select modes) ───────────
+;;;; Tree-sitter structural selection (Normal + Select modes).
 
-;;; Alt-o / Alt-i — expand / shrink to enclosing / child node
+;;; Alt-o / Alt-i -- expand / shrink to enclosing / child node
 (bind-key "Expand Selection"    #k"meta-o" :mode "Normal")
 (bind-key "Shrink Selection"    #k"meta-i" :mode "Normal")
 (bind-key "Select Next Sibling" #k"meta-n" :mode "Normal")
@@ -296,13 +296,13 @@
 (bind-key "Select Prev Sibling" #k"meta-p" :mode "Select")
 
 
-;;;; ─── Search — Normal + Select ──────────────────────────────────────────────
+;;;; Search -- Normal + Select.
 
 (bind-key "Helix Search Word"      #k"*"      :mode "Select")
 (bind-key "Helix Search Selection" #k"meta-*" :mode "Select")
 
 
-;;;; ─── Unimpaired — [ and ] submaps ──────────────────────────────────────────
+;;;; Unimpaired -- [ and ] submaps.
 
 ;;; Paragraph navigation
 (bind-key "Helix Forward Paragraph"  #k"] p" :mode "Normal")
@@ -310,4 +310,4 @@
 (bind-key "Helix Forward Paragraph"  #k"] p" :mode "Select")
 (bind-key "Helix Backward Paragraph" #k"[ p" :mode "Select")
 
-;;; Add blank lines — already bound above in operators section
+;;; Add blank lines -- already bound above in operators section

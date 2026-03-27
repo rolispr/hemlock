@@ -71,10 +71,11 @@
           (lambda ()
             (sleep 0.1)
             (when *agent-system*
-              (ignore-errors
-                (when (remoting-enabled-p *agent-system*)
-                  (disable-remoting *agent-system*))
-                (shutdown *agent-system* :wait t))
+              (when (remoting-enabled-p *agent-system*)
+                (handler-case (disable-remoting *agent-system*)
+                  (error () nil)))
+              (handler-case (shutdown *agent-system* :wait t)
+                (error () nil))
               (setf *agent-system* nil))
             (uiop:quit 0))
           :name "agent-shutdown"))
