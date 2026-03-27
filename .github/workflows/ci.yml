@@ -48,11 +48,22 @@ jobs:
 
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y libtree-sitter-dev
+        run: |
+          sudo apt-get install -y libtree-sitter-dev
+          curl -fsSL -o webui.zip \
+            "https://github.com/webui-dev/webui/releases/download/nightly/webui-linux-gcc-x64.zip"
+          unzip -q webui.zip
+          sudo cp webui-linux-gcc-x64/libwebui-2.so /usr/local/lib/
+          sudo ldconfig
 
       - name: Install system dependencies (macOS)
         if: runner.os == 'macOS'
-        run: brew install tree-sitter
+        run: |
+          brew install tree-sitter
+          curl -fsSL -o webui.zip \
+            "https://github.com/webui-dev/webui/releases/download/nightly/webui-macos-clang-arm64.zip"
+          unzip -q webui.zip
+          sudo cp webui-macos-clang-arm64/libwebui-2.dylib /usr/local/lib/
 
       - name: Install dependencies
         run: ocicl install
