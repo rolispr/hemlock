@@ -8,4 +8,5 @@
 (asdf:initialize-source-registry
  (list :source-registry
        (list :directory (uiop:getcwd))
+       (list :directory (merge-pathnames "vendor/cl-gserver/" (uiop:getcwd)))
        :inherit-configuration))

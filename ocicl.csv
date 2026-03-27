@@ -33,7 +33,6 @@ log4cl-examples, ghcr.io/ocicl/log4cl@sha256:bd33f6e5ad346892e852492e7101bc18d26
 log4cl.log4slime, ghcr.io/ocicl/log4cl@sha256:bd33f6e5ad346892e852492e7101bc18d263f9ef2ba6192178568d1b20337112, log4cl-20240503-fe3da51/log4cl.log4slime.asd
 log4cl.log4sly, ghcr.io/ocicl/log4cl@sha256:bd33f6e5ad346892e852492e7101bc18d263f9ef2ba6192178568d1b20337112, log4cl-20240503-fe3da51/log4cl.log4sly.asd
 pure-tls, ghcr.io/ocicl/pure-tls@sha256:23e5e7af9526be260d9912762dd4c33a8c1d28df303141578f5af0147e81eeb5, pure-tls-20260215-d78526b/pure-tls.asd
-sento, ghcr.io/ocicl/sento@sha256:c34b5b3e4e69bbff122ac24b564e81a219d81980cb3190a1e0db3f03abb05a55, cl-gserver-3.4.2/sento.asd
 str, ghcr.io/ocicl/str@sha256:685078f7554071268bca9e933392904940d6751077718a4aafaf3d0424003f26, cl-str-20250905-69ef8b4/str.asd
 str.test, ghcr.io/ocicl/str@sha256:685078f7554071268bca9e933392904940d6751077718a4aafaf3d0424003f26, cl-str-20250905-69ef8b4/str.test.asd
 timer-wheel, ghcr.io/ocicl/timer-wheel@sha256:4a3ac1c9f78f6c9c1400ba967c5f99edb9dba4bf95c8379bb715a8f1fdbb7639, timer-wheel-20240503-6cdcb93/timer-wheel.asd

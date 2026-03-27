@@ -1,0 +1,3 @@
+[submodule "vendor/cl-gserver"]
+	path = vendor/cl-gserver
+	url = https://github.com/mdbergmann/cl-gserver

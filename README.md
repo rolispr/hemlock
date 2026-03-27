@@ -7,7 +7,7 @@ A programmable, multiplexing, text editor written in Common Lisp.
 - Treesitter for syntax highlighting
 - Builtin terminal emulator with vt100/xterm capabilities
 - Modal editing mode inspired by Helix and Vim
-- Parallel agents via sento for local, and remote process management
+- Actor model for local, and remote process management
 - Immutable buffer snapshoting
 - TTY and WebUI backends
 

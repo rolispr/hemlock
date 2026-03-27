@@ -10,7 +10,7 @@ else
   SHLIB_FLAG := -shared -fPIC
 endif
 
-.PHONY: build test clean
+.PHONY: build test clean vendor
 
 src/io/libspawn-ctty.$(SHLIB_EXT): src/io/spawn-ctty.c
 	$(CC) $(SHLIB_FLAG) -o $@ $<
@@ -29,6 +29,9 @@ build: src/io/libspawn-ctty.$(SHLIB_EXT) src/tree-sitter-cl/lib/libts-wrapper.$(
 test: src/io/libspawn-ctty.$(SHLIB_EXT)
 	$(SBCL) --non-interactive --load init.lisp \
 		--eval '(asdf:test-system :hemlock-tests)'
+
+vendor:
+	git submodule update --init --recursive
 
 clean:
 	rm -rf bin/ src/io/libspawn-ctty.so src/io/libspawn-ctty.dylib \

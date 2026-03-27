@@ -46,8 +46,19 @@ jobs:
           brew install ocicl
           ocicl setup
 
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y libtree-sitter-dev
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install tree-sitter
+
       - name: Install dependencies
         run: ocicl install
+
+      - name: Vendor submodules
+        run: make vendor
 
       - name: Run tests
         run: make test

@@ -14,8 +14,14 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact: hemlock-Linux-x86_64.tar.gz
+            webui-zip: webui-linux-gcc-x64.zip
+            webui-dir: webui-linux-gcc-x64
+            webui-lib: libwebui-2.so
           - os: macos-latest
             artifact: hemlock-Darwin-arm64.tar.gz
+            webui-zip: webui-macos-clang-arm64.zip
+            webui-dir: webui-macos-clang-arm64
+            webui-lib: libwebui-2.dylib
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -55,8 +61,18 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install tree-sitter
 
+      - name: Install libwebui-2
+        run: |
+          curl -fsSL -o webui.zip \
+            "https://github.com/webui-dev/webui/releases/download/nightly/${{ matrix.webui-zip }}"
+          unzip -q webui.zip
+          sudo cp ${{ matrix.webui-dir }}/${{ matrix.webui-lib }} /usr/local/lib/
+
       - name: Install dependencies
         run: ocicl install
+
+      - name: Vendor submodules
+        run: make vendor
 
       - name: Build
         run: make build
