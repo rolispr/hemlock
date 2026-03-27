@@ -34,7 +34,8 @@
                   :command-line-arguments
                   :sento
                   :sento-remoting
-                  :fset)
+                  :fset
+                  :sb-concurrency)
     :components
     (;; Wire protocol
      (:module wire
@@ -254,7 +255,24 @@
                (:file "pty")
                (:file "input")
                (:file "render")
-               (:file "mode")))))
+               (:file "mode")))
+
+     ;; cl-webui CFFI bindings
+     (:module cl-webui
+              :pathname "src/cl-webui/"
+              :components
+              ((:file "webui")))
+
+     ;; WebUI backend
+     (:module webui
+              :pathname "src/webui/"
+              :depends-on (core-2 editor commands term cl-webui)
+              :serial t
+              :components
+              ((:file "device")
+               (:file "screen")
+               (:file "input")
+               (:file "display")))))
 
 
 ;;; For building binaries

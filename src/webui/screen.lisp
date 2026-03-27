@@ -94,15 +94,11 @@ function _getGridSize() {
   var ctx = canvas.getContext('2d');
   ctx.font = style.fontWeight + ' ' + fs + 'px ' + style.fontFamily;
   var cw = ctx.measureText('M').width || 8;
-  var rect = el.getBoundingClientRect();
-  var cols = Math.max(20, Math.floor(rect.width / cw));
-  var mainRows = Math.floor(rect.height / lh);
-  var fixedPx = 0;
-  document.querySelectorAll('.hem-echo, .hem-ml').forEach(function(e) {
-    fixedPx += e.getBoundingClientRect().height;
-  });
-  var rows = Math.max(4, mainRows + Math.round(fixedPx / lh));
-  return cols + ' ' + rows;
+  var cols = Math.max(20, Math.floor(el.getBoundingClientRect().width / cw));
+  var mainTextRows = Math.floor(el.getBoundingClientRect().height / lh);
+  var echoEl = document.querySelector('.hem-echo');
+  var echoRows = echoEl ? Math.floor(echoEl.getBoundingClientRect().height / lh) : 3;
+  return cols + ' ' + mainTextRows + ' ' + echoRows;
 }
 function _measureGrid() {
   var sz = _getGridSize();
@@ -160,9 +156,11 @@ window.addEventListener('resize', _measureGrid);
   (let* ((width           (webui-device-columns device))
          (height          (webui-device-lines   device))
          (echo-height     (value hemlock::echo-area-height))
+         ;; height from browser = total rows for entire viewport.
+         ;; Subtract: echo text lines, echo modeline, main modeline.
          (main-lines      (- height echo-height 1))
-         (main-text-lines (1- main-lines))
-         (last-text-line  (1- main-text-lines)))
+         (main-text-lines (max 1 (1- main-lines)))
+         (last-text-line  (max 0 (1- main-text-lines))))
     (setf (device-bottom-window-base device) last-text-line)
     ;; Echo area
     (let* ((echo-hunk (make-webui-hunk
@@ -265,7 +263,18 @@ window.addEventListener('resize', _measureGrid);
                   (sb-sys:add-fd-handler
                    (webui-device-pipe-read-fd dev)
                    :input (lambda (fd)
-                            (webui-drain-events dev fd))))
+                            (webui-drain-events dev fd)))
+                  ;; Also register the ioconnections wakeup pipe on this
+                  ;; thread so serve-event sees TS completions and
+                  ;; invoke-later callbacks.
+                  (when hemlock.io::*wakeup-read-fd*
+                    (sb-sys:add-fd-handler
+                     hemlock.io::*wakeup-read-fd*
+                     :input (lambda (fd)
+                              (cffi:with-foreign-object (buf :char 64)
+                                (cffi:foreign-funcall "read"
+                                  :int fd :pointer buf :size 64 :long))
+                              (hemlock.io:drain-pending-invocations)))))
                 (catch 'hemlock-exit (funcall fun)))
               ;; Command loop exited — signal webui to shut down so
               ;; webui-wait returns on the main thread.
@@ -459,9 +468,14 @@ Nuke all active lines back to spare, reallocate if wider, and rebuild modeline."
                                        (device-hunks device)))))
          (echo-hunk (window-hunk *echo-area-window*))
          (echo-text-height (webui-hunk-text-height echo-hunk))
-         ;; Available lines for non-echo hunks: total minus echo minus
-         ;; echo modeline.
-         (available (- new-lines echo-text-height 1)))
+         ;; browser-measured main-text-rows is pure text rows —
+         ;; the modeline is a separate CSS element, not counted.
+         ;; Add 1 because the redistribute loop subtracts it back
+         ;; for modeline hunks (has-modeline → new-text-h = new-h - 1).
+         (browser-rows (webui-device-main-text-rows device))
+         (available (if browser-rows
+                        (+ browser-rows 1)
+                        (- new-lines echo-text-height 1))))
     ;; If terminal is too small for even one window + echo, bail out.
     (when (< available 2)
       (return-from webui-apply-resize))
@@ -555,13 +569,16 @@ Nuke all active lines back to spare, reallocate if wider, and rebuild modeline."
 
 (defun webui-resize-callback (device event)
   (let* ((s  (webui:webui-get-string event))
-         (sp (when (stringp s) (position #\Space s)))
-         (cols (when sp (parse-integer s :end sp)))
-         (rows (when sp (parse-integer s :start (1+ sp)))))
+         (parts (when (stringp s) (uiop:split-string s :separator " ")))
+         (cols (when (>= (length parts) 1) (parse-integer (first parts) :junk-allowed t)))
+         (main-text (when (>= (length parts) 2) (parse-integer (second parts) :junk-allowed t)))
+         (echo-rows (when (>= (length parts) 3) (parse-integer (third parts) :junk-allowed t))))
     (declare (ignorable s))
-    (when (and cols rows (> cols 0) (> rows 0))
-      (setf (webui-device-columns device) cols
-            (webui-device-lines   device) rows)
+    (when (and cols main-text (> cols 0) (> main-text 0))
+      (let ((echo (or echo-rows 3)))
+        (setf (webui-device-columns device) cols
+              (webui-device-main-text-rows device) main-text
+              (webui-device-lines device) (+ main-text 1 echo 1)))
       ;; Mark that the main thread needs to adjust the window layout.
       ;; webui-drain-events reads this flag on the main thread and calls
       ;; webui-apply-resize safely (hemlock data structures are not

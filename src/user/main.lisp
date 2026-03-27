@@ -320,7 +320,11 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
                         :type boolean
                         :documentation ,(format nil "short for --backend ~A" b)
                         :action ,(let ((b b))
-                                   (alexandria:curry #'quick-backend b)))))))
+                                   (alexandria:curry #'quick-backend b))))
+      ("gui"
+       :type boolean
+       :documentation "short for --backend webui (graphical mode)"
+       :action ,(alexandria:curry #'quick-backend :webui)))))
 
 (defun show-cmd-line-help ()
   (format t "This is hemlock ~A.~%Usage:~%~%" *hemlock-version*)

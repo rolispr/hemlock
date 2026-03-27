@@ -355,6 +355,47 @@ Can be called from any thread — reads only immutable data."
                 (declare (ignore c))
                 nil))))))))
 
+(defun snapshot-render-all (device)
+  "Render all visible windows from immutable snapshots.
+Thread-safe — reads no mutable buffer state."
+  (let ((win-id (webui-device-window-id device)))
+    (when win-id
+      (sb-int:with-float-traps-masked (:invalid :overflow :inexact :divide-by-zero
+                                       :underflow)
+        (let ((cw (current-window))
+              (cx (webui-device-cursor-x device))
+              (cy (webui-device-cursor-y device)))
+          (dolist (window *window-list*)
+            (handler-case
+                (let* ((buf (window-buffer window))
+                       (snap (hemlock.command:buffer-snapshot buf window))
+                       (hunk (window-hunk window))
+                       (dom-id (webui-hunk-dom-id hunk))
+                       (cursor-line (when (eq window cw)
+                                      (hemlock.text::snap-point-line snap)))
+                       (cursor-col (when (eq window cw) cx))
+                       (json (snapshot->json snap
+                               :cursor-line cursor-line
+                               :cursor-col cursor-col))
+                       (ml (or (hemlock.text::snap-modeline snap) "")))
+                  (webui:webui-run win-id
+                    (format nil "updateWindow(\"~A\",~A.lines,\"~A\");"
+                            (json-escape dom-id)
+                            json
+                            (json-escape ml))))
+              (error (c) (declare (ignore c))))))
+        ;; Echo area
+        (when (and *echo-area-buffer* *echo-area-window*)
+          (handler-case
+              (let* ((snap (hemlock.command:buffer-snapshot
+                            *echo-area-buffer* *echo-area-window*))
+                     (json (snapshot->json snap))
+                     (ml (or (hemlock.text::snap-modeline snap) "")))
+                (webui:webui-run win-id
+                  (format nil "updateWindow(\"echo\",~A.lines,\"~A\");"
+                          json (json-escape ml))))
+            (error (c) (declare (ignore c)))))))))
+
 (defmethod device-finish-output ((device webui-device) window)
   (declare (ignore window))
   (device-force-output device))

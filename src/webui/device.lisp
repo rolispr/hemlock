@@ -20,6 +20,10 @@
     :initarg :lines
     :initform 40
     :documentation "Number of text rows.")
+   (main-text-rows
+    :accessor webui-device-main-text-rows
+    :initform nil
+    :documentation "Actual main window text rows as measured by browser.")
    (columns
     :accessor webui-device-columns
     :initarg :columns

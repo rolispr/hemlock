@@ -1,29 +1,31 @@
 # Hemlock
 
-Hemlock is a Common Lisp editor inspired by ZWEI and Emacs with a long history — born at CMU in the 1980s, it shipped inside CMUCL and later SBCL. Abandoned, and ported by many hands, this is an active modernization: dead backends removed, dependencies cleaned up, a tree-sitter integration for real syntax highlighting, and a Helix/others inspired modal editing experience. The core is still the same with some tweaks and changes here and there...
+A programmable, multiplexing, text editor written in Common Lisp.
 
-**Status:** v0.2.0 - loads only with SBCL (2.5.9), TTY backend fully working (should at least on mac), modal editing in place. Webui backend in progress. 
+Hemlock shares Emacs's heritage. Extensible, self-documenting, Lisp-powered, but diverges where Emacs can't: concurrent buffer access, actor-based eval agents, and a modern terminal renderer.
 
----
+## Highlights
 
-### What's in here
+- Tree-sitter syntax highlighting
+- Built-in terminal emulator
+- Helix-style modal editing (Normal/Select/Insert)
+- Parallel eval agents via sento (local, process, remote)
+- Immutable buffer snapshots (concurrent readers, single-thread writes, no locks)
+- TTY and WebUI backends
 
-- **TTY backend**   — terminal rendering, full color support (truecolor, 256, 16)
-- **Tree-sitter**   - WIP
-- **Terminal**      - full vt100/xterm emulation
-- **Modal editing** — Normal/Select modes, Mostly Helix keymap, spanning selections, TS textobjects, with inspiration in other places
-- **Completions**   — interactive completion in the minibuffer
-
----
-
-### Building
+## Quick start
 
 ```
-(asdf:load-system :hemlock)
+sbcl --eval '(asdf:load-system :hemlock)' --eval '(hemlock:hemlock)'
 ```
 
-Dependencies managed with [ocicl](https://github.com/ocicl/ocicl).
+## Status
 
----
+Phase 1 complete: sento agents work (local + process, parallel eval, remoting).
+Phase 2 in progress: FSet immutable buffer state, snapshot-based display and tree-sitter.
+
+## Heritage
+
+Hemlock was written at CMU in 1984. Public domain. This fork descends from the bluelisp/hemlock line and is actively maintained.
 
 ![Hemlock](doc/screenshot.png)

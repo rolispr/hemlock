@@ -50,17 +50,22 @@
     (cffi:with-pointer-to-vector-data (p buf)
       (cffi:foreign-funcall "read" :int fd :pointer p :size 64 :long)))
   ;; Push queued key-events into hemlock's editor-input.
-  (loop for ke = (sb-concurrency:dequeue (webui-device-input-queue device))
-        while ke
-        do (q-event *real-editor-input* ke))
-  ;; If the browser reported a new window size, update hemlock's windows
-  ;; on the main thread (hemlock display structures are not thread-safe).
-  ;; We set *screen-image-trashed* so the next redisplay pass does a full
-  ;; refresh, and we update each window's image to match the new dimensions.
-  (when (webui-device-resize-pending device)
-    (without-interrupts
-      (setf (webui-device-resize-pending device) nil)
-      (webui-apply-resize device))))
+  (let ((had-keys nil))
+    (loop for ke = (sb-concurrency:dequeue (webui-device-input-queue device))
+          while ke
+          do (setf had-keys t)
+             (q-event *real-editor-input* ke))
+    ;; If the browser reported a new window size, update hemlock's windows
+    ;; on the main thread (hemlock display structures are not thread-safe).
+    (when (webui-device-resize-pending device)
+      (without-interrupts
+        (setf (webui-device-resize-pending device) nil)
+        (webui-apply-resize device)))
+    ;; If the pipe woke us but there were no key events, something async
+    ;; completed (e.g. tree-sitter parse results). Force a full redisplay
+    ;; on the next command loop cycle.
+    (unless had-keys
+      (setf *screen-image-trashed* t))))
 
 
 ;;;; webui callback — runs in the libwebui thread

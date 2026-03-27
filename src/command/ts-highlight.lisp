@@ -405,11 +405,12 @@ Returns NIL for unrecognised captures (no color applied)."
   (let ((state (ts-get-or-create-state buffer)))
     (if (ts-buffer-state-parsing-p state)
         (pushnew buffer *ts-dirty-buffers* :test #'eq)
-        (progn
-          (setf (ts-buffer-state-parsing-p state) t)
-          (! *ts-actor* (list :parse state
-                              (buffer-modified-tick buffer)
-                              (ts-buffer-text buffer)))))))
+        (when *ts-actor*
+          (let* ((bs (buffer-state buffer))
+                 (tick (hemlock.text::bs-tick bs))
+                 (text (ts-text-from-state bs)))
+            (setf (ts-buffer-state-parsing-p state) t)
+            (! *ts-actor* (list :parse state tick text)))))))
 
 ;;; Called from redisplay-loop (twice: redisplay-loop and redisplay-windows-from-mark).
 ;;; Phase 0: update selection highlight plists.
