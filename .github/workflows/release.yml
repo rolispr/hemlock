@@ -77,6 +77,8 @@ jobs:
 
       - name: Build
         run: make build
+        env:
+          LD_LIBRARY_PATH: /usr/local/lib
 
       - name: Package
         run: tar czf ${{ matrix.artifact }} -C bin .

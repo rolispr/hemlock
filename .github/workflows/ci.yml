@@ -54,7 +54,6 @@ jobs:
             "https://github.com/webui-dev/webui/releases/download/nightly/webui-linux-gcc-x64.zip"
           unzip -q webui.zip
           sudo cp webui-linux-gcc-x64/libwebui-2.so /usr/local/lib/
-          sudo ldconfig
 
       - name: Install system dependencies (macOS)
         if: runner.os == 'macOS'
@@ -74,3 +73,5 @@ jobs:
 
       - name: Run tests
         run: make test
+        env:
+          LD_LIBRARY_PATH: /usr/local/lib
