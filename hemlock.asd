@@ -276,6 +276,11 @@
 
 
 ;;; For building binaries
+#+darwin
+(deploy:define-library pure-tls::core-foundation :dont-deploy t)
+#+darwin
+(deploy:define-library pure-tls::security-framework :dont-deploy t)
+
 (deploy:define-hook (:deploy asdf) (directory)
   (declare (ignorable directory))
   #+asdf (asdf:clear-source-registry)
