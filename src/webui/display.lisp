@@ -176,6 +176,46 @@
     nil))
 
 
+;;;; Color merging (syntax + selection)
+
+(defun merge-colors (syntax selection)
+  (if (null selection)
+      syntax
+      (if (null syntax)
+          selection
+          (let* ((len (max (loop for r in syntax maximize (second r))
+                           (loop for r in selection maximize (second r))))
+                 (fg-slots (make-array len :initial-element nil))
+                 (bg-slots (make-array len :initial-element nil)))
+            (dolist (r syntax)
+              (let ((s (first r)) (e (second r)) (font (third r)))
+                (loop for i from s below (min e len) do
+                  (setf (aref fg-slots i) font))))
+            (dolist (r selection)
+              (let ((s (first r)) (e (second r)) (font (third r)))
+                (loop for i from s below (min e len) do
+                  (setf (aref bg-slots i) font))))
+            (let ((result nil) (i 0))
+              (loop while (< i len) do
+                (let ((fg (aref fg-slots i))
+                      (bg (aref bg-slots i)))
+                  (let ((combined (cond
+                                    ((and fg bg) (append fg (if (listp bg) bg (list bg))))
+                                    (fg fg)
+                                    (bg bg)
+                                    (t nil))))
+                    (if combined
+                        (let ((start i))
+                          (loop while (and (< i len)
+                                          (let ((f2 (aref fg-slots i))
+                                                (b2 (aref bg-slots i)))
+                                            (and (equal f2 fg) (equal b2 bg))))
+                                do (incf i))
+                          (push (list start i combined) result))
+                        (incf i)))))
+              (nreverse result))))))
+
+
 ;;;; Terminal font-info conversion
 
 (defun term-font-info-to-colors (font-info line-len)
@@ -233,7 +273,8 @@
                         (idx 0))
                     (loop while line do
                       (let* ((str (line-string line))
-                             (sc (getf (line-plist line) 'hemlock.command::syntax-colors))
+                             (sc (merge-colors (getf (line-plist line) 'hemlock.command::syntax-colors)
+                                               (getf (line-plist line) 'hemlock.command::selection-colors)))
                              (cc (when (and is-current (= idx point-idx))
                                    (mark-charpos point))))
                         (push (format nil "<div>~A</div>" (line->html str sc cc)) html-parts))

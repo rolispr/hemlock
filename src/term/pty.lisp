@@ -33,6 +33,7 @@
                                                       #\=)))
                                         env)))))
       (set-var "TERM" term-type)
+      (set-var "COLORTERM" "truecolor")
       (set-var "TERMCAP" "")
       (set-var "INSIDE_HEMLOCK" "")
       env)))
