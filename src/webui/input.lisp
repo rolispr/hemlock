@@ -1,6 +1,6 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; WebUI display backend — editor input class and key translation.
+;;; WebUI display backend: editor input class and key translation.
 ;;;
 
 (in-package :hemlock.webui)
@@ -42,7 +42,7 @@
   (not (null (input-event-next (editor-input-head stream)))))
 
 
-;;;; Self-pipe drain — called on the main thread by the fd-handler
+;;;; Self-pipe drain.  Called on the main thread by the fd-handler.
 
 (defun webui-drain-events (device fd)
   ;; Drain wake bytes (content doesn't matter).
@@ -61,14 +61,11 @@
       (without-interrupts
         (setf (webui-device-resize-pending device) nil)
         (webui-apply-resize device)))
-    ;; If the pipe woke us but there were no key events, something async
-    ;; completed (e.g. tree-sitter parse results). Force a full redisplay
-    ;; on the next command loop cycle.
     (unless had-keys
       (setf *screen-image-trashed* t))))
 
 
-;;;; webui callback — runs in the libwebui thread
+;;;; webui callback.  Runs in the libwebui thread.
 
 (defun webui-key-callback (device event)
   (let* ((key-str (webui:webui-get-string event))

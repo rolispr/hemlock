@@ -1,6 +1,6 @@
 ;;;; -*- Mode: Lisp; indent-tabs-mode: nil -*-
 ;;;
-;;; WebUI display backend — device and hunk class definitions.
+;;; WebUI display backend: device and hunk class definitions.
 ;;;
 
 (in-package :hemlock.webui)
@@ -24,6 +24,10 @@
     :accessor webui-device-main-text-rows
     :initform nil
     :documentation "Actual main window text rows as measured by browser.")
+   (line-height-px
+    :accessor webui-device-line-height-px
+    :initform nil
+    :documentation "CSS line-height in pixels, reported by browser.")
    (columns
     :accessor webui-device-columns
     :initarg :columns

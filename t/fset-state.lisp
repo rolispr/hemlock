@@ -98,7 +98,7 @@
          ;; Insert newline at position 5
          (s4 (hemlock.text::bs-insert-char s3 0 5 #\Newline))
          (point (fset:@ (hemlock.text::bs-marks s4) :point)))
-    ;; Point was at (0,5) right-inserting — should move to (1,0)
+    ;; point was at (0,5) right-inserting; should move to (1,0)
     (is (= 1 (first point)))
     (is (= 0 (second point)))))
 

@@ -6,9 +6,9 @@ Hemlock shares Emacs's heritage. Extensible, self-documenting, Lisp-powered, but
 
 ## Highlights
 
-- Tree-sitter syntax highlighting
-- Built-in terminal emulator
-- Helix-style modal editing (Normal/Select/Insert)
+- Treesitter syntax highlighting
+- Builtin terminal emulator
+- Helix style modal editing (Normal/Select/Insert)
 - Parallel eval agents via sento (local, process, remote)
 - Immutable buffer snapshots (concurrent readers, single-thread writes, no locks)
 - TTY and WebUI backends
