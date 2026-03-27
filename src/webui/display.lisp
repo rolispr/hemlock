@@ -52,6 +52,11 @@
        (when (getf font :strike-through) (write-string "line-through " out))))
     (t "")))
 
+(defun index-to-rgb-css (idx property)
+  (let ((rgb (hemlock.term:color-index-to-rgb idx)))
+    (when rgb
+      (format nil "~A:rgb(~D,~D,~D);" property (aref rgb 0) (aref rgb 1) (aref rgb 2)))))
+
 (defun color->css-style (font)
   (when (listp font)
     (let ((result nil))
@@ -60,19 +65,17 @@
           (cond
             ((listp fg)
              (push (format nil "color:rgb(~D,~D,~D);" (first fg) (second fg) (third fg)) result))
-            ((and (integerp fg) (> fg 15))
-             (let ((rgb (hemlock.term:color-index-to-rgb fg)))
-               (when rgb
-                 (push (format nil "color:rgb(~D,~D,~D);" (aref rgb 0) (aref rgb 1) (aref rgb 2)) result)))))))
+            ((integerp fg)
+             (let ((css (index-to-rgb-css fg "color")))
+               (when css (push css result)))))))
       (let ((bg (getf font :bg)))
         (when bg
           (cond
             ((listp bg)
              (push (format nil "background:rgb(~D,~D,~D);" (first bg) (second bg) (third bg)) result))
-            ((and (integerp bg) (> bg 15))
-             (let ((rgb (hemlock.term:color-index-to-rgb bg)))
-               (when rgb
-                 (push (format nil "background:rgb(~D,~D,~D);" (aref rgb 0) (aref rgb 1) (aref rgb 2)) result)))))))
+            ((integerp bg)
+             (let ((css (index-to-rgb-css bg "background")))
+               (when css (push css result)))))))
       (when result (format nil "~{~A~}" (nreverse result))))))
 
 
@@ -171,6 +174,20 @@
       (when (= i n) (return-from nth-buffer-line line))
       (incf i) (setf line (line-next line)))
     nil))
+
+
+;;;; Terminal font-info conversion
+
+(defun term-font-info-to-colors (font-info line-len)
+  (when (and font-info (plusp line-len))
+    (let ((result nil))
+      (loop for (fi . rest) on font-info
+            for start = (car fi)
+            for plist = (cadr fi)
+            for end = (if rest (caar rest) line-len)
+            when (and plist (< start end))
+            do (push (list start end plist) result))
+      (nreverse result))))
 
 
 ;;;; Redisplay methods

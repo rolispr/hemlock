@@ -151,9 +151,16 @@
                     (hemlock.term:term-render-line term y render-buf)
                   (unless (string= (line-string line) row-str)
                     (setf (line-string line) (copy-seq row-str)))
-                  (setf (aref cache y)
-                        (terminal-font-changes-to-font-info
-                         font-changes (length row-str))))
+                  (let ((fi (terminal-font-changes-to-font-info
+                             font-changes (length row-str))))
+                    (setf (aref cache y) fi)
+                    (setf (getf (line-plist line) 'hemlock.command::syntax-colors)
+                          (loop for entry in fi
+                                for plist = (car entry)
+                                for start = (cadr entry)
+                                for end = (cddr entry)
+                                when (and plist (< start end))
+                                collect (list start end plist)))))
                 (when (= y cy)
                   (setf cursor-line line))
                 (setf line (line-next line))))

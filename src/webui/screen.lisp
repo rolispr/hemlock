@@ -39,9 +39,6 @@
   .hem-ml      { height:var(--line); background:#3a3a3a; color:#ccc;
                  white-space:pre; overflow:hidden; flex:none; }
   .cursor      { background:#528bff; color:#fff; }
-  "
-                           (generate-palette-css)
-                           "
   .bold{font-weight:bold} .underline{text-decoration:underline}
   .reverse{filter:invert(100%)} .italic{font-style:italic}
 </style></head>
