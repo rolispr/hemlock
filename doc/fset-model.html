@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hemlock — FSet Buffer Model</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --accent: #e94560;
+    --text: #eee;
+    --dim: #888;
+    --green: #4ecca3;
+    --blue: #7ec8e3;
+    --orange: #f0a500;
+    --purple: #b088f9;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Berkeley Mono', 'JetBrains Mono', 'Fira Code', monospace;
+    background: var(--bg); color: var(--text);
+    padding: 2rem; line-height: 1.6;
+    max-width: 1100px; margin: 0 auto;
+  }
+  h1 { color: var(--accent); font-size: 1.6rem; margin-bottom: 0.3rem; }
+  h2 { color: var(--blue); font-size: 1.2rem; margin: 2.5rem 0 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+  h3 { color: var(--green); font-size: 1rem; margin: 1.5rem 0 0.5rem; }
+  p, li { font-size: 0.85rem; }
+  .subtitle { color: var(--dim); margin-bottom: 2rem; }
+  .diagram { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1rem 0 2rem; overflow-x: auto; }
+  .box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem; margin: 0.8rem 0; }
+  .box .title { font-weight: bold; font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .box ul { padding-left: 1.2rem; }
+  .box li { font-size: 0.8rem; color: var(--dim); margin: 0.2rem 0; }
+  .box li strong { color: var(--text); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .note { background: #1a1a2e; border: 1px dashed var(--border); border-radius: 6px; padding: 0.8rem 1rem; margin: 1rem 0; font-size: 0.8rem; color: var(--dim); }
+  .note strong { color: var(--orange); }
+  code { color: var(--orange); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+<h1>Hemlock &mdash; FSet Buffer Model</h1>
+<p class="subtitle">How immutable state fits into a mutable editor without rewriting commands.</p>
+
+
+<!-- ================================================================= -->
+<h2>1. The problem with mutable buffers</h2>
+
+<div class="diagram">
+<svg viewBox="0 0 960 320" width="960" height="320" xmlns="http://www.w3.org/2000/svg">
+
+  <text x="480" y="22" text-anchor="middle" fill="#7ec8e3" font-family="monospace" font-weight="bold" font-size="14">WHY EMACS IS SINGLE-THREADED</text>
+
+  <!-- Gap buffer -->
+  <rect x="30" y="50" width="400" height="110" rx="8" fill="#1a1a2e" stroke="#e94560" stroke-width="2"/>
+  <text x="50" y="75" fill="#e94560" font-family="monospace" font-size="11" font-weight="bold">MUTABLE BUFFER (gap buffer)</text>
+  <text x="50" y="95" fill="#888" font-family="monospace" font-size="8">char array with a gap at point</text>
+  <text x="50" y="110" fill="#888" font-family="monospace" font-size="8">marks are raw pointers into the array</text>
+  <text x="50" y="125" fill="#888" font-family="monospace" font-size="8">insert = move gap, copy bytes, adjust all marks</text>
+  <text x="50" y="145" fill="#f0a500" font-family="monospace" font-size="8">ONE WRITER AT A TIME or everything corrupts</text>
+
+  <!-- Readers -->
+  <rect x="480" y="50" width="200" height="45" rx="4" fill="#0d1b2a" stroke="#f0a500"/>
+  <text x="492" y="72" fill="#f0a500" font-family="monospace" font-size="9" font-weight="bold">display thread</text>
+  <text x="492" y="86" fill="#888" font-family="monospace" font-size="8">reads buffer to render</text>
+
+  <rect x="480" y="105" width="200" height="45" rx="4" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="492" y="127" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">tree-sitter</text>
+  <text x="492" y="141" fill="#888" font-family="monospace" font-size="8">reads buffer to parse</text>
+
+  <rect x="720" y="50" width="210" height="45" rx="4" fill="#0d1b2a" stroke="#b088f9"/>
+  <text x="732" y="72" fill="#b088f9" font-family="monospace" font-size="9" font-weight="bold">agent output</text>
+  <text x="732" y="86" fill="#888" font-family="monospace" font-size="8">writes to buffer</text>
+
+  <rect x="720" y="105" width="210" height="45" rx="4" fill="#0d1b2a" stroke="#b088f9"/>
+  <text x="732" y="127" fill="#b088f9" font-family="monospace" font-size="9" font-weight="bold">webui client</text>
+  <text x="732" y="141" fill="#888" font-family="monospace" font-size="8">needs buffer state to render</text>
+
+  <!-- The wall -->
+  <rect x="440" y="50" width="4" height="100" fill="#e94560"/>
+  <text x="448" y="178" fill="#e94560" font-family="monospace" font-size="9" font-weight="bold">WALL</text>
+  <text x="448" y="193" fill="#888" font-family="monospace" font-size="8">all of these CANNOT read</text>
+  <text x="448" y="208" fill="#888" font-family="monospace" font-size="8">while a command mutates.</text>
+  <text x="448" y="223" fill="#888" font-family="monospace" font-size="8">if they do: torn reads,</text>
+  <text x="448" y="238" fill="#888" font-family="monospace" font-size="8">dangling marks, crashes.</text>
+
+  <!-- Bottom -->
+  <rect x="30" y="260" width="900" height="45" rx="6" fill="#0d1b2a" stroke="#e94560"/>
+  <text x="50" y="280" fill="#e94560" font-family="monospace" font-size="9" font-weight="bold">result: everything serialized on one thread.</text>
+  <text x="50" y="295" fill="#888" font-family="monospace" font-size="9">display waits for command. TS waits for display. agent waits for TS. nothing is parallel.</text>
+
+</svg>
+</div>
+
+<p style="font-size: 0.85rem; color: var(--dim);">
+Hemlock has the same model. Lines are a doubly-linked list. Marks are pointers into lines.
+<code>insert-string</code> mutates the line, adjusts the gap, fixes up marks. If anything
+reads a buffer while a command is halfway through a multi-line insert, it sees garbage.
+This is why <code>serve-event</code> serializes everything. It's not a design flaw &mdash;
+it's the only correct behavior given mutable state.
+</p>
+
+
+<!-- ================================================================= -->
+<h2>2. What FSet changes</h2>
+
+<div class="diagram">
+<svg viewBox="0 0 960 380" width="960" height="380" xmlns="http://www.w3.org/2000/svg">
+
+  <text x="480" y="22" text-anchor="middle" fill="#7ec8e3" font-family="monospace" font-weight="bold" font-size="14">DUAL-WRITE &mdash; mutable writes, immutable reads</text>
+
+  <!-- Command / mutable side -->
+  <rect x="30" y="50" width="380" height="180" rx="8" fill="#1a1a2e" stroke="#e94560" stroke-width="2"/>
+  <text x="50" y="75" fill="#e94560" font-family="monospace" font-size="11" font-weight="bold">WRITE PATH (unchanged)</text>
+
+  <rect x="50" y="90" width="340" height="30" rx="4" fill="#0d1b2a" stroke="#e94560"/>
+  <text x="62" y="110" fill="#e94560" font-family="monospace" font-size="9">command: (insert-string point "hello")</text>
+
+  <line x1="220" y1="120" x2="220" y2="135" stroke="#f0a500" stroke-width="1.5"/>
+  <polygon points="217,132 223,132 220,138" fill="#f0a500"/>
+
+  <rect x="50" y="138" width="340" height="30" rx="4" fill="#0d1b2a" stroke="#f0a500"/>
+  <text x="62" y="158" fill="#f0a500" font-family="monospace" font-size="9">mutable buffer: gap buffer mutated, marks adjusted</text>
+
+  <line x1="220" y1="168" x2="220" y2="183" stroke="#4ecca3" stroke-width="1.5"/>
+  <polygon points="217,180 223,180 220,186" fill="#4ecca3"/>
+
+  <rect x="50" y="186" width="340" height="30" rx="4" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="62" y="206" fill="#4ecca3" font-family="monospace" font-size="9">buffer-modified-hook fires &rarr; shadow to FSet</text>
+
+  <!-- FSet side -->
+  <rect x="460" y="50" width="470" height="180" rx="8" fill="#1a1a2e" stroke="#4ecca3" stroke-width="2"/>
+  <text x="480" y="75" fill="#4ecca3" font-family="monospace" font-size="11" font-weight="bold">READ PATH (new)</text>
+
+  <rect x="480" y="90" width="200" height="55" rx="4" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="492" y="110" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">buffer-state (FSet)</text>
+  <text x="492" y="125" fill="#888" font-family="monospace" font-size="8">immutable. edit returns new struct.</text>
+  <text x="492" y="138" fill="#888" font-family="monospace" font-size="8">old struct still valid.</text>
+
+  <rect x="700" y="90" width="210" height="55" rx="4" fill="#0d1b2a" stroke="#b088f9"/>
+  <text x="712" y="110" fill="#b088f9" font-family="monospace" font-size="9" font-weight="bold">snapshots</text>
+  <text x="712" y="125" fill="#888" font-family="monospace" font-size="8">cheap (structural sharing).</text>
+  <text x="712" y="138" fill="#888" font-family="monospace" font-size="8">hand out freely. read-only.</text>
+
+  <line x1="680" y1="118" x2="700" y2="118" stroke="#b088f9" stroke-width="1"/>
+
+  <!-- Consumers -->
+  <rect x="480" y="160" width="130" height="30" rx="3" fill="#0d1b2a" stroke="#f0a500"/>
+  <text x="492" y="180" fill="#f0a500" font-family="monospace" font-size="8">display</text>
+  <rect x="620" y="160" width="130" height="30" rx="3" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="632" y="180" fill="#4ecca3" font-family="monospace" font-size="8">tree-sitter</text>
+  <rect x="760" y="160" width="130" height="30" rx="3" fill="#0d1b2a" stroke="#b088f9"/>
+  <text x="772" y="180" fill="#b088f9" font-family="monospace" font-size="8">webui</text>
+
+  <text x="480" y="215" fill="#888" font-family="monospace" font-size="8">each holds its own snapshot. reads are instant. no contention. no locks. no waiting.</text>
+
+  <!-- The key insight -->
+  <rect x="30" y="260" width="900" height="100" rx="8" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="50" y="285" fill="#4ecca3" font-family="monospace" font-size="10" font-weight="bold">THE KEY INSIGHT</text>
+  <text x="50" y="308" fill="#888" font-family="monospace" font-size="9">Commands keep mutating the gap buffer. Nothing changes for them.</text>
+  <text x="50" y="325" fill="#888" font-family="monospace" font-size="9">Every mutation shadows into FSet via buffer-modified-hook. The FSet state is always consistent.</text>
+  <text x="50" y="342" fill="#f0a500" font-family="monospace" font-size="9">Readers never touch the mutable buffer. They get snapshots. Snapshots can't become inconsistent</text>
+  <text x="50" y="355" fill="#f0a500" font-family="monospace" font-size="9">because they're immutable. The command can be halfway through a multi-line insert &mdash; doesn't matter.</text>
+
+</svg>
+</div>
+
+
+<!-- ================================================================= -->
+<h2>3. Hemlock's mutable model</h2>
+
+<p style="font-size: 0.85rem; color: var(--dim); margin-bottom: 1rem;">
+What commands actually touch when they edit a buffer.
+</p>
+
+<div class="diagram">
+<svg viewBox="0 0 960 280" width="960" height="280" xmlns="http://www.w3.org/2000/svg">
+
+  <text x="480" y="22" text-anchor="middle" fill="#7ec8e3" font-family="monospace" font-weight="bold" font-size="14">HEMLOCK BUFFER INTERNALS</text>
+
+  <!-- Lines -->
+  <rect x="30" y="50" width="280" height="120" rx="6" fill="#0d1b2a" stroke="#e94560"/>
+  <text x="50" y="75" fill="#e94560" font-family="monospace" font-size="10" font-weight="bold">lines (doubly-linked list)</text>
+  <text x="50" y="95" fill="#888" font-family="monospace" font-size="8">each line: char array + open/close gap</text>
+  <text x="50" y="110" fill="#888" font-family="monospace" font-size="8">line-previous / line-next pointers</text>
+  <text x="50" y="125" fill="#888" font-family="monospace" font-size="8">line-buffer back-pointer</text>
+  <text x="50" y="145" fill="#f0a500" font-family="monospace" font-size="8">ONE line is "open" at a time (the gap)</text>
+  <text x="50" y="160" fill="#888" font-family="monospace" font-size="8">open-line, left-open-pos, right-open-pos</text>
+
+  <!-- Marks -->
+  <rect x="340" y="50" width="280" height="120" rx="6" fill="#0d1b2a" stroke="#f0a500"/>
+  <text x="360" y="75" fill="#f0a500" font-family="monospace" font-size="10" font-weight="bold">marks (pointers into lines)</text>
+  <text x="360" y="95" fill="#888" font-family="monospace" font-size="8">mark-line: pointer to a line struct</text>
+  <text x="360" y="110" fill="#888" font-family="monospace" font-size="8">mark-charpos: integer offset</text>
+  <text x="360" y="125" fill="#888" font-family="monospace" font-size="8">:left-inserting / :right-inserting</text>
+  <text x="360" y="145" fill="#f0a500" font-family="monospace" font-size="8">adjusted in-place on every edit</text>
+  <text x="360" y="160" fill="#888" font-family="monospace" font-size="8">with-mark creates temp marks, cleans up</text>
+
+  <!-- Buffer -->
+  <rect x="650" y="50" width="280" height="120" rx="6" fill="#0d1b2a" stroke="#b088f9"/>
+  <text x="670" y="75" fill="#b088f9" font-family="monospace" font-size="10" font-weight="bold">buffer</text>
+  <text x="670" y="95" fill="#888" font-family="monospace" font-size="8">region: start-mark .. end-mark</text>
+  <text x="670" y="110" fill="#888" font-family="monospace" font-size="8">point: the cursor (a mark)</text>
+  <text x="670" y="125" fill="#888" font-family="monospace" font-size="8">modified-tick / unmodified-tick</text>
+  <text x="670" y="145" fill="#888" font-family="monospace" font-size="8">modes, variables, windows</text>
+  <text x="670" y="160" fill="#888" font-family="monospace" font-size="8">buffer-modified-hook on every change</text>
+
+  <!-- The mutation path -->
+  <rect x="30" y="195" width="900" height="70" rx="6" fill="#1a1a2e" stroke="#e94560"/>
+  <text x="50" y="218" fill="#e94560" font-family="monospace" font-size="9" font-weight="bold">what insert-string does:</text>
+  <text x="50" y="236" fill="#888" font-family="monospace" font-size="8">1. open the target line (close previous open line) &rarr; 2. splice chars into gap &rarr; 3. maybe split line (newlines)</text>
+  <text x="50" y="250" fill="#888" font-family="monospace" font-size="8">4. adjust all marks on affected lines &rarr; 5. bump modified-tick &rarr; 6. fire buffer-modified-hook</text>
+
+</svg>
+</div>
+
+
+<!-- ================================================================= -->
+<h2>4. The FSet shadow</h2>
+
+<p style="font-size: 0.85rem; color: var(--dim); margin-bottom: 1rem;">
+Step 6 above &mdash; <code>buffer-modified-hook</code> &mdash; is the integration point.
+Every mutation fires this hook. The shadow catches it and produces the equivalent FSet edit.
+</p>
+
+<div class="diagram">
+<svg viewBox="0 0 960 400" width="960" height="400" xmlns="http://www.w3.org/2000/svg">
+
+  <text x="480" y="22" text-anchor="middle" fill="#7ec8e3" font-family="monospace" font-weight="bold" font-size="14">SHADOW PROTOCOL</text>
+
+  <!-- Step 1 -->
+  <rect x="30" y="50" width="280" height="50" rx="4" fill="#0d1b2a" stroke="#e94560"/>
+  <text x="42" y="72" fill="#e94560" font-family="monospace" font-size="9" font-weight="bold">command mutates buffer</text>
+  <text x="42" y="88" fill="#888" font-family="monospace" font-size="8">(insert-string point "hello\nworld")</text>
+
+  <line x1="310" y1="75" x2="350" y2="75" stroke="#f0a500" stroke-width="1.5"/>
+  <polygon points="347,72 353,75 347,78" fill="#f0a500"/>
+
+  <!-- Step 2 -->
+  <rect x="355" y="50" width="280" height="50" rx="4" fill="#0d1b2a" stroke="#f0a500"/>
+  <text x="367" y="72" fill="#f0a500" font-family="monospace" font-size="9" font-weight="bold">hook fires</text>
+  <text x="367" y="88" fill="#888" font-family="monospace" font-size="8">buffer-modified-hook (buffer t)</text>
+
+  <line x1="635" y1="75" x2="675" y2="75" stroke="#4ecca3" stroke-width="1.5"/>
+  <polygon points="672,72 678,75 672,78" fill="#4ecca3"/>
+
+  <!-- Step 3 -->
+  <rect x="680" y="50" width="250" height="50" rx="4" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="692" y="72" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">rebuild FSet state</text>
+  <text x="692" y="88" fill="#888" font-family="monospace" font-size="8">walk lines &rarr; new buffer-state</text>
+
+  <!-- The two approaches -->
+  <rect x="30" y="130" width="440" height="120" rx="6" fill="#1a1a2e" stroke="#f0a500"/>
+  <text x="50" y="155" fill="#f0a500" font-family="monospace" font-size="10" font-weight="bold">approach A: full rebuild on hook</text>
+  <text x="50" y="175" fill="#888" font-family="monospace" font-size="8">walk the line list, build FSet seq from scratch.</text>
+  <text x="50" y="190" fill="#888" font-family="monospace" font-size="8">O(lines) per edit. simple. no tracking needed.</text>
+  <text x="50" y="210" fill="#4ecca3" font-family="monospace" font-size="8">good enough? 10K lines = ~0.5ms. 50K = ~2ms.</text>
+  <text x="50" y="225" fill="#4ecca3" font-family="monospace" font-size="8">commands already take 1-5ms. rebuild amortizes into that.</text>
+  <text x="50" y="240" fill="#888" font-family="monospace" font-size="8">this is what actor-impl.lisp on sento-remoting did.</text>
+
+  <rect x="500" y="130" width="430" height="120" rx="6" fill="#1a1a2e" stroke="#4ecca3"/>
+  <text x="520" y="155" fill="#4ecca3" font-family="monospace" font-size="10" font-weight="bold">approach B: incremental diff</text>
+  <text x="520" y="175" fill="#888" font-family="monospace" font-size="8">track what changed (which lines, what op).</text>
+  <text x="520" y="190" fill="#888" font-family="monospace" font-size="8">apply matching FSet op (bs-insert-string, etc.).</text>
+  <text x="520" y="210" fill="#888" font-family="monospace" font-size="8">O(changed lines) per edit. fast. complex tracking.</text>
+  <text x="520" y="225" fill="#f0a500" font-family="monospace" font-size="8">needs hooks at insert/delete level, not just modified-hook.</text>
+  <text x="520" y="240" fill="#888" font-family="monospace" font-size="8">hemlock's text-insert/text-delete have internal hooks for this.</text>
+
+  <!-- Recommendation -->
+  <rect x="30" y="275" width="900" height="110" rx="8" fill="#0d1b2a" stroke="#7ec8e3"/>
+  <text x="50" y="300" fill="#7ec8e3" font-family="monospace" font-size="10" font-weight="bold">START WITH A, MOVE TO B IF NEEDED</text>
+  <text x="50" y="322" fill="#888" font-family="monospace" font-size="9">Approach A is 20 lines of code. Walk lines on hook, build FSet state, store it.</text>
+  <text x="50" y="338" fill="#888" font-family="monospace" font-size="9">Profile it. If rebuild cost is under 2ms (which it will be for normal files), ship it.</text>
+  <text x="50" y="354" fill="#888" font-family="monospace" font-size="9">Approach B is for the 100K-line file case. Cross that bridge when you have it.</text>
+  <text x="50" y="375" fill="#f0a500" font-family="monospace" font-size="9">Either way: zero changes to commands. Zero changes to the mutable model. It's purely additive.</text>
+
+</svg>
+</div>
+
+
+<!-- ================================================================= -->
+<h2>5. What readers get</h2>
+
+<div class="diagram">
+<svg viewBox="0 0 960 480" width="960" height="480" xmlns="http://www.w3.org/2000/svg">
+
+  <text x="480" y="22" text-anchor="middle" fill="#7ec8e3" font-family="monospace" font-weight="bold" font-size="14">SNAPSHOT CONSUMERS &mdash; all concurrent, all safe</text>
+
+  <!-- Central state -->
+  <rect x="330" y="50" width="300" height="60" rx="6" fill="#1a1a2e" stroke="#4ecca3" stroke-width="2"/>
+  <text x="350" y="75" fill="#4ecca3" font-family="monospace" font-size="11" font-weight="bold">buffer-state (FSet, tick=42)</text>
+  <text x="350" y="95" fill="#888" font-family="monospace" font-size="8">lines: FSet seq &bull; marks: FSet map &bull; meta: FSet map</text>
+
+  <!-- Display -->
+  <rect x="30" y="160" width="250" height="120" rx="6" fill="#0d1b2a" stroke="#f0a500"/>
+  <text x="50" y="185" fill="#f0a500" font-family="monospace" font-size="10" font-weight="bold">display (TTY or WebUI)</text>
+  <text x="50" y="205" fill="#888" font-family="monospace" font-size="8">receives snapshot at tick=42</text>
+  <text x="50" y="220" fill="#888" font-family="monospace" font-size="8">diffs against previous snapshot</text>
+  <text x="50" y="235" fill="#888" font-family="monospace" font-size="8">only redraws changed lines</text>
+  <text x="50" y="255" fill="#4ecca3" font-family="monospace" font-size="8">can render on its own thread/process</text>
+  <text x="50" y="270" fill="#4ecca3" font-family="monospace" font-size="8">command loop never blocks on display</text>
+
+  <line x1="350" y1="110" x2="155" y2="160" stroke="#f0a500" stroke-width="1"/>
+
+  <!-- Tree-sitter -->
+  <rect x="350" y="160" width="250" height="120" rx="6" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="370" y="185" fill="#4ecca3" font-family="monospace" font-size="10" font-weight="bold">tree-sitter</text>
+  <text x="370" y="205" fill="#888" font-family="monospace" font-size="8">receives snapshot at tick=42</text>
+  <text x="370" y="220" fill="#888" font-family="monospace" font-size="8">parses on pinned thread (C FFI)</text>
+  <text x="370" y="235" fill="#888" font-family="monospace" font-size="8">produces colors tagged tick=42</text>
+  <text x="370" y="255" fill="#4ecca3" font-family="monospace" font-size="8">if buffer is now tick=43: discard</text>
+  <text x="370" y="270" fill="#4ecca3" font-family="monospace" font-size="8">no race. snapshot is immutable.</text>
+
+  <line x1="480" y1="110" x2="475" y2="160" stroke="#4ecca3" stroke-width="1"/>
+
+  <!-- WebUI / remote -->
+  <rect x="670" y="160" width="260" height="120" rx="6" fill="#0d1b2a" stroke="#b088f9"/>
+  <text x="690" y="185" fill="#b088f9" font-family="monospace" font-size="10" font-weight="bold">webui / remote client</text>
+  <text x="690" y="205" fill="#888" font-family="monospace" font-size="8">receives snapshot via remoting</text>
+  <text x="690" y="220" fill="#888" font-family="monospace" font-size="8">renders in browser (DOM/canvas)</text>
+  <text x="690" y="235" fill="#888" font-family="monospace" font-size="8">network latency doesn't block editor</text>
+  <text x="690" y="255" fill="#4ecca3" font-family="monospace" font-size="8">multiple clients, same snapshot</text>
+  <text x="690" y="270" fill="#4ecca3" font-family="monospace" font-size="8">pair programming for free</text>
+
+  <line x1="600" y1="110" x2="800" y2="160" stroke="#b088f9" stroke-width="1"/>
+
+  <!-- Undo -->
+  <rect x="30" y="320" width="250" height="90" rx="6" fill="#0d1b2a" stroke="#b088f9"/>
+  <text x="50" y="345" fill="#b088f9" font-family="monospace" font-size="10" font-weight="bold">undo</text>
+  <text x="50" y="365" fill="#888" font-family="monospace" font-size="8">keep a list of old buffer-states</text>
+  <text x="50" y="380" fill="#888" font-family="monospace" font-size="8">undo = swap current state pointer</text>
+  <text x="50" y="395" fill="#4ecca3" font-family="monospace" font-size="8">structural sharing: 1000 undos ~ 1 buffer</text>
+
+  <!-- Agent output -->
+  <rect x="350" y="320" width="250" height="90" rx="6" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="370" y="345" fill="#4ecca3" font-family="monospace" font-size="10" font-weight="bold">agent output</text>
+  <text x="370" y="365" fill="#888" font-family="monospace" font-size="8">agent sends text to insert</text>
+  <text x="370" y="380" fill="#888" font-family="monospace" font-size="8">goes through write path (mutable)</text>
+  <text x="370" y="395" fill="#888" font-family="monospace" font-size="8">shadow picks it up automatically</text>
+
+  <!-- Search / grep -->
+  <rect x="670" y="320" width="260" height="90" rx="6" fill="#0d1b2a" stroke="#f0a500"/>
+  <text x="690" y="345" fill="#f0a500" font-family="monospace" font-size="10" font-weight="bold">background search / grep</text>
+  <text x="690" y="365" fill="#888" font-family="monospace" font-size="8">take snapshot, search it on worker thread</text>
+  <text x="690" y="380" fill="#888" font-family="monospace" font-size="8">user keeps editing while search runs</text>
+  <text x="690" y="395" fill="#4ecca3" font-family="monospace" font-size="8">results tagged with tick for staleness check</text>
+
+  <!-- Timing note -->
+  <rect x="30" y="435" width="900" height="35" rx="4" fill="#1a1a2e" stroke="#0f3460"/>
+  <text x="50" y="457" fill="#888" font-family="monospace" font-size="9">every consumer independently holds a snapshot. they never contend with each other or with commands.</text>
+
+</svg>
+</div>
+
+
+<!-- ================================================================= -->
+<h2>6. What FSet is, concretely</h2>
+
+<div class="box" style="border-left: 3px solid var(--green);">
+  <div class="title">buffer-state struct (src/text/fset-state.lisp)</div>
+  <ul>
+    <li><strong>lines</strong> &mdash; <code>FSet seq</code> of strings. One string per line. Balanced tree internally.
+        Insert/delete at any index: O(log n). Lookup by index: O(log n).</li>
+    <li><strong>marks</strong> &mdash; <code>FSet map</code> from mark-id to (line-idx charpos kind).
+        Every edit produces new marks with adjusted positions.</li>
+    <li><strong>meta</strong> &mdash; <code>FSet map</code> of buffer properties (name, modes, modified-tick, etc.).</li>
+    <li><strong>tick</strong> &mdash; monotonically increasing integer. Bumped on every edit.
+        Consumers compare ticks to detect staleness.</li>
+  </ul>
+</div>
+
+<div class="box" style="border-left: 3px solid var(--purple);">
+  <div class="title">structural sharing</div>
+  <ul>
+    <li>Editing line 50 of a 10,000-line buffer copies ~13 tree nodes (log2 10000).
+        The other 9,999 lines are shared between old and new state.</li>
+    <li>A snapshot is just a pointer to the root. Cost: one pointer copy.</li>
+    <li>Old states are garbage collected when no one holds them. If undo holds 100 states
+        and they share 99% of lines, memory cost is ~1% overhead per undo level.</li>
+  </ul>
+</div>
+
+<div class="box" style="border-left: 3px solid var(--orange);">
+  <div class="title">buffer-snapshot struct (for display)</div>
+  <ul>
+    <li>Lightweight view extracted from buffer-state via <code>state-&gt;snapshot</code>.</li>
+    <li>Contains: lines, line-count, point position, display-start, modes, modified-p,
+        colors (from tree-sitter), modeline string, window dimensions.</li>
+    <li>Everything the display needs to render. No back-references to mutable state.</li>
+    <li>Display diffs old snapshot vs new snapshot to minimize terminal writes.</li>
+  </ul>
+</div>
+
+
+<!-- ================================================================= -->
+<h2>7. What this does NOT require</h2>
+
+<div class="grid">
+  <div class="box" style="border-left: 3px solid var(--green);">
+    <div class="title" style="color: var(--green);">No changes to:</div>
+    <ul>
+      <li><strong>Commands</strong> &mdash; all 50+ command files untouched.
+          insert-string, delete-characters, with-mark all work as-is.</li>
+      <li><strong>Marks</strong> &mdash; still mutable pointers. Commands use them normally.
+          FSet marks are a parallel data structure, not a replacement.</li>
+      <li><strong>Gap buffer</strong> &mdash; still the write-path representation.
+          Fast single-cursor edits, same as always.</li>
+      <li><strong>Command loop</strong> &mdash; still single-threaded, still serialized.
+          The command loop is the writer. It doesn't need to change.</li>
+      <li><strong>Keybindings</strong> &mdash; nothing changes.</li>
+    </ul>
+  </div>
+  <div class="box" style="border-left: 3px solid var(--accent);">
+    <div class="title" style="color: var(--accent);">What changes:</div>
+    <ul>
+      <li><strong>buffer-modified-hook</strong> &mdash; gains a shadow function that
+          rebuilds FSet state after each mutation. ~20 lines of code.</li>
+      <li><strong>Display</strong> &mdash; reads from snapshots instead of directly
+          walking the mutable line list. Existing tty/display.lisp adapts.</li>
+      <li><strong>Tree-sitter</strong> &mdash; receives snapshots instead of reading
+          mutable lines. Parses immutable data. Colors tagged with tick.</li>
+      <li><strong>Undo</strong> &mdash; optionally backed by state history instead of
+          the current reverse-edit approach. Simpler, more reliable.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="note">
+  <strong>The mutable model stays.</strong> It's the fast path for commands. FSet is the
+  safe path for readers. They coexist. Commands write to mutable buffers. The shadow
+  propagates to FSet. Readers consume FSet snapshots. Nobody waits for anybody.
+  This is the dual-write architecture from archv2.html Phase 2 &mdash; and it's the
+  realistic ceiling that gets you 90% of the parallelism benefits without rewriting
+  the editor.
+</div>
+
+</body>
+</html>

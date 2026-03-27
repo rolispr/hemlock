@@ -7,7 +7,7 @@
 (asdf:defsystem :hemlock.webui
   :description "WebUI display backend for Hemlock"
   :licence "Public Domain"
-  :depends-on (:hemlock :hemlock.term :cl-webui :sb-concurrency)
+  :depends-on (:hemlock :cl-webui :sb-concurrency)
   :pathname #.(make-pathname
                :directory
                (pathname-directory *hemlock-base-directory*)

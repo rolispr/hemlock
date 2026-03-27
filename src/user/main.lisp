@@ -287,7 +287,10 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
    (setf *standard-output* stream
          *error-output*    stream
          *trace-output*    stream))
- (hemlock.io:setup-wakeup-pipe))
+ (hemlock.io:setup-wakeup-pipe)
+ (hemlock.actor:start-actor-system)
+ (hemlock.actor:start-agent-registry)
+ (hemlock.actor:start-local-agent))
 
 (defvar *command-line-options* nil)
 
@@ -422,10 +425,6 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
                    :backend-type backend-type
                    :display display)
        (process-command-line-argument x)
-       ;; Start the actor system for agent communication.
-       (hemlock.actor:start-actor-system)
-       (hemlock.actor:start-agent-registry)
-       (hemlock.actor:start-local-agent)
        (handler-case (invoke-hook hemlock::entry-hook)
          (error (c) (setf *pending-error* c)))
        (unwind-protect
@@ -490,7 +489,8 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
               (setq *editor-has-been-entered* t)
               ;; Pick up user initializations to be done after initialization.
               (handler-case
-                  (invoke-hook (reverse *after-editor-initializations-funs*))
+                  (dolist (f (reverse *after-editor-initializations-funs*))
+                    (funcall f))
                 (error (c) (setf *pending-error* c)))
               (when hemlock.command::*ts-init-failed*
                 (message "tree-sitter unavailable~@[: ~A~]"

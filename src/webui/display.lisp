@@ -210,6 +210,87 @@
     (write-char #\] out)))
 
 
+;;;; Snapshot-based rendering — builds HTML from immutable buffer-snapshot.
+;;;; Can be called from any thread without touching mutable buffer state.
+
+(defun snapshot-line->html (line-str colors cursor-col)
+  "Render a single line from a snapshot as HTML.
+LINE-STR is the line string, COLORS is the syntax color ranges (or nil),
+CURSOR-COL is the cursor column on this line (or nil)."
+  (let ((len (length line-str)))
+    (with-output-to-string (out)
+      (if (and (zerop len) (null cursor-col))
+          (write-string " " out)
+          (let ((pos 0))
+            (when colors
+              (dolist (range colors)
+                (when (and (listp range) (>= (length range) 3))
+                  (let ((start (max 0 (min (first range) len)))
+                        (end (max 0 (min (second range) len)))
+                        (font (third range)))
+                    (when (< start end)
+                      (when (< pos start)
+                        (emit-snapshot-chars line-str pos start cursor-col out)
+                        (setf pos start))
+                      (let ((style (color->css-style font))
+                            (css (font->css font)))
+                        (write-string "<span" out)
+                        (unless (string= css "")
+                          (format out " class=\"~A\"" css))
+                        (when style
+                          (format out " style=\"~A\"" style))
+                        (write-string ">" out)
+                        (emit-snapshot-chars line-str start end cursor-col out)
+                        (write-string "</span>" out)
+                        (setf pos (max pos end))))))))
+            (when (< pos len)
+              (emit-snapshot-chars line-str pos len cursor-col out))
+            (when (and cursor-col (>= cursor-col len))
+              (write-string "<span class=\"cursor\"> </span>" out)))))))
+
+(defun emit-snapshot-chars (str start end cursor-col out)
+  "Emit characters [start..end) with cursor injection."
+  (if (and cursor-col (>= cursor-col start) (< cursor-col end))
+      (progn
+        (when (< start cursor-col)
+          (html-escape-range str start cursor-col out))
+        (write-string "<span class=\"cursor\">" out)
+        (html-escape-range str cursor-col (1+ cursor-col) out)
+        (write-string "</span>" out)
+        (when (< (1+ cursor-col) end)
+          (html-escape-range str (1+ cursor-col) end out)))
+      (html-escape-range str start end out)))
+
+(defun snapshot->json (snap &key cursor-line cursor-col)
+  "Build a JSON object from a buffer-snapshot for the WebUI.
+Can be called from any thread — reads only immutable data."
+  (let* ((lines (hemlock.text::snap-lines snap))
+         (count (hemlock.text::snap-line-count snap))
+         (start (hemlock.text::snap-start-line snap))
+         (colors (hemlock.text::snap-colors snap))
+         (height (or (hemlock.text::snap-text-height snap) (min count 40)))
+         (name (hemlock.text::snap-name snap))
+         (modeline (hemlock.text::snap-modeline snap))
+         (cursor-line (or cursor-line (hemlock.text::snap-point-line snap)))
+         (cursor-col (or cursor-col (hemlock.text::snap-point-charpos snap))))
+    (with-output-to-string (out)
+      (format out "{\"name\":\"~A\",\"tick\":~D,\"lines\":["
+              (json-escape name)
+              (hemlock.text::snap-tick snap))
+      (let ((end (min count (+ start height))))
+        (loop for i from start below end
+              for rel = (- i start)
+              do (when (> rel 0) (write-char #\, out))
+                 (write-char #\" out)
+                 (let* ((line-str (fset:@ lines i))
+                        (lc (and colors (< i (fset:size colors)) (fset:@ colors i)))
+                        (cc (when (= i cursor-line) cursor-col))
+                        (html (snapshot-line->html line-str lc cc)))
+                   (write-string (json-escape (format nil "<div>~A</div>" html)) out))
+                 (write-char #\" out)))
+      (format out "],\"modeline\":\"~A\"}" (json-escape (or modeline ""))))))
+
+
 ;;;; Modeline text
 
 (defun modeline-text (window)

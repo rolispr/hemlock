@@ -520,7 +520,7 @@
   (:export
    #:dispatch-events #:dispatch-events-no-hang #:dispatch-events-timeout
 
-   #:fset-state #:fset-snapshot #:drop-fset-state
+   #:buffer-state #:buffer-snapshot #:drop-buffer-state
 
    #:current-mark
    #:pop-buffer-mark

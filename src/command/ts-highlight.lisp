@@ -179,6 +179,15 @@ Returns NIL for unrecognised captures (no color applied)."
           (setf line (line-next line)))
     (format nil "~{~A~^~%~}" (nreverse parts))))
 
+(defun ts-text-from-state (bs)
+  "Extract buffer text from an immutable buffer-state. No mutable buffer access."
+  (let ((lines (hemlock.text::bs-lines bs))
+        (count (hemlock.text::bs-line-count bs)))
+    (with-output-to-string (s)
+      (dotimes (i count)
+        (unless (zerop i) (write-char #\Newline s))
+        (write-string (fset:@ lines i) s)))))
+
 (defun ts-build-line-offsets (text)
   (let* ((bytes (babel:string-to-octets text :encoding :utf-8))
          (total (length bytes))

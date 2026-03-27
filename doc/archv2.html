@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hemlock — Architecture v2</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --accent: #e94560;
+    --text: #eee;
+    --dim: #888;
+    --green: #4ecca3;
+    --blue: #7ec8e3;
+    --orange: #f0a500;
+    --purple: #b088f9;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Berkeley Mono', 'JetBrains Mono', 'Fira Code', monospace;
+    background: var(--bg); color: var(--text);
+    padding: 2rem; line-height: 1.6;
+    max-width: 1100px; margin: 0 auto;
+  }
+  h1 { color: var(--accent); font-size: 1.6rem; margin-bottom: 0.3rem; }
+  h2 { color: var(--blue); font-size: 1.2rem; margin: 2.5rem 0 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+  h3 { color: var(--green); font-size: 1rem; margin: 1.5rem 0 0.5rem; }
+  p, li { font-size: 0.85rem; }
+  .subtitle { color: var(--dim); margin-bottom: 2rem; }
+  .diagram { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1rem 0 2rem; overflow-x: auto; }
+  .box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem; margin: 0.8rem 0; }
+  .box .title { font-weight: bold; font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .box ul { padding-left: 1.2rem; }
+  .box li { font-size: 0.8rem; color: var(--dim); margin: 0.2rem 0; }
+  .box li strong { color: var(--text); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .note { background: #1a1a2e; border: 1px dashed var(--border); border-radius: 6px; padding: 0.8rem 1rem; margin: 1rem 0; font-size: 0.8rem; color: var(--dim); }
+  .note strong { color: var(--orange); }
+  .lesson { background: #1a1a2e; border: 1px solid var(--accent); border-radius: 6px; padding: 0.8rem 1rem; margin: 0.5rem 0; font-size: 0.8rem; }
+  .lesson strong { color: var(--accent); }
+  .pro { color: var(--green); font-size: 0.8rem; }
+  .con { color: var(--accent); font-size: 0.8rem; }
+  code { color: var(--orange); font-size: 0.8rem; }
+  .phase-label { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.7rem; font-weight: bold; margin-bottom: 0.3rem; }
+  .phase-1 { background: var(--green); color: #000; }
+  .phase-2 { background: var(--orange); color: #000; }
+  .phase-3 { background: var(--purple); color: #000; }
+</style>
+</head>
+<body>
+
+<h1>Hemlock &mdash; Architecture v2</h1>
+<p class="subtitle">Lessons from sento-remoting. The real path forward.</p>
+
+
+<!-- ================================================================= -->
+<h2>1. What sento-remoting proved</h2>
+
+<p>The branch attempted Option B (full actor model) in one shot. It partially worked.
+Here's what we learned.</p>
+
+<div class="grid">
+  <div class="box" style="border-left: 3px solid var(--green);">
+    <div class="title" style="color: var(--green);">Validated</div>
+    <ul>
+      <li><strong>Sento remoting works</strong> &mdash; two actor-systems communicating
+          over localhost TCP. Smoke test proves ping, eval, fire-and-forget.</li>
+      <li><strong>FSet immutable buffer state works</strong> &mdash; 15 tests passing.
+          Insert, delete, region ops, mark adjustment, structural sharing.
+          Pure functions, zero coupling to hemlock internals.</li>
+      <li><strong>Actor protocols are sound</strong> &mdash; buffer, command, display,
+          input as separate actors with deferred receive functions.
+          Clean separation of protocol from implementation.</li>
+      <li><strong>Agent registry works</strong> &mdash; uniform <code>ask-s</code>
+          interface for local/process/remote agents.</li>
+      <li><strong>hemlock.core.asd layering works</strong> &mdash; 10-layer module
+          structure with clean dependency graph.</li>
+    </ul>
+  </div>
+  <div class="box" style="border-left: 3px solid var(--accent);">
+    <div class="title" style="color: var(--accent);">Failed</div>
+    <ul>
+      <li><strong>Display-actor was a toy</strong> &mdash; reimplemented terminal
+          rendering from scratch. No dis-line diffing, no scroll optimization,
+          no hunk management, no modeline fields. Regressed everything.</li>
+      <li><strong>Input-actor duplicated code</strong> &mdash; copy-pasted bracketed
+          paste, focus, SGR mouse, key event parsing from tty/input.lisp
+          into tty/input-actor.lisp. Two copies of the same logic.</li>
+      <li><strong>Tree-sitter broke</strong> &mdash; actor indirection between
+          TS and buffers added latency and race conditions that didn't exist
+          in the synchronous model.</li>
+      <li><strong>Gray streams over actors</strong> &mdash; reimplemented old wire-backed
+          stream pattern on top of sento. Unnecessary. Sento messages are the I/O.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="lesson">
+  <strong>Core lesson:</strong> The architecture is right. The execution was wrong.
+  Don't rewrite working code from scratch. Adapt existing code to work within the
+  actor model incrementally.
+</div>
+
+
+<!-- ================================================================= -->
+<h2>2. The tmux model</h2>
+
+<p>hemlock is a client that bootstraps its own core.
+Not a daemon you manage. Not a server you start separately.
+Like tmux: you run it, it works. The server is an implementation detail.</p>
+
+<div class="diagram">
+<svg viewBox="0 0 960 460" width="960" height="460" xmlns="http://www.w3.org/2000/svg">
+
+  <text x="480" y="22" text-anchor="middle" fill="#7ec8e3" font-family="monospace" font-weight="bold" font-size="14">THE TMUX MODEL &mdash; client IS the entry point</text>
+
+  <!-- Core -->
+  <rect x="280" y="45" width="400" height="200" rx="10" fill="#1a1a2e" stroke="#b088f9" stroke-width="2"/>
+  <text x="300" y="72" fill="#b088f9" font-family="monospace" font-size="13" font-weight="bold">CORE (actor-system)</text>
+  <text x="300" y="90" fill="#888" font-family="monospace" font-size="8">sento actor-system + remoting enabled</text>
+
+  <rect x="300" y="102" width="170" height="40" rx="4" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="312" y="120" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">buffer-actor</text>
+  <text x="312" y="134" fill="#888" font-family="monospace" font-size="8">FSet state, snapshots</text>
+
+  <rect x="490" y="102" width="170" height="40" rx="4" fill="#0d1b2a" stroke="#e94560"/>
+  <text x="502" y="120" fill="#e94560" font-family="monospace" font-size="9" font-weight="bold">command-actor</text>
+  <text x="502" y="134" fill="#888" font-family="monospace" font-size="8">dispatch, invoke</text>
+
+  <rect x="300" y="155" width="170" height="40" rx="4" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="312" y="173" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">ts-actor</text>
+  <text x="312" y="187" fill="#888" font-family="monospace" font-size="8">parse snapshots</text>
+
+  <rect x="490" y="155" width="170" height="40" rx="4" fill="#0d1b2a" stroke="#b088f9"/>
+  <text x="502" y="173" fill="#b088f9" font-family="monospace" font-size="9" font-weight="bold">agent-registry</text>
+  <text x="502" y="187" fill="#888" font-family="monospace" font-size="8">tracks all agents</text>
+
+  <text x="300" y="230" fill="#f0a500" font-family="monospace" font-size="8">remoting: 127.0.0.1:auto-port</text>
+
+  <!-- TTY client (in-process) -->
+  <rect x="30" y="80" width="220" height="130" rx="8" fill="#16213e" stroke="#f0a500" stroke-width="2"/>
+  <text x="50" y="105" fill="#f0a500" font-family="monospace" font-size="11" font-weight="bold">TTY CLIENT</text>
+  <text x="50" y="122" fill="#888" font-family="monospace" font-size="8">in-process (owns terminal)</text>
+  <text x="50" y="140" fill="#888" font-family="monospace" font-size="8">input: reads stdin</text>
+  <text x="50" y="154" fill="#888" font-family="monospace" font-size="8">display: writes terminal</text>
+  <text x="50" y="172" fill="#888" font-family="monospace" font-size="8">adapts existing tty/ code</text>
+  <text x="50" y="196" fill="#4ecca3" font-family="monospace" font-size="7">bootstraps core on startup</text>
+
+  <line x1="250" y1="145" x2="280" y2="145" stroke="#f0a500" stroke-width="2"/>
+  <text x="253" y="138" fill="#f0a500" font-family="monospace" font-size="7">in-proc</text>
+
+  <!-- WebUI client -->
+  <rect x="710" y="80" width="220" height="130" rx="8" fill="#16213e" stroke="#7ec8e3" stroke-width="2"/>
+  <text x="730" y="105" fill="#7ec8e3" font-family="monospace" font-size="11" font-weight="bold">WEBUI CLIENT</text>
+  <text x="730" y="122" fill="#888" font-family="monospace" font-size="8">in-process HTTP server</text>
+  <text x="730" y="140" fill="#888" font-family="monospace" font-size="8">input: browser events</text>
+  <text x="730" y="154" fill="#888" font-family="monospace" font-size="8">display: HTML/canvas</text>
+  <text x="730" y="172" fill="#888" font-family="monospace" font-size="8">browser connects to it</text>
+  <text x="730" y="196" fill="#4ecca3" font-family="monospace" font-size="7">or: bootstraps core itself</text>
+
+  <line x1="680" y1="145" x2="710" y2="145" stroke="#7ec8e3" stroke-width="2"/>
+  <text x="683" y="138" fill="#7ec8e3" font-family="monospace" font-size="7">in-proc</text>
+
+  <!-- Agents below -->
+  <rect x="120" y="310" width="200" height="70" rx="6" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="140" y="335" fill="#4ecca3" font-family="monospace" font-size="10" font-weight="bold">local agent</text>
+  <text x="140" y="352" fill="#888" font-family="monospace" font-size="8">actor in core's system</text>
+  <text x="140" y="366" fill="#888" font-family="monospace" font-size="8">hemlock self-eval</text>
+
+  <line x1="220" y1="250" x2="220" y2="310" stroke="#4ecca3" stroke-width="1.5" stroke-dasharray="4,2"/>
+
+  <rect x="380" y="310" width="200" height="70" rx="6" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="400" y="335" fill="#4ecca3" font-family="monospace" font-size="10" font-weight="bold">process agent</text>
+  <text x="400" y="352" fill="#888" font-family="monospace" font-size="8">separate OS process</text>
+  <text x="400" y="366" fill="#888" font-family="monospace" font-size="8">sento remoting, localhost</text>
+
+  <line x1="480" y1="250" x2="480" y2="310" stroke="#e94560" stroke-width="1.5"/>
+  <text x="486" y="286" fill="#e94560" font-family="monospace" font-size="7">remoting</text>
+
+  <rect x="640" y="310" width="200" height="70" rx="6" fill="#0d1b2a" stroke="#4ecca3" stroke-dasharray="5,3"/>
+  <text x="660" y="335" fill="#4ecca3" font-family="monospace" font-size="10" font-weight="bold">remote agent</text>
+  <text x="660" y="352" fill="#888" font-family="monospace" font-size="8">different machine / k8s</text>
+  <text x="660" y="366" fill="#888" font-family="monospace" font-size="8">sento remoting + TLS</text>
+
+  <line x1="740" y1="250" x2="740" y2="310" stroke="#e94560" stroke-width="1.5"/>
+  <text x="746" y="286" fill="#e94560" font-family="monospace" font-size="7">remoting</text>
+
+  <!-- CLI examples -->
+  <rect x="30" y="410" width="900" height="40" rx="6" fill="#0d1b2a" stroke="#0f3460"/>
+  <text x="50" y="432" fill="#f0a500" font-family="monospace" font-size="9">$ hemlock foo.lisp</text>
+  <text x="280" y="432" fill="#888" font-family="monospace" font-size="8">&rarr; start core + attach TTY client (like tmux)</text>
+  <text x="560" y="432" fill="#f0a500" font-family="monospace" font-size="9">$ hemlock --gui foo.lisp</text>
+  <text x="770" y="432" fill="#888" font-family="monospace" font-size="8">&rarr; start core + webui</text>
+
+</svg>
+</div>
+
+<div class="note">
+  <strong>Key insight:</strong> The client bootstraps the core. Like tmux, the user
+  never thinks about servers or daemons. <code>hemlock</code> just works.
+  The client is in-process &mdash; it IS the process. Agents connect from outside.
+  Multiple clients can attach to the same core (pair programming, mobile + desktop, etc.).
+</div>
+
+
+<!-- ================================================================= -->
+<h2>3. FSet: the data foundation</h2>
+
+<p>Immutable buffer state is what makes parallel actor access safe without locks.
+This is already built and tested (<code>src/text/fset-state.lisp</code>, 15 tests passing).</p>
+
+<div class="diagram">
+<svg viewBox="0 0 960 340" width="960" height="340" xmlns="http://www.w3.org/2000/svg">
+
+  <text x="480" y="22" text-anchor="middle" fill="#7ec8e3" font-family="monospace" font-weight="bold" font-size="14">IMMUTABLE BUFFER STATE &mdash; shared without locks</text>
+
+  <!-- Buffer actor -->
+  <rect x="340" y="50" width="280" height="80" rx="8" fill="#1a1a2e" stroke="#4ecca3" stroke-width="2"/>
+  <text x="360" y="75" fill="#4ecca3" font-family="monospace" font-size="11" font-weight="bold">buffer-actor</text>
+  <text x="360" y="93" fill="#888" font-family="monospace" font-size="8">holds current buffer-state (FSet)</text>
+  <text x="360" y="107" fill="#888" font-family="monospace" font-size="8">applies edits &rarr; produces new state</text>
+  <text x="360" y="121" fill="#f0a500" font-family="monospace" font-size="8">snapshots are free (structural sharing)</text>
+
+  <!-- Consumers -->
+  <rect x="30" y="180" width="200" height="60" rx="6" fill="#0d1b2a" stroke="#f0a500"/>
+  <text x="50" y="205" fill="#f0a500" font-family="monospace" font-size="9" font-weight="bold">display client</text>
+  <text x="50" y="220" fill="#888" font-family="monospace" font-size="8">receives snapshot, renders it</text>
+  <text x="50" y="232" fill="#888" font-family="monospace" font-size="8">doesn't touch buffer-state</text>
+
+  <rect x="270" y="180" width="200" height="60" rx="6" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="290" y="205" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">tree-sitter</text>
+  <text x="290" y="220" fill="#888" font-family="monospace" font-size="8">receives snapshot, parses it</text>
+  <text x="290" y="232" fill="#888" font-family="monospace" font-size="8">sends colors back by tick</text>
+
+  <rect x="510" y="180" width="200" height="60" rx="6" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="530" y="205" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">agent</text>
+  <text x="530" y="220" fill="#888" font-family="monospace" font-size="8">reads buffer content for eval</text>
+  <text x="530" y="232" fill="#888" font-family="monospace" font-size="8">writes output to buffer</text>
+
+  <rect x="750" y="180" width="180" height="60" rx="6" fill="#0d1b2a" stroke="#b088f9"/>
+  <text x="770" y="205" fill="#b088f9" font-family="monospace" font-size="9" font-weight="bold">undo stack</text>
+  <text x="770" y="220" fill="#888" font-family="monospace" font-size="8">just a list of old states</text>
+  <text x="770" y="232" fill="#888" font-family="monospace" font-size="8">undo = swap pointer</text>
+
+  <!-- Arrows -->
+  <line x1="380" y1="130" x2="130" y2="180" stroke="#f0a500" stroke-width="1"/>
+  <line x1="430" y1="130" x2="370" y2="180" stroke="#4ecca3" stroke-width="1"/>
+  <line x1="530" y1="130" x2="610" y2="180" stroke="#4ecca3" stroke-width="1"/>
+  <line x1="580" y1="130" x2="840" y2="180" stroke="#b088f9" stroke-width="1"/>
+
+  <!-- Labels -->
+  <text x="180" y="160" fill="#f0a500" font-family="monospace" font-size="7">snapshot</text>
+  <text x="360" y="160" fill="#4ecca3" font-family="monospace" font-size="7">snapshot</text>
+  <text x="570" y="160" fill="#4ecca3" font-family="monospace" font-size="7">snapshot</text>
+  <text x="750" y="160" fill="#b088f9" font-family="monospace" font-size="7">old states</text>
+
+  <!-- Data model -->
+  <rect x="30" y="270" width="900" height="55" rx="6" fill="#0d1b2a" stroke="#0f3460"/>
+  <text x="50" y="292" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">buffer-state</text>
+  <text x="180" y="292" fill="#888" font-family="monospace" font-size="8">lines: FSet seq of strings</text>
+  <text x="420" y="292" fill="#888" font-family="monospace" font-size="8">marks: FSet map (id &rarr; position)</text>
+  <text x="680" y="292" fill="#888" font-family="monospace" font-size="8">meta: FSet map (properties)</text>
+  <text x="50" y="312" fill="#888" font-family="monospace" font-size="8">tick: monotonic edit counter &mdash; consumers compare ticks to know if they're stale</text>
+  <text x="500" y="312" fill="#f0a500" font-family="monospace" font-size="8">all immutable. edit returns a new struct. old struct unchanged.</text>
+
+</svg>
+</div>
+
+<div class="box" style="border-left: 3px solid var(--green);">
+  <div class="title">Why FSet matters</div>
+  <ul>
+    <li><strong>No locks:</strong> actors hold snapshots, not references to mutable state.
+        No reader-writer contention. No deadlocks. No races.</li>
+    <li><strong>Structural sharing:</strong> inserting a character copies O(log n) tree nodes,
+        not O(n) line strings. Snapshots are nearly free.</li>
+    <li><strong>Undo for free:</strong> keep a list of old buffer-states. Undo = point at
+        previous state. No diff/patch/reverse machinery.</li>
+    <li><strong>Tree-sitter safety:</strong> TS parses a snapshot. If the buffer changes
+        while parsing, the snapshot is still valid &mdash; just stale. Parse completes,
+        colors tagged with tick. If tick &lt; current, discard or re-parse. No corruption.</li>
+  </ul>
+</div>
+
+
+<!-- ================================================================= -->
+<h2>4. Tree-sitter in the actor model</h2>
+
+<p>This is where sento-remoting broke down. Here's how it actually works with FSet.</p>
+
+<div class="diagram">
+<svg viewBox="0 0 960 250" width="960" height="250" xmlns="http://www.w3.org/2000/svg">
+
+  <text x="480" y="22" text-anchor="middle" fill="#7ec8e3" font-family="monospace" font-weight="bold" font-size="14">TREE-SITTER FLOW &mdash; snapshot-based, no races</text>
+
+  <!-- Steps -->
+  <rect x="30" y="50" width="170" height="55" rx="4" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="42" y="72" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">1. edit happens</text>
+  <text x="42" y="88" fill="#888" font-family="monospace" font-size="8">buffer-actor applies edit</text>
+  <text x="42" y="98" fill="#888" font-family="monospace" font-size="8">new state, tick=N</text>
+
+  <line x1="200" y1="78" x2="225" y2="78" stroke="#f0a500" stroke-width="1.5"/>
+  <polygon points="222,75 228,78 222,81" fill="#f0a500"/>
+
+  <rect x="228" y="50" width="170" height="55" rx="4" fill="#0d1b2a" stroke="#f0a500"/>
+  <text x="240" y="72" fill="#f0a500" font-family="monospace" font-size="9" font-weight="bold">2. tell ts-actor</text>
+  <text x="240" y="88" fill="#888" font-family="monospace" font-size="8">send snapshot (tick=N)</text>
+  <text x="240" y="98" fill="#888" font-family="monospace" font-size="8">fire and forget</text>
+
+  <line x1="398" y1="78" x2="423" y2="78" stroke="#f0a500" stroke-width="1.5"/>
+  <polygon points="420,75 426,78 420,81" fill="#f0a500"/>
+
+  <rect x="426" y="50" width="170" height="55" rx="4" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="438" y="72" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">3. ts-actor parses</text>
+  <text x="438" y="88" fill="#888" font-family="monospace" font-size="8">on its own pinned thread</text>
+  <text x="438" y="98" fill="#888" font-family="monospace" font-size="8">C FFI, takes ~ms</text>
+
+  <line x1="596" y1="78" x2="621" y2="78" stroke="#f0a500" stroke-width="1.5"/>
+  <polygon points="618,75 624,78 618,81" fill="#f0a500"/>
+
+  <rect x="624" y="50" width="170" height="55" rx="4" fill="#0d1b2a" stroke="#f0a500"/>
+  <text x="636" y="72" fill="#f0a500" font-family="monospace" font-size="9" font-weight="bold">4. colors back</text>
+  <text x="636" y="88" fill="#888" font-family="monospace" font-size="8">tell buffer-actor</text>
+  <text x="636" y="98" fill="#888" font-family="monospace" font-size="8">(:colors tick=N ranges)</text>
+
+  <line x1="794" y1="78" x2="819" y2="78" stroke="#f0a500" stroke-width="1.5"/>
+  <polygon points="816,75 822,78 816,81" fill="#f0a500"/>
+
+  <rect x="822" y="50" width="120" height="55" rx="4" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="834" y="72" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">5. attach</text>
+  <text x="834" y="88" fill="#888" font-family="monospace" font-size="8">if tick=current:</text>
+  <text x="834" y="98" fill="#888" font-family="monospace" font-size="8">store colors</text>
+
+  <!-- Key point -->
+  <rect x="30" y="130" width="910" height="50" rx="6" fill="#0d1b2a" stroke="#4ecca3"/>
+  <text x="50" y="152" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">No race condition:</text>
+  <text x="200" y="152" fill="#888" font-family="monospace" font-size="9">TS holds an immutable snapshot. Buffer can change freely while TS parses.</text>
+  <text x="50" y="170" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">No wasted work:</text>
+  <text x="200" y="170" fill="#888" font-family="monospace" font-size="9">If tick is stale when colors arrive, discard. Next edit triggers a new parse.</text>
+
+  <!-- Contrast -->
+  <rect x="30" y="200" width="910" height="35" rx="6" fill="#1a1a2e" stroke="#e94560"/>
+  <text x="50" y="222" fill="#e94560" font-family="monospace" font-size="9" font-weight="bold">sento-remoting branch got this wrong:</text>
+  <text x="340" y="222" fill="#888" font-family="monospace" font-size="9">TS asked buffer-actor for contents via ask-s, adding round-trip latency and ordering bugs.</text>
+
+</svg>
+</div>
+
+
+<!-- ================================================================= -->
+<h2>5. Backend protocol</h2>
+
+<p>Backends are display clients. The protocol is the same for all of them.
+The existing TTY and WebUI code adapts to this protocol &mdash; no rewrite.</p>
+
+<div class="grid">
+  <div class="box" style="border-left: 3px solid var(--orange);">
+    <div class="title">Display protocol (core &rarr; client)</div>
+    <ul>
+      <li><strong><code>:snapshot</code></strong> &mdash; buffer-snapshot struct.
+          Lines, marks, colors, modeline, dimensions. Everything needed to render.</li>
+      <li><strong><code>:clear</code></strong> &mdash; clear display.</li>
+      <li><strong><code>:resize cols lines</code></strong> &mdash; terminal/window resized.</li>
+      <li><strong><code>:message text</code></strong> &mdash; echo area / status.</li>
+    </ul>
+    <p style="font-size: 0.75rem; color: var(--dim); margin-top: 0.5rem;">
+      Client receives these and renders however it wants.
+      TTY: escape sequences. WebUI: DOM updates. Future GUI: draw calls.
+    </p>
+  </div>
+  <div class="box" style="border-left: 3px solid var(--blue);">
+    <div class="title">Input protocol (client &rarr; core)</div>
+    <ul>
+      <li><strong><code>:key-event ke</code></strong> &mdash; translated key event.</li>
+      <li><strong><code>:mouse-event type x y modifiers</code></strong> &mdash; click, scroll, drag.</li>
+      <li><strong><code>:resize cols lines</code></strong> &mdash; client reports new size.</li>
+      <li><strong><code>:paste text</code></strong> &mdash; bracketed paste content.</li>
+      <li><strong><code>:focus state</code></strong> &mdash; gained/lost focus.</li>
+    </ul>
+    <p style="font-size: 0.75rem; color: var(--dim); margin-top: 0.5rem;">
+      Client translates raw input into these messages.
+      TTY: parse escape sequences. WebUI: JS event handlers. Same messages either way.
+    </p>
+  </div>
+</div>
+
+<div class="note">
+  <strong>No duplication.</strong> The existing tty/input.lisp keeps parsing escape sequences.
+  The existing tty/display.lisp keeps rendering. They just get wired to send/receive
+  actor messages instead of going through serve-event fd-handlers.
+  The sento-remoting branch rewrote both from scratch. That was the mistake.
+</div>
+
+
+<!-- ================================================================= -->
+<h2>6. What to keep from sento-remoting</h2>
+
+<div class="box" style="border-left: 3px solid var(--green);">
+  <div class="title" style="color: var(--green);">Keep</div>
+  <ul>
+    <li><strong><code>src/text/fset-state.lisp</code></strong> + <strong><code>t/fset-state.lisp</code></strong>
+        &mdash; immutable buffer state. Foundation for everything. 15 tests. Zero coupling.</li>
+    <li><strong><code>hemlock.core.asd</code></strong> module layering
+        &mdash; the 10-layer structure is the right dependency graph.</li>
+    <li><strong><code>src/actor/system.lisp</code></strong>
+        &mdash; actor-system start/stop, remoting enable/disable.</li>
+    <li><strong><code>src/actor/registry.lisp</code></strong>
+        &mdash; agent registry with uniform ask-s interface.</li>
+    <li><strong><code>src/actor/local-agent.lisp</code></strong>
+        &mdash; in-process eval agent.</li>
+    <li><strong><code>t/remoting-smoke.lisp</code></strong>
+        &mdash; proves sento remoting works end-to-end.</li>
+    <li><strong><code>src/actor/agent.lisp</code></strong>
+        &mdash; agent-side actor (receives :eval, replies with result). Drop the gray streams,
+        keep the actor and connect entry point.</li>
+  </ul>
+</div>
+
+<div class="box" style="border-left: 3px solid var(--accent);">
+  <div class="title" style="color: var(--accent);">Discard</div>
+  <ul>
+    <li><strong><code>src/tty/display-actor.lisp</code></strong>
+        &mdash; toy reimplementation of terminal rendering. Use real tty/display.lisp.</li>
+    <li><strong><code>src/tty/input-actor.lisp</code></strong>
+        &mdash; duplicated input parsing. Adapt existing tty/input.lisp instead.</li>
+    <li><strong><code>src/user/actor-impl.lisp</code></strong>
+        &mdash; the buffer-actor and command-actor receive functions that wrap mutable buffers
+        in FSet snapshots on every call. Rebuild this properly when FSet is the primary
+        data model, not a dual-write afterthought.</li>
+    <li><strong>Gray stream classes</strong> in <code>src/actor/agent.lisp</code>
+        &mdash; agent-output-stream, agent-input-stream. Sento messages are the I/O.
+        No wrapper needed.</li>
+    <li><strong><code>src/actor/buffer-actor.lisp</code></strong>,
+        <strong><code>command-actor.lisp</code></strong>,
+        <strong><code>display-actor.lisp</code></strong>,
+        <strong><code>input-actor.lisp</code></strong>
+        &mdash; protocol stubs with deferred receive. Replace with real implementations
+        that integrate with existing hemlock code instead of stubbing around it.</li>
+  </ul>
+</div>
+
+
+<!-- ================================================================= -->
+<h2>7. Migration phases</h2>
+
+<p>Each phase produces a working editor. No big-bang rewrite. The key difference from
+architecture.html: we're not choosing between Option A and Option B. We're building
+Option B incrementally, and every intermediate state is a working editor.</p>
+
+<div class="diagram">
+<svg viewBox="0 0 960 520" width="960" height="520" xmlns="http://www.w3.org/2000/svg">
+
+  <text x="480" y="25" text-anchor="middle" fill="#7ec8e3" font-family="monospace" font-weight="bold" font-size="13">MIGRATION &mdash; each phase is a working editor</text>
+
+  <!-- Phase 1 -->
+  <rect x="20" y="50" width="290" height="450" rx="8" fill="#16213e" stroke="#4ecca3"/>
+  <text x="40" y="78" fill="#4ecca3" font-family="monospace" font-size="12" font-weight="bold">Phase 1: Agents work</text>
+  <text x="40" y="96" fill="#888" font-family="monospace" font-size="8">Sento for agent communication.</text>
+  <text x="40" y="110" fill="#888" font-family="monospace" font-size="8">Editor core unchanged.</text>
+
+  <text x="40" y="138" fill="#f0a500" font-family="monospace" font-size="9" font-weight="bold">Build:</text>
+  <text x="40" y="156" fill="#888" font-family="monospace" font-size="8">&bull; actor/system.lisp (start/stop sento)</text>
+  <text x="40" y="170" fill="#888" font-family="monospace" font-size="8">&bull; actor/registry.lisp (track agents)</text>
+  <text x="40" y="184" fill="#888" font-family="monospace" font-size="8">&bull; actor/local-agent.lisp (eval in-process)</text>
+  <text x="40" y="198" fill="#888" font-family="monospace" font-size="8">&bull; agent.lisp rewrite (sento actor, no wire)</text>
+  <text x="40" y="212" fill="#888" font-family="monospace" font-size="8">&bull; eval-server.lisp uses ask-s, not wire</text>
+  <text x="40" y="226" fill="#888" font-family="monospace" font-size="8">&bull; hemlock-agent.asd depends on sento</text>
+  <text x="40" y="240" fill="#888" font-family="monospace" font-size="8">&bull; bridge: invoke-in-main-loop (sento &rarr; main)</text>
+
+  <text x="40" y="268" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">Don't touch:</text>
+  <text x="40" y="286" fill="#888" font-family="monospace" font-size="8">&bull; command loop (serve-event stays)</text>
+  <text x="40" y="300" fill="#888" font-family="monospace" font-size="8">&bull; tty/ (no changes)</text>
+  <text x="40" y="314" fill="#888" font-family="monospace" font-size="8">&bull; display code (no changes)</text>
+  <text x="40" y="328" fill="#888" font-family="monospace" font-size="8">&bull; buffer model (mutable, as-is)</text>
+
+  <text x="40" y="360" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">Result:</text>
+  <text x="40" y="378" fill="#888" font-family="monospace" font-size="8">Eval works. Multiple agents in parallel.</text>
+  <text x="40" y="392" fill="#888" font-family="monospace" font-size="8">Remote agents possible.</text>
+  <text x="40" y="406" fill="#888" font-family="monospace" font-size="8">Wire protocol no longer in critical path.</text>
+  <text x="40" y="420" fill="#888" font-family="monospace" font-size="8">Everything else identical to main branch.</text>
+
+  <text x="40" y="450" fill="#4ecca3" font-family="monospace" font-size="9" font-weight="bold">Verify:</text>
+  <text x="40" y="468" fill="#888" font-family="monospace" font-size="8">spawn agent, eval form, see result in buffer.</text>
+  <text x="40" y="482" fill="#888" font-family="monospace" font-size="8">two agents eval simultaneously.</text>
+
+  <!-- Phase 2 -->
+  <rect x="335" y="50" width="290" height="450" rx="8" fill="#16213e" stroke="#f0a500"/>
+  <text x="355" y="78" fill="#f0a500" font-family="monospace" font-size="12" font-weight="bold">Phase 2: FSet buffers</text>
+  <text x="355" y="96" fill="#888" font-family="monospace" font-size="8">Immutable buffer state becomes primary.</text>
+  <text x="355" y="110" fill="#888" font-family="monospace" font-size="8">Mutable buffers still exist (dual-write).</text>
+
+  <text x="355" y="138" fill="#f0a500" font-family="monospace" font-size="9" font-weight="bold">Build:</text>
+  <text x="355" y="156" fill="#888" font-family="monospace" font-size="8">&bull; buffer-actor: holds FSet state</text>
+  <text x="355" y="170" fill="#888" font-family="monospace" font-size="8">&bull; dual-write: edits update both</text>
+  <text x="355" y="184" fill="#888" font-family="monospace" font-size="8">  mutable + FSet in sync</text>
+  <text x="355" y="198" fill="#888" font-family="monospace" font-size="8">&bull; display reads FSet snapshots</text>
+  <text x="355" y="212" fill="#888" font-family="monospace" font-size="8">&bull; ts-actor receives snapshots</text>
+  <text x="355" y="226" fill="#888" font-family="monospace" font-size="8">&bull; undo via state history</text>
+  <text x="355" y="240" fill="#888" font-family="monospace" font-size="8">&bull; adapt tty/display.lisp to render</text>
+  <text x="355" y="254" fill="#888" font-family="monospace" font-size="8">  from snapshots (not direct buffer)</text>
+
+  <text x="355" y="282" fill="#f0a500" font-family="monospace" font-size="9" font-weight="bold">Key constraint:</text>
+  <text x="355" y="300" fill="#888" font-family="monospace" font-size="8">Commands still use mutable buffers.</text>
+  <text x="355" y="314" fill="#888" font-family="monospace" font-size="8">with-mark, insert-string, etc. all still work.</text>
+  <text x="355" y="328" fill="#888" font-family="monospace" font-size="8">Dual-write keeps both in sync.</text>
+  <text x="355" y="342" fill="#888" font-family="monospace" font-size="8">This is transitional &mdash; not the end state.</text>
+
+  <text x="355" y="370" fill="#f0a500" font-family="monospace" font-size="9" font-weight="bold">Result:</text>
+  <text x="355" y="388" fill="#888" font-family="monospace" font-size="8">Display is snapshot-based (safe from any thread).</text>
+  <text x="355" y="402" fill="#888" font-family="monospace" font-size="8">Tree-sitter is race-free.</text>
+  <text x="355" y="416" fill="#888" font-family="monospace" font-size="8">Undo is O(1) state swap.</text>
+  <text x="355" y="430" fill="#888" font-family="monospace" font-size="8">Commands still work exactly as before.</text>
+
+  <text x="355" y="458" fill="#f0a500" font-family="monospace" font-size="9" font-weight="bold">Verify:</text>
+  <text x="355" y="476" fill="#888" font-family="monospace" font-size="8">tree-sitter colors during rapid typing.</text>
+  <text x="355" y="490" fill="#888" font-family="monospace" font-size="8">undo/redo through edit history.</text>
+
+  <!-- Phase 3 (revised) -->
+  <rect x="650" y="50" width="290" height="450" rx="8" fill="#16213e" stroke="#b088f9"/>
+  <text x="670" y="78" fill="#b088f9" font-family="monospace" font-size="12" font-weight="bold">Phase 2 IS the architecture</text>
+  <text x="670" y="96" fill="#888" font-family="monospace" font-size="8">Commands stay mutable. Readers go parallel.</text>
+  <text x="670" y="110" fill="#888" font-family="monospace" font-size="8">This is the end state.</text>
+
+  <text x="670" y="138" fill="#b088f9" font-family="monospace" font-size="9" font-weight="bold">Why not rewrite commands?</text>
+  <text x="670" y="156" fill="#888" font-family="monospace" font-size="8">~50 command files, battle-tested, fast.</text>
+  <text x="670" y="170" fill="#888" font-family="monospace" font-size="8">Rewriting for ask-s adds latency, risk,</text>
+  <text x="670" y="184" fill="#888" font-family="monospace" font-size="8">and buys nothing the user can see.</text>
+  <text x="670" y="198" fill="#888" font-family="monospace" font-size="8">Emacs is single-threaded for the same</text>
+  <text x="670" y="212" fill="#888" font-family="monospace" font-size="8">reason: mutable buffers work.</text>
+
+  <text x="670" y="240" fill="#b088f9" font-family="monospace" font-size="9" font-weight="bold">The actual concurrency model:</text>
+  <text x="670" y="258" fill="#4ecca3" font-family="monospace" font-size="8">WRITE: one thread (commands)</text>
+  <text x="670" y="272" fill="#4ecca3" font-family="monospace" font-size="8">  insert-string, delete-region, with-mark</text>
+  <text x="670" y="286" fill="#4ecca3" font-family="monospace" font-size="8">  mutable buffer, single-threaded, fast</text>
+  <text x="670" y="306" fill="#f0a500" font-family="monospace" font-size="8">READ: many threads (actors)</text>
+  <text x="670" y="320" fill="#f0a500" font-family="monospace" font-size="8">  display reads FSet snapshots</text>
+  <text x="670" y="334" fill="#f0a500" font-family="monospace" font-size="8">  tree-sitter parses FSet snapshots</text>
+  <text x="670" y="348" fill="#f0a500" font-family="monospace" font-size="8">  agents read FSet snapshots</text>
+  <text x="670" y="362" fill="#f0a500" font-family="monospace" font-size="8">  webui sends FSet snapshots</text>
+  <text x="670" y="376" fill="#f0a500" font-family="monospace" font-size="8">  undo = stack of FSet states</text>
+
+  <text x="670" y="404" fill="#b088f9" font-family="monospace" font-size="9" font-weight="bold">What this gets you:</text>
+  <text x="670" y="422" fill="#888" font-family="monospace" font-size="8">Parallel readers, no locks, no races.</text>
+  <text x="670" y="436" fill="#888" font-family="monospace" font-size="8">Commands unchanged, fast, reliable.</text>
+  <text x="670" y="450" fill="#888" font-family="monospace" font-size="8">Multiple display clients (TTY + WebUI).</text>
+  <text x="670" y="464" fill="#888" font-family="monospace" font-size="8">Agents in parallel, TS race-free.</text>
+  <text x="670" y="478" fill="#888" font-family="monospace" font-size="8">No one has done this before.</text>
+
+</svg>
+</div>
+
+<div class="note">
+  <strong>Phase 1 is urgent</strong> &mdash; gets eval working, proves sento as transport.
+  <strong>Phase 2 is the architecture</strong> &mdash; FSet becomes the read model,
+  display and TS become snapshot consumers, commands stay mutable.
+  There is no Phase 3. Phase 2 is the end state. One thread writes (commands),
+  many threads read (display, TS, agents, webui). That's the concurrency model.
+</div>
+
+
+<!-- ================================================================= -->
+<h2>8. What this means for main branch</h2>
+
+<div class="box" style="border-left: 3px solid var(--orange);">
+  <div class="title">Merge strategy</div>
+  <ul>
+    <li><strong>Cherry-pick from sento-remoting:</strong>
+        <code>fset-state.lisp</code>, <code>t/fset-state.lisp</code>,
+        <code>hemlock.core.asd</code> (the layering, not all the actor deps),
+        <code>actor/system.lisp</code>, <code>actor/registry.lisp</code>,
+        <code>actor/local-agent.lisp</code>,
+        <code>t/remoting-smoke.lisp</code>.</li>
+    <li><strong>Don't merge:</strong> tty/display-actor.lisp, tty/input-actor.lisp,
+        actor-impl.lisp, gray stream classes, the protocol stubs.</li>
+    <li><strong>On main:</strong> start Phase 1 cleanly. Wire up sento for agents.
+        Leave display, input, tree-sitter, command loop untouched.</li>
+  </ul>
+</div>
+
+<div class="box" style="border-left: 3px solid var(--green);">
+  <div class="title">The end state</div>
+  <ul>
+    <li>hemlock is a self-assembling editor (tmux model).</li>
+    <li>Commands mutate buffers on a single thread (fast, proven, unchanged).</li>
+    <li>Every mutation shadows into FSet state via buffer-modified-hook.</li>
+    <li>Display, tree-sitter, agents, webui read FSet snapshots (parallel, race-free).</li>
+    <li>Agents connect via sento remoting (local, process, remote).</li>
+    <li>Undo is a stack of immutable states. O(1) swap.</li>
+    <li>Multiple display clients on the same session (TTY + WebUI).</li>
+    <li>No locks. No CRDTs. No command rewrites. Just one writer, many readers.</li>
+  </ul>
+</div>
+
+</body>
+</html>

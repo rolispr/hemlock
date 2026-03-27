@@ -226,7 +226,7 @@
      ;; TTY backend
      (:module tty
               :pathname "src/tty/"
-              :depends-on (core-2 editor io)
+              :depends-on (core-2 editor io commands)
               :components
               ((:file "render")
                (:file "terminfo")
@@ -238,7 +238,23 @@
                (:file "input" :depends-on ("terminfo" "render" "screen"))
                (:file "linedit" :depends-on ("display"))))
 
-))
+     ;; Terminal emulator
+     (:module term
+              :pathname "src/term/"
+              :depends-on (core-2 editor commands)
+              :serial t
+              :components
+              ((:file "package")
+               (:file "types")
+               (:file "color")
+               (:file "sgr")
+               (:file "ops")
+               (:file "write")
+               (:file "parser")
+               (:file "pty")
+               (:file "input")
+               (:file "render")
+               (:file "mode")))))
 
 
 ;;; For building binaries
