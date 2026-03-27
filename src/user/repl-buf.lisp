@@ -266,39 +266,62 @@
           (declare (simple-string string))
           (insert-character (current-point) #\NewLine)
           (let ((wire (session-data-wire ts)))
-            (if (eq wire :local)
-                ;; Local master eval — spawn thread, post results via later.
-                (let ((captured-ts ts))
-                  (sb-thread:make-thread
-                   (lambda ()
-                     (let ((output (make-string-output-stream)))
-                       (handler-case
-                           (let* ((*standard-output* output)
-                                  (*error-output* output)
-                                  (*trace-output* output)
-                                  (values (multiple-value-list
-                                           (eval (read-from-string string))))
-                                  (out-str (get-output-stream-string output))
-                                  (result-str
-                                   (format nil "=> ~{~#[~;~A~:;~A, ~]~}~%"
-                                           (mapcar #'prin1-to-string values))))
-                             (later
-                               (unless (zerop (length out-str))
-                                 (session-buffer-output-string captured-ts out-str))
-                               (session-buffer-output-string captured-ts result-str)))
-                         (error (c)
-                           (later
-                             (session-buffer-output-string
-                              captured-ts (format nil "Error: ~A~%" c)))))))
-                   :name "hemlock-repl-eval"))
-                ;; Wire-backed agent — send over wire.
-                (progn
-                  (hemlock.wire:remote wire
-                    (session-stream-accept-input (session-data-stream ts)
-                                            (concatenate 'simple-string
-                                                         string
-                                                         (string #\newline))))
-                  (hemlock.wire:wire-force-output wire))))
+            (cond
+              ((eq wire :local)
+               ;; Local master eval — spawn thread, post results via later.
+               (let ((captured-ts ts))
+                 (sb-thread:make-thread
+                  (lambda ()
+                    (let ((output (make-string-output-stream)))
+                      (handler-case
+                          (let* ((*standard-output* output)
+                                 (*error-output* output)
+                                 (*trace-output* output)
+                                 (values (multiple-value-list
+                                          (eval (read-from-string string))))
+                                 (out-str (get-output-stream-string output))
+                                 (result-str
+                                  (format nil "=> ~{~#[~;~A~:;~A, ~]~}~%"
+                                          (mapcar #'prin1-to-string values))))
+                            (later
+                              (unless (zerop (length out-str))
+                                (session-buffer-output-string captured-ts out-str))
+                              (session-buffer-output-string captured-ts result-str)))
+                        (error (c)
+                          (later
+                            (session-buffer-output-string
+                             captured-ts (format nil "Error: ~A~%" c)))))))
+                  :name "hemlock-repl-eval")))
+              ((eq wire :actor)
+               ;; Actor-based agent — eval via sento.
+               (let ((captured-ts ts)
+                     (server (session-data-server ts)))
+                 (sb-thread:make-thread
+                  (lambda ()
+                    (handler-case
+                        (let ((result (hemlock.actor:agent-eval
+                                       (server-info-name server) string
+                                       :time-out 60)))
+                          (later
+                            (destructuring-bind (status value) result
+                              (if (eq status :ok)
+                                  (session-buffer-output-string
+                                   captured-ts (format nil "=> ~A~%" value))
+                                  (session-buffer-output-string
+                                   captured-ts (format nil "Error: ~A~%" value))))))
+                      (error (c)
+                        (later
+                          (session-buffer-output-string
+                           captured-ts (format nil "Error: ~A~%" c))))))
+                  :name "hemlock-actor-repl-eval")))
+              (t
+               ;; Wire-backed agent — send over wire.
+               (hemlock.wire:remote wire
+                 (session-stream-accept-input (session-data-stream ts)
+                                         (concatenate 'simple-string
+                                                      string
+                                                      (string #\newline))))
+               (hemlock.wire:wire-force-output wire))))
           (buffer-end (session-data-fill-mark ts)
                       (session-data-buffer ts)))))))
 

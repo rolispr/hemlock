@@ -199,7 +199,7 @@
       (sb-impl::process (sb-ext:process-pid p)))))
 
 (pushnew (merge-pathnames "src/io/"
-                          (asdf:system-source-directory :hemlock.base))
+                          (asdf:system-source-directory :hemlock))
          cffi:*foreign-library-directories*
          :test #'equal)
 

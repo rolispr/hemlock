@@ -7,7 +7,7 @@
 
 (asdf:defsystem :hemlock-wire-tests
   :description "Wire protocol codec tests"
-  :depends-on (:hemlock.base :fiveam)
+  :depends-on (:hemlock :fiveam)
   :components
   ((:module tests
     :pathname "t"

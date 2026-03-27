@@ -84,9 +84,12 @@
 (defun send-note (note)
   (let* ((server (note-server note))
          (wire (server-info-wire server)))
-    (if (eq wire :local)
-        (send-note-locally note server)
-        (send-note-via-wire note server wire))))
+    (cond ((eq wire :local)
+           (send-note-locally note server))
+          ((eq wire :actor)
+           (send-note-via-actor note server))
+          (t
+           (send-note-via-wire note server wire)))))
 
 (defun send-note-locally (note server)
   "Evaluate a note in a background thread. Post results back via LATER."
@@ -137,6 +140,56 @@
                      (delete note (server-info-notes server)))
                (message "Error: ~A" c))))))
      :name "hemlock-local-eval")))
+
+(defun send-note-via-actor (note server)
+  "Evaluate a note via a sento actor agent. Async — results posted via LATER."
+  (setf (note-state note) :running)
+  (let* ((text (note-text note))
+         (pkg-name (note-package note))
+         (kind (note-kind note))
+         (agent-name (server-info-name server))
+         (bg-ts (server-info-background-info server)))
+    (message "Sending ~A to ~A." (note-context note) agent-name)
+    (sb-thread:make-thread
+     (lambda ()
+       (handler-case
+           (let* ((msg (case kind
+                         (:eval (list :eval text))
+                         (:compile (list :compile text pkg-name))
+                         (t (list :eval text))))
+                  (result (hemlock.actor:agent-eval agent-name
+                            (format nil "(let ((*package* ~A)) ~A)"
+                                    (if pkg-name
+                                        (format nil "(or (find-package ~S) *package*)"
+                                                pkg-name)
+                                        "*package*")
+                                    text)
+                            :time-out 60)))
+             (later
+               (setf (note-state note) :dead)
+               (setf (server-info-notes server)
+                     (delete note (server-info-notes server)))
+               (destructuring-bind (status value) result
+                 (case status
+                   (:ok
+                    (case kind
+                      (:eval (message "=> ~A" value))
+                      (:compile
+                       (when bg-ts
+                         (session-buffer-output-string bg-ts
+                           (format nil "~A~%=> ~A~%" text value)))
+                       (message "=> ~A" value))
+                      (t (message "=> ~A" value))))
+                   (:error
+                    (loud-message "Error during ~A: ~A"
+                                  (note-context note) value))))))
+         (error (c)
+           (later
+             (setf (note-state note) :dead)
+             (setf (server-info-notes server)
+                   (delete note (server-info-notes server)))
+             (loud-message "Agent ~A error: ~A" agent-name c)))))
+     :name (format nil "hemlock-actor-eval-~A" agent-name))))
 
 (defun send-note-via-wire (note server wire)
   (let* ((remote (hemlock.wire:make-remote-object note))
@@ -324,8 +377,17 @@
     (cond (*synchronous-evaluation-of-agent-requests-in-the-master*
            (eval form))
           ((eq wire :local)
-           ;; Local thread agent — eval directly, no wire protocol.
            (eval form))
+          ((eq wire :actor)
+           ;; Actor-based agent — synchronous eval via sento.
+           (let ((result (hemlock.actor:agent-eval
+                          (server-info-name info)
+                          (prin1-to-string form)
+                          :time-out 30)))
+             (destructuring-bind (status value) result
+               (if (eq status :ok)
+                   (values (read-from-string value))
+                   (error "Agent error: ~A" value)))))
           (t
            (hemlock.wire:remote wire
              (eval-safely-in-agent form))))))
@@ -347,20 +409,36 @@
     (editor-error "Agent ~S is currently busy.  See \"List Operations\"."
                   (server-info-name server-info)))
   (let ((wire (server-info-wire server-info)))
-    (if (eq wire :local)
-        ;; Local thread agent — eval directly in master image.
-        (let* ((pkg (if package (find-package package) *package*))
-               (*package* (or pkg *package*)))
-          (mapcar #'prin1-to-string
-                  (multiple-value-list
-                   (eval (read-from-string form)))))
-        ;; Process agent — go through wire.
-        (multiple-value-bind (values error)
-            (hemlock.wire:remote-value wire
-              (server-eval-form package form))
-          (when error
-            (editor-error "The agent died before finishing"))
-          values))))
+    (cond ((eq wire :local)
+           ;; Local thread agent — eval directly in master image.
+           (let* ((pkg (if package (find-package package) *package*))
+                  (*package* (or pkg *package*)))
+             (mapcar #'prin1-to-string
+                     (multiple-value-list
+                      (eval (read-from-string form))))))
+          ((eq wire :actor)
+           ;; Actor-based agent — synchronous ask via sento.
+           (let* ((wrapped (format nil "(let ((*package* ~A)) ~A)"
+                                   (if package
+                                       (format nil "(or (find-package ~S) *package*)"
+                                               package)
+                                       "*package*")
+                                   form))
+                  (result (hemlock.actor:agent-eval
+                           (server-info-name server-info) wrapped
+                           :time-out 30)))
+             (destructuring-bind (status value) result
+               (if (eq status :ok)
+                   (list value)
+                   (editor-error "Agent error: ~A" value)))))
+          (t
+           ;; Process agent — go through wire.
+           (multiple-value-bind (values error)
+               (hemlock.wire:remote-value wire
+                 (server-eval-form package form))
+             (when error
+               (editor-error "The agent died before finishing"))
+             values)))))
 
 ;;; EVAL-FORM-IN-SERVER-1 -- Public.
 ;;;

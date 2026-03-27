@@ -19,7 +19,7 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
 ;;;; Definition of *hemlock-version*.
 
 (defparameter *hemlock-version*
-  (let* ((system (asdf:find-system :hemlock.base))
+  (let* ((system (asdf:find-system :hemlock))
          (dir (asdf:component-pathname system)))
     (or (ignore-errors
           (uiop:with-current-directory (dir)
@@ -422,6 +422,10 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
                    :backend-type backend-type
                    :display display)
        (process-command-line-argument x)
+       ;; Start the actor system for agent communication.
+       (hemlock.actor:start-actor-system)
+       (hemlock.actor:start-agent-registry)
+       (hemlock.actor:start-local-agent)
        (handler-case (invoke-hook hemlock::entry-hook)
          (error (c) (setf *pending-error* c)))
        (unwind-protect
@@ -431,7 +435,8 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
          (when hemlock.command::*ts-actor-system*
            (ac:shutdown hemlock.command::*ts-actor-system* :wait nil)
            (setf hemlock.command::*ts-actor-system* nil
-                 hemlock.command::*ts-actor* nil))))
+                 hemlock.command::*ts-actor* nil))
+         (ignore-errors (hemlock.actor:stop-actor-system))))
      (uiop:quit 0))))
 
 (defun command-loop ()
@@ -617,4 +622,4 @@ Set by lisp-error-error-handler or hook protection, consumed by %command-loop.")
 
 (defun installation-directory ()
   (or *installation-directory*
-      (asdf:component-pathname (asdf:find-system :hemlock.base))))
+      (asdf:component-pathname (asdf:find-system :hemlock))))

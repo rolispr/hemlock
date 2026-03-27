@@ -457,6 +457,59 @@
   (let ((info (create-local-eval (pick-agent-buffer-names "Eval"))))
     (change-to-buffer (server-info-agent-buffer info))))
 
+(defun create-actor-eval (&optional name)
+  "Create an eval server backed by the sento local agent actor.
+Evaluates in hemlock's image via actor message passing."
+  (when (and name (getstring name *buffer-names*))
+    (editor-error "Buffer ~A is already in use." name))
+  (multiple-value-bind (agent background)
+      (if name
+          (values name (format nil "Compilation ~A" name))
+          (pick-agent-buffer-names))
+    (let ((server-info (make-buffers-for-session agent background)))
+      (setf (server-info-wire server-info) :actor)
+      ;; Use "local" as the agent name — the sento local-agent actor.
+      (setf (server-info-name server-info) "local")
+      (let ((ts (server-info-agent-info server-info))
+            (bg (server-info-background-info server-info)))
+        (when ts (setf (session-data-wire ts) :actor))
+        (when bg (setf (session-data-wire bg) :actor)))
+      server-info)))
+
+(defun create-process-actor-eval (&optional name)
+  "Spawn a separate SBCL process agent via sento remoting.
+The agent gets its own heap and connects back to the master."
+  (when (and name (getstring name *buffer-names*))
+    (editor-error "Buffer ~A is already in use." name))
+  (multiple-value-bind (agent-buf-name background)
+      (if name
+          (values name (format nil "Compilation ~A" name))
+          (pick-agent-buffer-names))
+    (let* ((agent-name (format nil "agent-~A" (incf *next-agent-index*)))
+           (server-info (make-buffers-for-session agent-buf-name background)))
+      (setf (server-info-wire server-info) :actor)
+      (setf (server-info-name server-info) agent-name)
+      (let ((ts (server-info-agent-info server-info))
+            (bg (server-info-background-info server-info)))
+        (when ts (setf (session-data-wire ts) :actor))
+        (when bg (setf (session-data-wire bg) :actor)))
+      ;; Spawn the process agent in background — it registers with the registry.
+      (message "Spawning process agent ~A..." agent-name)
+      (handler-case
+          (hemlock.actor:spawn-process-agent agent-name)
+        (error (c)
+          (message "Failed to spawn agent: ~A" c)))
+      server-info)))
+
+(defcommand "Actor Eval" (p)
+  "Create an eval server backed by the sento local agent.
+With prefix argument, spawn a separate process agent."
+  "Create an actor-backed eval agent."
+  (let ((info (if p
+                  (create-process-actor-eval)
+                  (create-actor-eval))))
+    (change-to-buffer (server-info-agent-buffer info))))
+
 (defcommand "Select Agent" (p)
   "" ""
   (let* ((info (or (get-current-eval-server)

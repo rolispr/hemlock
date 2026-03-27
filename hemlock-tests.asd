@@ -16,7 +16,7 @@
 
 (asdf:defsystem :hemlock-tests
   :description "Full hemlock test suite"
-  :depends-on (:hemlock.base :hemlock-wire-tests :fiveam)
+  :depends-on (:hemlock :hemlock-wire-tests :fiveam)
   :components
   ((:module tests
     :pathname "t"

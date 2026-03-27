@@ -520,6 +520,8 @@
   (:export
    #:dispatch-events #:dispatch-events-no-hang #:dispatch-events-timeout
 
+   #:fset-state #:fset-snapshot #:drop-fset-state
+
    #:current-mark
    #:pop-buffer-mark
    #:push-buffer-mark
@@ -1729,6 +1731,41 @@
         :hemlock.io :trivial-gray-streams)
   (:shadowing-import-from :hemlock.text #:char-code-limit)
   (:nicknames :tty))
+
+;;;
+;;; hemlock.actor — actor system, agent registry, agent protocols.
+;;; Uses sento packages (ac, act, asys, rem) for actor primitives.
+;;;
+(defpackage :hemlock.actor
+  (:use :common-lisp :ac :act :asys :rem)
+  (:export
+   ;; system lifecycle
+   #:*actor-system*
+   #:*remoting-port*
+   #:start-actor-system
+   #:stop-actor-system
+   ;; agent registry
+   #:*agent-registry*
+   #:agent-info
+   #:agent-info-name #:agent-info-type #:agent-info-actor
+   #:agent-info-buffers #:agent-info-port
+   #:start-agent-registry
+   #:register-agent #:unregister-agent #:find-agent #:list-agents
+   #:agent-eval #:agent-compile
+   ;; local agent
+   #:*local-agent*
+   #:start-local-agent
+   ;; process agent spawning
+   #:spawn-process-agent
+   #:kill-process-agent))
+
+;;;
+;;; hemlock.agent — agent-side package. Loaded in agent processes only.
+;;; Separate actor-system that connects to the master via sento remoting.
+;;;
+(defpackage :hemlock.agent
+  (:use :common-lisp :ac :act :asys :rem)
+  (:export #:connect))
 
 (defpackage :hemlock.webui
   (:use :common-lisp :hemlock.text :hemlock.command :hemlock :hemlock.display
