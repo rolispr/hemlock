@@ -335,18 +335,8 @@ document.addEventListener('scroll', function(e) {
 ;;;; Sync CSS flex heights to hemlock hunk allocations.
 
 (defun webui-sync-flex-heights (device)
-  "Update CSS flex proportions for split windows."
-  (let ((win-id (webui-device-window-id device)))
-    (when win-id
-      (sb-int:with-float-traps-masked (:invalid :overflow :inexact :divide-by-zero
-                                                :underflow)
-                                      (dolist (w *window-list*)
-                                        (let* ((hunk (window-hunk w))
-                                               (dom-id (webui-hunk-dom-id hunk))
-                                               (text-h (webui-hunk-text-height hunk)))
-                                          (webui:webui-run win-id
-                                                           (format nil "setWindowRows('~A',~D);"
-                                                                   (json-escape dom-id) text-h))))))))
+  (declare (ignore device))
+  nil)
 
 
 ;;;; device-clear

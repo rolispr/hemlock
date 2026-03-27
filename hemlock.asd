@@ -14,7 +14,7 @@
 
 (asdf:defsystem :hemlock
      :description "Hemlock text editor"
-     :licence "Public Domain"
+     :licence "BSD"
      :defsystem-depends-on (:deploy)
      :build-operation "deploy-op"
      :build-pathname "hemlock"
