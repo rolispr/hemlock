@@ -63,6 +63,7 @@ jobs:
           curl -fsSL -o webui.zip \
             "https://github.com/webui-dev/webui/releases/download/nightly/webui-macos-clang-arm64.zip"
           unzip -q webui.zip
+          sudo mkdir -p /usr/local/lib
           sudo cp webui-macos-clang-arm64/libwebui-2.dylib /usr/local/lib/
 
       - name: Install dependencies
