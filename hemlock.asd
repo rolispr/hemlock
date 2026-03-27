@@ -276,12 +276,14 @@
 
 
 ;;; For building binaries
-#+darwin
-(deploy:define-library pure-tls::core-foundation :dont-deploy t)
-#+darwin
-(deploy:define-library pure-tls::security-framework :dont-deploy t)
-
 (deploy:define-hook (:deploy asdf) (directory)
   (declare (ignorable directory))
   #+asdf (asdf:clear-source-registry)
   #+asdf (defun asdf:upgrade-asdf () nil))
+
+#+darwin
+(deploy:define-hook (:deploy skip-frameworks) (directory)
+  (declare (ignore directory))
+  (dolist (lib (deploy:list-libraries))
+    (when (search "framework" (namestring (deploy:library-path lib)))
+      (setf (deploy:library-dont-deploy-p lib) t))))
